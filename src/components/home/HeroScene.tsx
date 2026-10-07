@@ -80,9 +80,10 @@ float stormAmount(vec2 sph) {
     float r = length(d) / 0.13;
     if (r > 1.6) continue;
     float th = atan(d.y, d.x);
-    float arms = 0.5 + 0.5 * sin(2.0 * th + 6.0 * log(r + 0.06) - sa * 2.5 + uStorm[k].w * 6.0);
+    // Thin spiral bands (a cyclone seen from orbit), not a solid mass.
+    float arms = pow(0.5 + 0.5 * sin(3.0 * th + 7.0 * log(r + 0.06) - sa * 2.5 + uStorm[k].w * 6.0), 4.0);
     float body = smoothstep(1.35, 0.35, r) * smoothstep(0.06, 0.2, r);
-    st = max(st, body * (0.3 + 0.7 * arms) * grow);
+    st = max(st, body * arms * 0.8 * grow);
   }
   return st;
 }
@@ -90,13 +91,13 @@ float cloudBase(vec2 sph) {
   vec2 p = cloudCoords(sph);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
   float base = fbm5(p * 1.7 + 0.45 * w);
-  return max(base, 0.42 + 0.42 * stormAmount(sph));
+  return max(base, 0.38 + 0.36 * stormAmount(sph));
 }
 // Final cloud density from the (simulated) base amount plus fine detail.
 float cloudDetail(float base, vec2 pw) {
   // Soft, rounded detail (coarser than before, so no fine streaks).
   float detail = fbm5(pw * 5.0 + vec2(uT * 0.04, 0.0));
-  return smoothstep(0.42, 0.72, base + (detail - 0.5) * 0.4);
+  return smoothstep(0.38, 0.7, base + (detail - 0.5) * 0.4);
 }
 `;
 
@@ -827,7 +828,30 @@ void main() {
         float line = exp(-best * best / (w * w)) + 0.25 * exp(-best * best / (10.0 * w * w));
         sc3 = max(sc3, vec3(line * flow * fadeTip * str));
       }
-      col += vec3(0.6, 0.7, 0.84) * sc3 * 0.38 * pointerInSpace;
+      // The sheet between them: a soft gradient filling the fan, brightest along
+      // its middle, with faint striations flowing outward.
+      vec2 A0 = uStrandA[0].xy, A3 = uStrandA[3].xy;
+      vec2 Cm = (uStrandA[1].zw + uStrandA[2].zw) * 0.5;
+      vec2 Tm = (uStrandT[1].xy + uStrandT[2].xy) * 0.5;
+      vec2 Am = (A0 + A3) * 0.5;
+      vec2 prevC = Am;
+      float bestC = 1e9, tC = 0.0;
+      for (int j = 1; j <= 14; j++) {
+        float t = float(j) / 14.0;
+        vec2 P = mix(mix(Am, Cm, t), mix(Cm, Tm, t), t);
+        vec2 ab = P - prevC;
+        float h = clamp(dot(sp - prevC, ab) / max(dot(ab, ab), 1e-4), 0.0, 1.0);
+        float d = length(sp - prevC - ab * h);
+        if (d < bestC) { bestC = d; tC = (float(j) - 1.0 + h) / 14.0; }
+        prevC = P;
+      }
+      // Half-width of the fan at this point: wide at the planet, pinching to the tip.
+      float halfW = length(A3 - A0) * 0.5 * (1.0 - tC) * (1.0 - tC) + 3.0;
+      float across = bestC / halfW;
+      float stri = 0.6 + 0.4 * vnoise(vec2(across * 7.0, tC * 5.0 - uT * 1.2));
+      float sheet = exp(-across * across * 1.6) * stri * smoothstep(0.0, 0.08, tC) * (1.0 - smoothstep(0.75, 1.0, tC));
+      float sheetStr = max(uStrandT[1].w, uStrandT[2].w);
+      col += vec3(0.6, 0.7, 0.84) * (sc3 * 0.38 + sheet * sheetStr * 0.12) * pointerInSpace;
     }
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
@@ -1144,13 +1168,19 @@ export function HeroScene({
             let x1 = Math.max(head.x, pcx + Math.cos(ang) * pr), y1 = Math.max(head.y, pcy + Math.sin(ang) * pr);
             for (let k = 0; k < 4; k++) {
               const off = (k - 1.5) * Math.min(0.16, (reach / pr) * 0.35) + Math.sin(tSecS * 0.5 + k * 1.7) * 0.015;
-              const ax = pcx + Math.cos(ang + off) * pr;
-              const ay = pcy + Math.sin(ang + off) * pr;
-              // Bend: out along the planet's normal, then swaying sideways.
+              // Anchored just inside the limb, so the planet always hides the ends.
+              const ax = pcx + Math.cos(ang + off) * (pr - 10);
+              const ay = pcy + Math.sin(ang + off) * (pr - 10);
+              // Bend inward: every strand curves toward the shared axis (planet
+              // centre → cursor) and they pinch together toward the tip, like the
+              // main streams; a slow sway keeps them alive.
               const nx = Math.cos(ang + off), ny = Math.sin(ang + off);
-              const sway = Math.sin(tSecS * (0.7 + 0.2 * k) + k * 2.1) * reach * 0.22;
-              const cxp = ax + nx * reach * 0.55 - ny * sway;
-              const cyp = ay + ny * reach * 0.55 + nx * sway;
+              const axx = Math.cos(ang), axy = Math.sin(ang);
+              // Neighbouring strands sway in opposite phase, so they twine
+              // around one another.
+              const sway = Math.sin(tSecS * 0.55 + k * Math.PI * 0.75) * reach * 0.13;
+              const cxp = pcx + axx * (pr + reach * 0.42) - axy * sway;
+              const cyp = pcy + axy * (pr + reach * 0.42) + axx * sway;
               const tx = head.x + Math.sin(tSecS * 0.9 + k * 3.3) * 6 - nx * k * 3;
               const ty = head.y + Math.cos(tSecS * 0.8 + k * 2.4) * 6 - ny * k * 3;
               strandA.set([ax, ay, cxp, cyp], k * 4);
@@ -1160,7 +1190,7 @@ export function HeroScene({
               x1 = Math.max(x1, cxp);
               y1 = Math.max(y1, cyp);
             }
-            gl.uniform4f(U.strandBox, x0 - 30, y0 - 30, x1 + 30, y1 + 30);
+            gl.uniform4f(U.strandBox, x0 - 60, y0 - 60, x1 + 60, y1 + 60);
           } else {
             gl.uniform4f(U.strandBox, 0, 0, -1, -1);
           }

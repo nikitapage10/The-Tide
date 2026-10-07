@@ -260,7 +260,7 @@ export class FlowSim {
       const gy = ((my + 1) / 2) * n - 0.5;
       const fx = (mvx * n) / 2;
       const fy = (mvy * n) / 2;
-      const r = 1.8;
+      const r = 0.9;   // a small wake, about the size of the cursor's reach
       for (let j = Math.max(0, (gy - 3 * r) | 0); j < Math.min(n, gy + 3 * r); j++)
         for (let i = Math.max(0, (gx - 3 * r) | 0); i < Math.min(n, gx + 3 * r); i++) {
           const w = Math.exp(-((i - gx) ** 2 + (j - gy) ** 2) / (r * r));
@@ -268,7 +268,7 @@ export class FlowSim {
           // A gentle wake: the air picks up a little of the pointer's motion.
           u[k] = u[k]! + fx * w * 0.22;
           v[k] = v[k]! + fy * w * 0.22;
-          clr[k] = Math.min(0.85, clr[k]! + w * Math.min(0.05, speed * 1.2));
+          clr[k] = Math.min(0.5, clr[k]! + w * Math.min(0.02, speed * 0.5));
         }
       this.awake = true;
     }
