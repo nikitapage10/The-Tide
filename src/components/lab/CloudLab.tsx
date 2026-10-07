@@ -20,11 +20,14 @@
  *  8. Puffs + air: soft puffs carried by a simple air simulation the cursor stirs.
  *  9. Light:     nothing moves; the cursor is a low light skimming the cloud
  *                tops, raising highlights and casting shadows.
+ * 10. Layered:   all three together: a drifting cloud deck underneath that the
+ *                cursor doesn't touch, a denser moving layer of puffs on top that
+ *                the cursor stirs, and the cursor's light over both.
  */
 import { useEffect, useRef, useState } from "react";
 import { FlowSim } from "@/components/home/heroPhysics";
 
-type Mode = "fluid" | "eddies" | "particles" | "dissipate" | "nebula" | "curl" | "wake" | "airpuffs" | "light";
+type Mode = "fluid" | "eddies" | "particles" | "dissipate" | "nebula" | "curl" | "wake" | "airpuffs" | "light" | "layered";
 
 const MODES: { id: Mode; label: string; note: string }[] = [
   { id: "fluid", label: "1 · Fluid", note: "Real fluid: the cursor is wind, the cloud is carried by the air." },
@@ -36,6 +39,7 @@ const MODES: { id: Mode; label: string; note: string }[] = [
   { id: "wake", label: "7 · Wake", note: "A thin, focused wind: the cursor leaves a wake that slowly feathers apart." },
   { id: "airpuffs", label: "8 · Puffs + air", note: "Soft puffs carried by moving air that the cursor stirs." },
   { id: "light", label: "9 · Light", note: "Nothing moves: the cursor is a low light skimming the cloud tops." },
+  { id: "layered", label: "10 · Layered", note: "Drifting deck below (untouched), moving puffs above that you stir, and the cursor's light on both." },
 ];
 
 const VERT = `
@@ -338,15 +342,53 @@ void main() {
 }
 `;
 
+// Layered mode, bottom: the natural deck drifting slowly (not interactive),
+// lit by the cursor's light from its height field.
+const LAYER_BASE = `
+precision highp float;
+varying vec2 vUv;
+uniform float uAspect, uT, uLight;
+uniform vec2 uM, uWind;
+${NOISE}
+float hgt(vec2 uv) { return deck(vec2(uv.x * uAspect, uv.y) * 2.0 + uWind * uT); }
+void main() {
+  vec2 p = vec2(vUv.x * uAspect, vUv.y);
+  float land = smoothstep(0.52, 0.56, fbm(p * 1.6 + 20.0));
+  vec3 ground = mix(vec3(0.06, 0.075, 0.09), vec3(0.15, 0.16, 0.16) * (0.8 + 0.4 * fbm(p * 12.0)), land);
+  float c = hgt(vUv);
+  vec2 q = p * 2.0 + uWind * uT;
+  float tex = fbm(q * 11.0) * 0.5 + fbm(q * 25.0) * 0.5;
+  float dens = smoothstep(0.05, 0.85, c * (0.75 + 0.5 * tex)) * 0.75;
+  float e = 0.004;
+  float hx = hgt(vUv + vec2(e, 0.0)) - hgt(vUv - vec2(e, 0.0));
+  float hy = hgt(vUv + vec2(0.0, e)) - hgt(vUv - vec2(0.0, e));
+  vec3 n = normalize(vec3(-hx * 5.0, -hy * 5.0, 1.0));
+  vec3 lp = vec3((uM.x - vUv.x) * uAspect, uM.y - vUv.y, 0.15);
+  float dist = length(lp);
+  float diff = clamp(dot(n, lp / dist), 0.0, 1.0) / (1.0 + dist * dist * 14.0);
+  ground *= 1.0 - 0.4 * smoothstep(0.05, 0.85, hgt(vUv + vec2(-0.01, 0.01))) * (1.0 - dens);
+  vec3 cloud = vec3(0.72, 0.76, 0.82) * (0.6 + 0.35 * tex) * (0.75 + 0.3 * n.x - 0.2 * n.y);
+  vec3 col = mix(ground, cloud, dens);
+  col *= 1.0 + uLight * diff * 1.6;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
 const PUFF_VERT = `
 attribute vec4 aP;     // x, y (uv); size px; alpha
 varying float vA;
 varying float vSeed;
-uniform float uDpr;
+uniform float uDpr, uAspect, uLight;
+uniform vec2 uM;
+varying float vL;
+varying vec2 vToLight;
 void main() {
   gl_Position = vec4(aP.xy * 2.0 - 1.0, 0.0, 1.0);
   gl_PointSize = aP.z * uDpr;
   vA = aP.w;
+  vec2 dl = vec2((uM.x - aP.x) * uAspect, uM.y - aP.y);
+  vL = uLight * exp(-dot(dl, dl) / 0.025);
+  vToLight = normalize(dl + 1e-4);
   vSeed = fract(aP.x * 91.7 + aP.y * 37.3);
 }
 `;
@@ -355,6 +397,8 @@ const PUFF_FRAG = `
 precision mediump float;
 varying float vA;
 varying float vSeed;
+varying float vL;
+varying vec2 vToLight;
 float h1(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float n1(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -368,6 +412,9 @@ void main() {
   float n = n1(c * 2.4 + vSeed * 40.0) * 0.6 + n1(c * 5.0 + vSeed * 13.0) * 0.4;
   float puff = smoothstep(1.0, 0.25, d) * smoothstep(0.2, 0.7, n + 0.3 * (1.0 - d));
   float lit = 0.8 + 0.25 * (-c.x - c.y) * 0.5;
+  // The cursor's light: the side of each puff facing it brightens.
+  vec2 cf = vec2(c.x, -c.y);
+  lit += vL * (0.5 + 0.9 * clamp(dot(cf, vToLight), 0.0, 1.0) * (1.0 - d * 0.3));
   float a = clamp(puff * vA, 0.0, 1.0);
   gl_FragColor = vec4(vec3(0.9, 0.93, 0.97) * lit * a, a);
 }
@@ -473,6 +520,7 @@ export function CloudLab() {
         nebula: program(VERT, NEBULA),
         curlVel: program(VERT, CURLVEL),
         light: program(VERT, LIGHT),
+        layerBase: program(VERT, LAYER_BASE),
       };
     } catch (e) {
       queueMicrotask(() => setError(String(e)));
@@ -594,15 +642,18 @@ export function CloudLab() {
     const placeDeck = () => {
       pCount = 0;
       let tries = 0;
-      while (pCount < 5200 && tries < 60000) {
+      const layered = params.current.mode === "layered";
+      const want = layered ? 6800 : 5200;
+      while (pCount < want && tries < 90000) {
         tries++;
         const x = Math.random(), y = Math.random();
-        const d = deck(x * aspect * 2, y * 2);
+        // The top layer is its own cloud system (a different pattern from the deck).
+        const d = layered ? deck(x * aspect * 1.6 + 7.3, y * 1.6 + 3.1) : deck(x * aspect * 2, y * 2);
         if (Math.random() > d) continue;
         const i = pCount++;
         homes[i * 2] = x;
         homes[i * 2 + 1] = y;
-        pA.set([x, y, 10 + Math.random() * 16, 0.18 + 0.3 * d], i * 4);
+        pA.set([x, y, layered ? 7 + Math.random() * 13 : 10 + Math.random() * 16, layered ? 0.14 + 0.32 * d : 0.18 + 0.3 * d], i * 4);
         pv[i * 2] = pv[i * 2 + 1] = 0;
       }
     };
@@ -775,7 +826,10 @@ export function CloudLab() {
       }
 
       // Puffs + air: a simple air simulation (the hero's) carries the puffs.
-      if (mode === "airpuffs") {
+      if (mode === "airpuffs" || mode === "layered") {
+        const layered = mode === "layered";
+        // Layered: the whole top system drifts with a steady wind (and wraps).
+        const wx0 = layered ? 0.012 : 0, wy0 = layered ? 0.004 : 0;
         const mx = pointer.x * 2 - 1, my = pointer.y * 2 - 1;
         air.step(mx, my, moving ? dx * 2 * (0.5 + strength) : 0, moving ? dy * 2 * (0.5 + strength) : 0, dt * 60);
         const k = 0.1 + recover * 1.0;
@@ -784,14 +838,22 @@ export function CloudLab() {
           let x = pA[o]!, y = pA[o + 1]!;
           const [ax, ay] = air.velocityAt(x * 2 - 1, y * 2 - 1);
           // Air velocity (disc units per frame) → uv per second.
-          const wx = ax * 30 * (1 + 2 * strength), wy = ay * 30 * (1 + 2 * strength);
+          const gain = (layered ? 110 : 30) * (1 + 2 * strength);
+          const wx = ax * gain, wy = ay * gain;
           let vx = pv[i * 2]!, vy = pv[i * 2 + 1]!;
           vx += (wx - vx) * Math.min(1, dt * (2 + 6 * hash(i, 3)));
           vy += (wy - vy) * Math.min(1, dt * (2 + 6 * hash(i, 4)));
+          if (layered) {
+            let hx = homes[i * 2]! + wx0 * dt, hy = homes[i * 2 + 1]! + wy0 * dt;
+            if (hx > 1.05) { hx -= 1.1; x -= 1.1; }
+            if (hy > 1.05) { hy -= 1.1; y -= 1.1; }
+            homes[i * 2] = hx;
+            homes[i * 2 + 1] = hy;
+          }
           vx += (homes[i * 2]! - x) * k * dt;
           vy += (homes[i * 2 + 1]! - y) * k * dt;
-          x += vx * dt;
-          y += vy * dt;
+          x += (vx + wx0) * dt;
+          y += (vy + wy0) * dt;
           pA[o] = x;
           pA[o + 1] = y;
           pv[i * 2] = vx;
@@ -845,13 +907,21 @@ export function CloudLab() {
 
       // Display.
       bindQuad();
-      const puffMode = mode === "particles" || mode === "airpuffs";
+      const puffMode = mode === "particles" || mode === "airpuffs" || mode === "layered";
+      const lightAmt = pointer.inside ? 0.4 + strength * 0.6 : 0;
       if (mode === "nebula") {
         gl.useProgram(P.nebula!.p);
         gl.uniform1i(P.nebula!.u("uMap"), tex(0, dye.read.tex));
         gl.uniform1f(P.nebula!.u("uAspect"), aspect);
         gl.uniform1f(P.nebula!.u("uT"), now / 1000);
         gl.uniform2f(P.nebula!.u("uM"), pointer.x, pointer.y);
+      } else if (mode === "layered") {
+        gl.useProgram(P.layerBase!.p);
+        gl.uniform1f(P.layerBase!.u("uAspect"), aspect);
+        gl.uniform1f(P.layerBase!.u("uT"), now / 1000);
+        gl.uniform1f(P.layerBase!.u("uLight"), lightAmt);
+        gl.uniform2f(P.layerBase!.u("uM"), pointer.x, pointer.y);
+        gl.uniform2f(P.layerBase!.u("uWind"), -0.006, -0.002);
       } else if (mode === "light") {
         gl.useProgram(P.light!.p);
         gl.uniform1f(P.light!.u("uAspect"), aspect);
@@ -873,6 +943,9 @@ export function CloudLab() {
           wisps.forEach((w, i) => data.set([w.x, w.y, w.size * (1 + w.age), w.a * Math.sin(Math.PI * Math.min(1, w.age * 1.2 + 0.05))], i * 4));
         gl.useProgram(P.puff!.p);
         gl.uniform1f(P.puff!.u("uDpr"), dpr);
+        gl.uniform1f(P.puff!.u("uAspect"), aspect);
+        gl.uniform2f(P.puff!.u("uM"), pointer.x, pointer.y);
+        gl.uniform1f(P.puff!.u("uLight"), mode === "layered" ? lightAmt : 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, puffBuf);
         gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
         const la = gl.getAttribLocation(P.puff!.p, "aP");
