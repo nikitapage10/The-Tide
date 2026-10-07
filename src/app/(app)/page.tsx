@@ -175,7 +175,7 @@ export default async function HomePage() {
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {questions.map(({ record: q }) => (
               <li key={q.id} className="rounded-[var(--radius)] border border-warn/40 bg-surface p-4">
-                <h3 className="font-[family-name:var(--font-body)] text-base font-semibold">{q.title}</h3>
+                <h3 className="text-lg">{q.title}</h3>
                 {q.summary ? <p className="mt-1 text-sm text-muted">{q.summary}</p> : null}
                 {q.body ? (
                   <details className="mt-2 text-sm">
