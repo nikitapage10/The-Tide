@@ -1043,8 +1043,12 @@ export function HeroScene({
 }: {
   layer: "planet" | "meteors";
   progress: { current: number };
-  /** Shared intro clock (ms timestamp) so both canvases animate in sync. */
-  clock: { current: number };
+  /**
+   * Shared intro clock (ms timestamp) so both canvases animate in sync. It only
+   * starts once both layers have drawn a few frames (\`ready\` holds one bit per
+   * layer), so a slow first load never starts the fade-in without the planet.
+   */
+  clock: { current: { start: number; ready: number } };
   onReady?: () => void;
   /** A storm was planted at this point (CSS px, relative to the canvas). */
   onStorm?: (x: number, y: number) => void;
@@ -1061,6 +1065,7 @@ export function HeroScene({
     const canvas = ref.current;
     if (!canvas) return;
     const transparent = layer === "meteors";
+    const bit = layer === "planet" ? 1 : 2;
     const gl = canvas.getContext("webgl", { antialias: false, alpha: transparent, premultipliedAlpha: true });
     if (!gl) {
       onFail?.();
@@ -1074,6 +1079,8 @@ export function HeroScene({
       return;
     }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Seconds since the shared intro started (0 until it has).
+    const elapsed = (now: number) => (clock.current.start ? (now - clock.current.start) / 1000 : 0);
     // Preview aid: ?t=SECONDS starts the scene clock later (to check timed effects).
     const timeShift = Math.max(0, Number(new URLSearchParams(window.location.search).get("t")) || 0);
     let disposed = false;
@@ -1317,7 +1324,7 @@ export function HeroScene({
               // so they trail and settle like smoke rather than snapping.
               const st = flowState[k]!;
               // Frame-rate independent (≈ 0.025–0.06 per 60 Hz frame).
-              const wob = Math.sin(((now - clock.current) / 1000) * (0.35 + 0.07 * k) + k * 2.3);
+              const wob = Math.sin(elapsed(now) * (0.35 + 0.07 * k) + k * 2.3);
               // Tips stay with the cursor (a small bundle around it, never a single
               // point); only the bend trails behind, which keeps them flowing.
               const tgx = head.x + px * s * 7 + px * wob * 3;
@@ -1382,7 +1389,7 @@ export function HeroScene({
         gl.uniform2f(U.fc, g.cx, g.cy);
         gl.uniform2f(U.fs, g.fw, g.fh);
         gl.uniform1f(U.p, progress.current);
-        gl.uniform1f(U.t, reduced ? 10 : (now - clock.current) / 1000 + timeShift);
+        gl.uniform1f(U.t, reduced ? 10 : elapsed(now) + timeShift);
         gl.uniform2f(U.m, pointer.x, pointer.y);
         gl.uniform2f(U.v, pointer.svx, pointer.svy);
         gl.uniform1f(U.e, reduced ? 0 : pointer.e);
@@ -1397,7 +1404,7 @@ export function HeroScene({
         gl.uniform1f(U.s, reduced ? 0 : scroll.v);
         gl.uniform1f(U.menu, menuH);
         gl.uniform1f(U.q, quality.level);
-        const tSec = (now - clock.current) / 1000 + timeShift;
+        const tSec = elapsed(now) + timeShift;
         const p = progress.current;
         const fx = (pointer.tx - (g.cx - g.fw / 2)) / g.fw;
         const fy = (pointer.ty - (g.cy - g.fh / 2)) / g.fh;
@@ -1440,10 +1447,21 @@ export function HeroScene({
         drawWisps(g, p, tSec);
       };
 
+      let warmFrames = 0;
+      let firstWarm = 0;
       const loop = (now: number) => {
         if (disposed) return;
         if (visible && !document.hidden) {
           draw(now);
+          // Start the shared intro once both layers have warmed up (a few frames
+          // drawn: textures uploaded, shaders ready), or after a few seconds if
+          // the other layer never gets there.
+          if (!clock.current.start) {
+            warmFrames += 1;
+            if (warmFrames === 3) clock.current.ready |= bit;
+            if (warmFrames >= 3 && !firstWarm) firstWarm = now;
+            if (warmFrames >= 3 && (clock.current.ready === 3 || now - firstWarm > 5000)) clock.current.start = now;
+          }
           // Adaptive quality (planet only): if frames run long, render a little
           // smaller; recover when there is headroom. At most one change per 2s.
           if (layer === "planet" && quality.last) {
@@ -1525,7 +1543,6 @@ export function HeroScene({
           });
           uploadSims();
           resize();
-          if (!clock.current) clock.current = performance.now();
           onReady?.();
           raf = requestAnimationFrame(loop);
         })

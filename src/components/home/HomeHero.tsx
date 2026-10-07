@@ -66,7 +66,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
   // The interface (callouts) is revealed late in the scroll; it types itself in.
   const [revealed, setRevealed] = useState(false);
   // One intro clock shared by both scene layers so they fade in in sequence.
-  const clock = useRef(0);
+  const clock = useRef({ start: 0, ready: 0 });
   const onSceneReady = useCallback(() => stage.current?.setAttribute("data-gl", "on"), []);
   // Without WebGL, fall back to the plain image layers.
   const onSceneFail = useCallback(() => stage.current?.setAttribute("data-gl", "off"), []);
