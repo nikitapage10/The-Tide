@@ -1130,8 +1130,10 @@ export function HeroScene({
           const dist = Math.hypot(dx, dy);
           const out = dist - pr;
           // Present while the cursor is out in space, not too far off; eases in/out.
-          const want = head.x > -9000 && out > 8 && out < pr * 0.9 && progress.current > 0.3 && !reduced ? 1 : 0;
-          strand.on += (want - strand.on) * (want ? 0.04 : 0.06);
+          // Only as the rocks clear: faint while the last ones leave, full once gone.
+          const clear = smooth(0.72, 0.97, progress.current);
+          const want = head.x > -9000 && out > 8 && out < pr * 0.9 && clear > 0 && !reduced ? clear : 0;
+          strand.on += (want - strand.on) * (want > strand.on ? 0.04 : 0.06);
           strandA.fill(0);
           strandT.fill(0);
           if (strand.on > 0.002) {
