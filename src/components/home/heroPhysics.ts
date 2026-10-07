@@ -260,7 +260,7 @@ export class FlowSim {
       const gy = ((my + 1) / 2) * n - 0.5;
       const fx = (mvx * n) / 2;
       const fy = (mvy * n) / 2;
-      const r = 2.6;
+      const r = 1.8;
       for (let j = Math.max(0, (gy - 3 * r) | 0); j < Math.min(n, gy + 3 * r); j++)
         for (let i = Math.max(0, (gx - 3 * r) | 0); i < Math.min(n, gx + 3 * r); i++) {
           const w = Math.exp(-((i - gx) ** 2 + (j - gy) ** 2) / (r * r));
@@ -281,24 +281,14 @@ export class FlowSim {
       }
     u.set(t1);
     v.set(t2);
-    for (let j = 1; j < n - 1; j++)
-      for (let i = 1; i < n - 1; i++) {
-        const k = j * n + i;
-        div[k] = -0.5 * (u[k + 1]! - u[k - 1]! + v[k + n]! - v[k - n]!);
-        p[k] = 0;
-      }
-    for (let it = 0; it < 14; it++)
-      for (let j = 1; j < n - 1; j++)
-        for (let i = 1; i < n - 1; i++) {
-          const k = j * n + i;
-          p[k] = (div[k]! + p[k - 1]! + p[k + 1]! + p[k - n]! + p[k + n]!) / 4;
-        }
-    for (let j = 1; j < n - 1; j++)
-      for (let i = 1; i < n - 1; i++) {
-        const k = j * n + i;
-        u[k] = (u[k]! - 0.5 * (p[k + 1]! - p[k - 1]!)) * 0.975;
-        v[k] = (v[k]! - 0.5 * (p[k + n]! - p[k - n]!)) * 0.975;
-      }
+    // No pressure solve: that spread every push across the whole disc (and swept
+    // all the cloud away). The wake stays local and dies out quickly.
+    void p;
+    void div;
+    for (let k = 0; k < n * n; k++) {
+      u[k] = u[k]! * 0.93;
+      v[k] = v[k]! * 0.93;
+    }
     // The cleared amount drifts a little with the air and fills back in slowly.
     let live = 0;
     for (let j = 0; j < n; j++)
