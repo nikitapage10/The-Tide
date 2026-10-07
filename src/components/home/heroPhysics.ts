@@ -200,8 +200,6 @@ export class FlowSim {
   private v = new Float32Array(64 * 64);
   private t1 = new Float32Array(64 * 64);
   private t2 = new Float32Array(64 * 64);
-  private p = new Float32Array(64 * 64);
-  private div = new Float32Array(64 * 64);
   private clr = new Float32Array(64 * 64);
   readonly data = new Uint8Array(64 * 64 * 4);
   awake = true;
@@ -230,48 +228,68 @@ export class FlowSim {
     return [this.sample(this.u, gx, gy) * s, this.sample(this.v, gx, gy) * s];
   }
 
-  /** A storm you planted: the air starts turning around the point. */
+  /** Storms you planted: the air keeps turning around them for a few seconds. */
+  private storms: { x: number; y: number; life: number; dir: number }[] = [];
+  /** Set when new data needs uploading (including the final still frame). */
+  dirty = true;
+
   vortex(mx: number, my: number) {
-    const n = this.n;
-    const gx = ((mx + 1) / 2) * n - 0.5;
-    const gy = ((my + 1) / 2) * n - 0.5;
-    const r = 3.5;
-    for (let j = Math.max(0, (gy - 3 * r) | 0); j < Math.min(n, gy + 3 * r); j++)
-      for (let i = Math.max(0, (gx - 3 * r) | 0); i < Math.min(n, gx + 3 * r); i++) {
-        const ex = i - gx;
-        const ey = j - gy;
-        const w = Math.exp(-(ex * ex + ey * ey) / (r * r));
-        const k = j * n + i;
-        this.u[k] = this.u[k]! - ey * w * 0.25;
-        this.v[k] = this.v[k]! + ex * w * 0.25;
-      }
+    this.storms.push({ x: ((mx + 1) / 2) * this.n - 0.5, y: ((my + 1) / 2) * this.n - 0.5, life: 1, dir: 1 });
+    if (this.storms.length > 3) this.storms.shift();
     this.awake = true;
   }
 
-  /** Pointer in disc units (-1..1) and its motion this frame in the same units. */
-  step(mx: number, my: number, mvx: number, mvy: number) {
+  /**
+   * Pointer in disc units (-1..1) and its motion this frame in the same units.
+   * dt: frames elapsed (≈1).
+   */
+  step(mx: number, my: number, mvx: number, mvy: number, dt = 1) {
     const n = this.n;
-    const { u, v, t1, t2, p, div, clr } = this;
+    const { u, v, t1, t2, clr } = this;
     mvx = clamp(mvx, -0.03, 0.03);
     mvy = clamp(mvy, -0.03, 0.03);
     const speed = Math.hypot(mvx, mvy);
+    // The pointer's wake is a narrow band along the path it just travelled (not
+    // a round blob); clouds there pick up a fraction of its motion and coast.
     if (speed > 0.0004 && mx * mx + my * my < 1.1) {
-      const gx = ((mx + 1) / 2) * n - 0.5;
-      const gy = ((my + 1) / 2) * n - 0.5;
+      const bx = ((mx + 1) / 2) * n - 0.5;
+      const by = ((my + 1) / 2) * n - 0.5;
+      const ax = bx - (mvx * n) / 2;
+      const ay = by - (mvy * n) / 2;
       const fx = (mvx * n) / 2;
       const fy = (mvy * n) / 2;
-      const r = 0.9;   // a small wake, about the size of the cursor's reach
-      for (let j = Math.max(0, (gy - 3 * r) | 0); j < Math.min(n, gy + 3 * r); j++)
-        for (let i = Math.max(0, (gx - 3 * r) | 0); i < Math.min(n, gx + 3 * r); i++) {
-          const w = Math.exp(-((i - gx) ** 2 + (j - gy) ** 2) / (r * r));
+      const r = 0.75;
+      const ex = bx - ax;
+      const ey = by - ay;
+      const ll = Math.max(ex * ex + ey * ey, 1e-6);
+      for (let j = Math.max(0, Math.floor(Math.min(ay, by) - 3 * r)); j <= Math.min(n - 1, Math.ceil(Math.max(ay, by) + 3 * r)); j++)
+        for (let i = Math.max(0, Math.floor(Math.min(ax, bx) - 3 * r)); i <= Math.min(n - 1, Math.ceil(Math.max(ax, bx) + 3 * r)); i++) {
+          const t = clamp(((i - ax) * ex + (j - ay) * ey) / ll, 0, 1);
+          const d2 = (i - ax - ex * t) ** 2 + (j - ay - ey * t) ** 2;
+          const w = Math.exp(-d2 / (r * r));
           const k = j * n + i;
-          // A gentle wake: the air picks up a little of the pointer's motion.
-          u[k] = u[k]! + fx * w * 0.22;
-          v[k] = v[k]! + fy * w * 0.22;
-          clr[k] = Math.min(0.5, clr[k]! + w * Math.min(0.02, speed * 0.5));
+          u[k] = u[k]! + fx * w * 0.04;
+          v[k] = v[k]! + fy * w * 0.04;
+          clr[k] = Math.min(0.3, clr[k]! + w * Math.min(0.01, speed * 0.3));
         }
       this.awake = true;
     }
+    // Planted storms: the air spins around each for a few seconds, fading.
+    for (const st of this.storms) {
+      const R = 3.2;
+      const spin = 0.005 * st.life * dt;
+      for (let j = Math.max(0, Math.floor(st.y - 3 * R)); j <= Math.min(n - 1, Math.ceil(st.y + 3 * R)); j++)
+        for (let i = Math.max(0, Math.floor(st.x - 3 * R)); i <= Math.min(n - 1, Math.ceil(st.x + 3 * R)); i++) {
+          const ex = i - st.x;
+          const ey = j - st.y;
+          const w = Math.exp(-(ex * ex + ey * ey) / (R * R));
+          const k = j * n + i;
+          u[k] = u[k]! - ey * w * spin;
+          v[k] = v[k]! + ex * w * spin;
+        }
+      st.life -= dt / 360; // about six seconds
+    }
+    this.storms = this.storms.filter((st) => st.life > 0);
     if (!this.awake) return;
     for (let j = 0; j < n; j++)
       for (let i = 0; i < n; i++) {
@@ -281,24 +299,22 @@ export class FlowSim {
       }
     u.set(t1);
     v.set(t2);
-    // No pressure solve: that spread every push across the whole disc (and swept
-    // all the cloud away). The wake stays local and dies out quickly.
-    void p;
-    void div;
+    // No pressure solve (it spread every push across the whole disc). The wake
+    // coasts briefly, then the air is still again.
+    const damp = Math.pow(0.9, dt);
     for (let k = 0; k < n * n; k++) {
-      u[k] = u[k]! * 0.93;
-      v[k] = v[k]! * 0.93;
+      u[k] = u[k]! * damp;
+      v[k] = v[k]! * damp;
     }
-    // The cleared amount drifts a little with the air and fills back in slowly.
     let live = 0;
     for (let j = 0; j < n; j++)
       for (let i = 0; i < n; i++) {
         const k = j * n + i;
-        t1[k] = this.sample(clr, i - u[k]! * 0.5, j - v[k]! * 0.5) * 0.9965;
-        live = Math.max(live, t1[k]!, Math.abs(u[k]!) * 3, Math.abs(v[k]!) * 3);
+        t1[k] = this.sample(clr, i - u[k]!, j - v[k]!) * Math.pow(0.996, dt);
+        live = Math.max(live, t1[k]!, Math.abs(u[k]!) * 20, Math.abs(v[k]!) * 20);
       }
     clr.set(t1);
-    if (live < 0.003) {
+    if (live < 0.003 && this.storms.length === 0) {
       clr.fill(0);
       u.fill(0);
       v.fill(0);
@@ -308,12 +324,13 @@ export class FlowSim {
   }
 
   private pack() {
+    this.dirty = true;
     const { clr, data } = this;
     for (let k = 0; k < clr.length; k++) {
-      // Velocity in grid cells per frame (±2), then the cleared amount.
-      // 128 = still air exactly; ±127 = ±2 cells per frame.
-      data[k * 4] = clamp(128 + Math.round((this.u[k]! / 2) * 127), 1, 255);
-      data[k * 4 + 1] = clamp(128 + Math.round((this.v[k]! / 2) * 127), 1, 255);
+      // Velocity in grid cells per frame (±0.5), then the cleared amount.
+      // 128 = still air exactly; ±127 = ±0.5 cells per frame.
+      data[k * 4] = clamp(128 + Math.round((this.u[k]! / 0.5) * 127), 1, 255);
+      data[k * 4 + 1] = clamp(128 + Math.round((this.v[k]! / 0.5) * 127), 1, 255);
       data[k * 4 + 2] = clamp(Math.round(clr[k]! * 255), 0, 255);
       data[k * 4 + 3] = 255;
     }
