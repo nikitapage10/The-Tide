@@ -275,7 +275,7 @@ export class FlowSim {
           const pw = Math.exp(-d2 / (r * r * 2.2)) * Math.min(1, Math.sqrt(d2) / r);
           u[k] = u[k]! + fx * w * 0.035 + (-ey / sl) * side * pw * Math.hypot(fx, fy) * 0.03;
           v[k] = v[k]! + fy * w * 0.035 + (ex / sl) * side * pw * Math.hypot(fx, fy) * 0.03;
-          clr[k] = Math.min(0.3, clr[k]! + w * Math.min(0.01, speed * 0.3));
+          clr[k] = Math.min(0.6, clr[k]! + w * Math.min(0.035, speed * 1.1));
         }
       this.awake = true;
     }
@@ -338,6 +338,74 @@ export class FlowSim {
       data[k * 4 + 1] = clamp(128 + Math.round((this.v[k]! / 0.5) * 127), 1, 255);
       data[k * 4 + 2] = clamp(Math.round(clr[k]! * 255), 0, 255);
       data[k * 4 + 3] = 255;
+    }
+  }
+}
+
+/**
+ * Wisps of cloud broken off where the cursor passes through the cloud deck:
+ * many small, soft particles thrown along and to the sides of the path, carried
+ * by the air, spreading and evaporating over a second or two. (The deck itself
+ * thins where they came from and slowly fills back in.)
+ */
+export class CloudWisps {
+  readonly max = 1400;
+  /** Per particle: x, y (disc units), age 0..1, seed; then spawn x, y. */
+  readonly a = new Float32Array(1400 * 4);
+  readonly s = new Float32Array(1400 * 2);
+  private vx = new Float32Array(1400);
+  private vy = new Float32Array(1400);
+  private life = new Float32Array(1400);
+  count = 0;
+
+  spawn(mx: number, my: number, mvx: number, mvy: number, dt: number) {
+    mvx = clamp(mvx, -0.03, 0.03);
+    mvy = clamp(mvy, -0.03, 0.03);
+    const speed = Math.hypot(mvx, mvy);
+    if (speed < 0.0004 || mx * mx + my * my > 0.97) return;
+    const n = Math.min(12, Math.floor(speed * 900 * dt) + (Math.random() < 0.5 ? 1 : 0));
+    const ux = mvx / speed, uy = mvy / speed;
+    for (let q = 0; q < n; q++) {
+      if (this.count >= this.max) this.remove(0);
+      const i = this.count++;
+      // Along the stretch just travelled, spread across a narrow band.
+      const t = Math.random();
+      const side = (Math.random() * 2 - 1) * 0.028;
+      const x = mx - mvx * t - uy * side;
+      const y = my - mvy * t + ux * side;
+      this.a.set([x, y, 0, Math.random()], i * 4);
+      this.s.set([x, y], i * 2);
+      // Thrown a little along the motion and parted to the side it sits on.
+      const k = 0.12 + Math.random() * 0.35;
+      const sp = Math.sign(side) * speed * (0.15 + Math.random() * 0.35);
+      this.vx[i] = mvx * k - uy * sp + (Math.random() - 0.5) * 0.0008;
+      this.vy[i] = mvy * k + ux * sp + (Math.random() - 0.5) * 0.0008;
+      this.life[i] = 70 + Math.random() * 100;
+    }
+  }
+
+  private remove(i: number) {
+    const last = --this.count;
+    if (i !== last) {
+      this.a.copyWithin(i * 4, last * 4, last * 4 + 4);
+      this.s.copyWithin(i * 2, last * 2, last * 2 + 2);
+      this.vx[i] = this.vx[last]!;
+      this.vy[i] = this.vy[last]!;
+      this.life[i] = this.life[last]!;
+    }
+  }
+
+  step(flow: FlowSim, dt: number) {
+    const drag = Math.pow(0.955, dt);
+    for (let i = this.count - 1; i >= 0; i--) {
+      const o = i * 4;
+      const [ax, ay] = flow.velocityAt(this.a[o]!, this.a[o + 1]!);
+      this.vx[i] = (this.vx[i]! + ax * 0.04 * dt) * drag;
+      this.vy[i] = (this.vy[i]! + ay * 0.04 * dt) * drag;
+      this.a[o] = this.a[o]! + this.vx[i]! * dt;
+      this.a[o + 1] = this.a[o + 1]! + this.vy[i]! * dt;
+      this.a[o + 2] = this.a[o + 2]! + dt / this.life[i]!;
+      if (this.a[o + 2]! >= 1) this.remove(i);
     }
   }
 }

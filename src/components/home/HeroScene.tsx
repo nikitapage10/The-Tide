@@ -19,7 +19,7 @@
  * Geometry matches the CSS .hero-frame so DOM callouts stay pinned to the art.
  */
 import { useEffect, useRef } from "react";
-import { FlowSim, RockBodies } from "./heroPhysics";
+import { CloudWisps, FlowSim, RockBodies } from "./heroPhysics";
 import { heroSignal } from "./heroSound";
 import { ROCKS } from "./rocks";
 
@@ -88,9 +88,8 @@ vec2 stormTwist(vec2 sph, out float bonus, out float eye) {
     if (r > 2.6) continue;
     // A gentle twist only draws nearby cloud in; the storm brings its own.
     float spinA = (0.6 * sa - 0.04 * sa * sa + 0.4) * grow;
-    float a = spinA * exp(-r * r * 0.9);
-    float cs = cos(a), sn = sin(a);
-    q = c + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
+    // (No twisting of the surrounding cloud: that read as stringy liquid.)
+    spinA *= 0.0;
     // Its own cloud, generated whether or not there was any here: two smooth
     // logarithmic spiral arms that keep turning (slowing as it dies), softened
     // by low-frequency noise so the edges are soft rather than jagged.
@@ -112,30 +111,6 @@ float cloudBase(vec2 sph) {
   float base = fbm5(p * 1.7 + 0.45 * w);
   return max(base, 0.4 + 0.38 * bonus) - eye * 0.3;
 }
-// Cloud displacement field (simulated on the GPU, 256² over the disc): how far
-// the cloud at each point has been carried from where the weather put it, in
-// disc units, stored as two 16-bit values (nearest-filtered; interpolated here).
-vec4 cloudEnc(vec2 o) {
-  vec2 v = floor(clamp(o / 0.5 + 0.5, 0.0, 1.0) * 65535.0 + 0.5);
-  vec2 hi = floor(v / 256.0);
-  vec2 lo = v - hi * 256.0;
-  return vec4(hi.x, lo.x, hi.y, lo.y) / 255.0;
-}
-vec2 cloudDec(vec4 t) {
-  vec4 b = floor(t * 255.0 + 0.5);
-  return ((vec2(b.x, b.z) * 256.0 + vec2(b.y, b.w)) / 65535.0 - 0.5) * 0.5;
-}
-vec2 cloudOffAt(sampler2D tx, vec2 uv) {
-  vec2 p = clamp(uv, 0.0, 1.0) * 256.0 - 0.5;
-  vec2 i = floor(p);
-  vec2 f = p - i;
-  vec2 a = cloudDec(texture2D(tx, (i + vec2(0.5, 0.5)) / 256.0));
-  vec2 b = cloudDec(texture2D(tx, (i + vec2(1.5, 0.5)) / 256.0));
-  vec2 c = cloudDec(texture2D(tx, (i + vec2(0.5, 1.5)) / 256.0));
-  vec2 d = cloudDec(texture2D(tx, (i + vec2(1.5, 1.5)) / 256.0));
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
 // Final cloud density from the (simulated) base amount plus fine detail.
 float cloudDetail(float base, vec2 pw) {
   // Soft, rounded detail (coarser than before, so no fine streaks).
@@ -148,7 +123,6 @@ const FRAG = `
 precision highp float;
 uniform sampler2D uPlanet, uFar, uNear;
 uniform sampler2D uFlow;          // planet: weather flow (z: where the clouds were brushed thin)
-uniform sampler2D uClouds;        // planet: simulated cloud amount (carried by the air)
 uniform sampler2D uMasks;         // planet: baked masks (R land, G light streams on the disc)
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
@@ -379,42 +353,25 @@ vec3 planetWithLimb(vec2 uv) {
     col *= 1.0 - 0.18 * veil;                                   // its faint shadow
     col = mix(col, skyCol * (0.55 + 0.45 * light), veilA);
 
-    // Clouds: the large-scale amount comes from the simulation (the air carries
-    // it, so pushing moves real cloud); fine detail is added here, crisp.
-    vec2 pw = cloudCoords(sph);
+    // Clouds. They stay where the weather puts them (warping them read as
+    // smeared liquid). Where the cursor passes, cloud dissipates: a hole with
+    // ragged edges opens and slowly fills back in, while the cloud that was
+    // there breaks off as small drifting wisps (drawn separately as particles).
     vec2 sunStepS = normalize(sunDir.xy) * 0.012;
-    // Where the cloud now here came from (carried by the air you stirred).
-    // (Displacement fades strongly toward the limb, where foreshortening would
-    // make any shift look like the horizon itself bending.)
-    vec2 offH = cloudOffAt(uClouds, sph * 0.5 + 0.5) * smoothstep(0.1, 0.55, z);
-    // Clouds break apart rather than smear: each small puff (noise at puff
-    // scale in the cloud's own coordinates, so it travels with it) is carried a
-    // different amount, so clumps pull apart, and holes tear open in the cloud
-    // where it was pushed (more pushing, more holes).
-    float moved = length(offH);
-    float clumpN = 0.5, holes = 0.5;
-    if (moved > 0.0005) {
-      vec2 mc = cloudCoords(sph - offH);
-      clumpN = vnoise(mc * 9.0 + 7.0) * 0.7 + vnoise(mc * 18.0 + 3.0) * 0.3;
-      holes = vnoise(mc * 14.0 + 11.0) * 0.6 + vnoise(mc * 30.0) * 0.4;
-    }
-    vec2 srcH = sph - offH * (0.1 + 1.8 * clumpN);
-    srcH *= min(1.0, 0.985 / max(length(srcH), 1e-4));
-    vec2 srcS = srcH + sunStepS;
-    float tear = smoothstep(0.003, 0.03, moved);
-    float coverH = 1.0 - smoothstep(0.95 - 0.38 * tear, 1.05 - 0.38 * tear, 1.0 - holes) * tear;
+    vec2 srcH = sph;
+    vec2 srcS = sph + sunStepS;
+    float sbH, seH;
+    vec2 pw = cloudCoords(stormTwist(srcH, sbH, seH));
+    float rag = vnoise(pw * 14.0 + 11.0) * 0.6 + vnoise(pw * 31.0) * 0.4;
+    float holeH = clamp(cleared * 2.4 - 0.55 * rag, 0.0, 1.0);
+    float coverH = 1.0 - smoothstep(0.15, 0.6, holeH);
     float coverS = coverH;
     float baseHere = cloudBase(srcH);
     float baseSun = cloudBase(srcS);
-    float sbH, seH;
-    pw = cloudCoords(stormTwist(srcH, sbH, seH));
-    // The cloud amount drifts with the particles; the fine texture stays put
-    // (moving it made the clouds shimmer while they settled).
     float dens = clamp(cloudDetail(baseHere, pw) * coverH, 0.0, 1.0);
     // Smooth storm cloud (fine detail would break its arms into jagged bits).
-    dens = mix(dens, smoothstep(0.42, 0.72, baseHere) * coverH, sbH * 0.65);
+    dens = mix(dens, smoothstep(0.42, 0.72, baseHere) * coverH, sbH * 0.7);
     float densSun = clamp(cloudDetail(baseSun, cloudCoords(stormTwist(srcS, sbH, seH))) * coverS, 0.0, 1.0);
-    cleared = max(cleared, clamp(1.0 - coverH, 0.0, 1.0));
     vec2 eyes[3];
     eyes[0] = vec2(-0.4127, -0.0255);
     eyes[1] = vec2(-0.45, -0.55);
@@ -900,9 +857,9 @@ void main() {
       }
       // The sheet between them: a soft gradient filling the fan, brightest along
       // its middle, with faint striations flowing outward.
-      vec2 A0 = uStrandA[0].xy, A3 = uStrandA[5].xy;
-      vec2 Cm = (uStrandA[2].zw + uStrandA[3].zw) * 0.5;
-      vec2 Tm = (uStrandT[2].xy + uStrandT[3].xy) * 0.5;
+      vec2 A0 = uStrandA[0].xy, A3 = uStrandA[3].xy;
+      vec2 Cm = (uStrandA[1].zw + uStrandA[2].zw) * 0.5;
+      vec2 Tm = (uStrandT[1].xy + uStrandT[2].xy) * 0.5;
       vec2 Am = (A0 + A3) * 0.5;
       vec2 prevC = Am;
       float bestC = 1e9, tC = 0.0;
@@ -916,14 +873,14 @@ void main() {
         prevC = P;
       }
       // Half-width of the fan at this point: wide at the planet, pinching to the tip.
-      float spreadC = length(uStrandA[5].zw - uStrandA[0].zw);
+      float spreadC = length(uStrandA[3].zw - uStrandA[0].zw);
       float halfW = length(A3 - A0) * 0.5 * (1.0 - tC) * (1.0 - tC) + spreadC * 0.6 * 4.0 * tC * (1.0 - tC) + 4.0;
       float across = bestC / halfW;
       // Made of many faint filaments (not a flat fill), so the strands dissolve into it.
       float fil = vnoise(vec2(across * 12.0 + 0.6 * sin(tC * 6.0 + uT * 0.4), tC * 4.0 - uT * 1.1));
       fil = 0.3 * fil + 0.7 * pow(vnoise(vec2(across * 26.0, tC * 7.0 - uT * 1.6)), 2.0) + 0.25 * fil * fil;
       float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.12, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
-      float sheetStr = max(uStrandT[2].w, uStrandT[3].w);
+      float sheetStr = max(uStrandT[1].w, uStrandT[2].w);
       // Fade out well inside the region it is drawn in (no visible mask edges).
       vec2 e2 = min(sp - uStrandBox.xy, uStrandBox.zw - sp);
       float edgeFade = smoothstep(0.0, 50.0, min(e2.x, e2.y));
@@ -945,30 +902,64 @@ void main() {
 }
 `;
 
-// Cloud simulation (GPU, 256×256 over the planet's disc): each frame the cloud
-// amount is carried by the air (semi-Lagrangian advection through the flow
-// field) and relaxes slowly toward the natural cloud cover, so pushed clouds
-// pile up, part and swirl, then settle back.
-const SIM_FRAG = `
+// Cloud wisps (point sprites): each takes its look from the cloud where it
+// broke off (density computed here from the same weather functions), drifts,
+// swells a little and evaporates.
+const WISP_VERT = `
 precision highp float;
-uniform sampler2D uPrev, uFlow;
-uniform float uT, uDt, uFirst;
+attribute vec4 aP;            // x, y (disc); age 0..1; seed
+attribute vec2 aS;            // where it broke off (disc)
+uniform vec2 uRes, uFrameC, uFrameS;
+uniform float uP, uDpr, uT;
 uniform vec4 uStorm[3];
+varying float vA;
+varying float vSeed;
+varying vec3 vCol;
 ${NOISE}
 ${CLOUDS}
 void main() {
-  vec2 uv = gl_FragCoord.xy / 256.0;
-  vec2 sph = uv * 2.0 - 1.0;
-  // Decoded so that the stored 128 is exactly still air (a 0.5 offset here was a
-  // phantom breeze that slowly slid the whole deck away).
-  vec2 vel = (floor(texture2D(uFlow, uv).rg * 255.0 + 0.5) - 128.0) / 127.0 * 0.5 * (2.0 / 64.0);
-  // The cloud here came from upstream: it carries that cloud's displacement plus
-  // this step. Clouds keep the shape you give them (full detail travels with
-  // them) and only very slowly drift back into the natural weather.
-  vec2 off = cloudOffAt(uPrev, (sph - vel) * 0.5 + 0.5) + vel;
-  off *= exp(-uDt * 0.05);
-  if (uFirst > 0.5) off = vec2(0.0);
-  gl_FragColor = cloudEnc(off);
+  vec2 puv = vec2(1.0122, 0.65) + aP.xy * 883.0 / vec2(2000.0, 1126.0);
+  vec2 oP = vec2(0.85, 0.58);
+  vec2 f = oP + (puv - oP) * (1.25 - 0.25 * uP);
+  vec2 sp = (uFrameC - 0.5 * uFrameS) + f * uFrameS;
+  vec2 clip = sp / (uRes / uDpr) * 2.0 - 1.0;
+  gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+  float r2 = dot(aP.xy, aP.xy);
+  float z = sqrt(max(0.0, 1.0 - r2));
+  float bonus, eye;
+  vec2 tw = stormTwist(aS, bonus, eye);
+  float dens = cloudDetail(cloudBase(aS), cloudCoords(tw));
+  float age = aP.z;
+  gl_PointSize = (5.0 + 9.0 * aP.w) * (1.0 + 0.9 * age) * uDpr * (uFrameS.x / 1800.0) * (0.4 + 0.6 * z);
+  vA = dens * smoothstep(0.0, 0.08, age) * pow(1.0 - age, 1.4) * step(r2, 0.985) * smoothstep(0.0, 0.2, z);
+  vSeed = aP.w;
+  vec3 nrm = vec3(aP.xy, z);
+  float light = clamp(dot(nrm, normalize(vec3(-0.85, -0.35, 0.4))), 0.0, 1.0);
+  float night = smoothstep(-0.3, 0.3, (aP.x + 0.62) * 0.9 + (aP.y + 0.05));
+  vCol = vec3(0.94, 0.96, 0.99) * (0.3 + 0.62 * light) * (1.0 - 0.72 * night);
+}
+`;
+
+const WISP_FRAG = `
+precision mediump float;
+uniform float uBright;
+varying float vA;
+varying float vSeed;
+varying vec3 vCol;
+float h1(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+float n1(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), u.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+void main() {
+  vec2 c = gl_PointCoord * 2.0 - 1.0;
+  float d = length(c);
+  if (d > 1.0) discard;
+  float n = n1(c * 2.5 + vSeed * 31.0) * 0.6 + n1(c * 5.0 + vSeed * 17.0) * 0.4;
+  float puff = smoothstep(1.0, 0.2, d) * smoothstep(0.25, 0.75, n + 0.25 * (1.0 - d));
+  float a = clamp(puff * vA * 0.55 * uBright, 0.0, 1.0);
+  gl_FragColor = vec4(vCol * a, a);
 }
 `;
 
@@ -1096,6 +1087,9 @@ export function HeroScene({
       // Strands drawn off the planet toward the cursor (planet layer).
       const head = { x: -9999, y: -9999 };
       const strand = { on: 0 };
+      const flowState = [0, 1, 2, 3].map(() => ({ tx: -9999, ty: -9999, cx: -9999, cy: -9999 }));
+      let strandDt = 1;
+      let strandLast = 0;
       const strandA = new Float32Array(24);
       const strandT = new Float32Array(24);
       // Pointer-driven simulations: weather over the planet, rocks in the meteor layer.
@@ -1138,66 +1132,60 @@ export function HeroScene({
         if (fieldNear) uploadData(7, "uStateNear", 64, 64, fieldNear.state, true);
       };
 
-      // Cloud simulation: ping-pong between two 256² textures through a framebuffer.
-      let simProg: WebGLProgram | null = null;
-      const simTex: WebGLTexture[] = [];
-      let simFb: WebGLFramebuffer | null = null;
-      let simIdx = 0;
-      let simFirst = true;
-      const SU: Record<string, WebGLUniformLocation | null> = {};
-      if (layer === "planet") {
+      // Cloud wisps (planet only): a small second program drawing point sprites.
+      const wisps = layer === "planet" ? new CloudWisps() : null;
+      let wProg: WebGLProgram | null = null;
+      let wBufA: WebGLBuffer | null = null;
+      let wBufS: WebGLBuffer | null = null;
+      let wLocA = -1;
+      let wLocS = -1;
+      const WU: Record<string, WebGLUniformLocation | null> = {};
+      if (wisps) {
         try {
-          simProg = gl.createProgram()!;
-          gl.attachShader(simProg, compile(gl, gl.VERTEX_SHADER, VERT));
-          gl.attachShader(simProg, compile(gl, gl.FRAGMENT_SHADER, SIM_FRAG));
-          gl.bindAttribLocation(simProg, loc, "a");
-          gl.linkProgram(simProg);
-          if (!gl.getProgramParameter(simProg, gl.LINK_STATUS)) throw new Error("link");
-          for (const n of ["uPrev", "uFlow", "uT", "uDt", "uFirst", "uStorm[0]"]) SU[n] = gl.getUniformLocation(simProg, n);
-          for (let i = 0; i < 2; i++) {
-            const t = gl.createTexture()!;
-            gl.bindTexture(gl.TEXTURE_2D, t);
-            // Encoded 16-bit values: read exactly (nearest), interpolated in the shader.
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-            simTex.push(t);
-          }
-          simFb = gl.createFramebuffer();
+          wProg = gl.createProgram()!;
+          gl.attachShader(wProg, compile(gl, gl.VERTEX_SHADER, WISP_VERT));
+          gl.attachShader(wProg, compile(gl, gl.FRAGMENT_SHADER, WISP_FRAG));
+          gl.linkProgram(wProg);
+          if (!gl.getProgramParameter(wProg, gl.LINK_STATUS)) throw new Error("link");
+          wLocA = gl.getAttribLocation(wProg, "aP");
+          wLocS = gl.getAttribLocation(wProg, "aS");
+          for (const n of ["uRes", "uFrameC", "uFrameS", "uP", "uDpr", "uT", "uStorm[0]", "uBright"]) WU[n] = gl.getUniformLocation(wProg, n);
+          wBufA = gl.createBuffer();
+          wBufS = gl.createBuffer();
         } catch {
-          onFail?.();
-          return;
+          wProg = null; // the clouds still work, just without wisps
         }
         gl.useProgram(prog);
       }
-      const stepClouds = (tSec: number, dtSec: number) => {
-        if (!simProg || !simFb) return;
-        const src = simTex[simIdx]!;
-        const dst = simTex[1 - simIdx]!;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, simFb);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, dst, 0);
-        gl.viewport(0, 0, 256, 256);
-        gl.useProgram(simProg);
-        gl.activeTexture(gl.TEXTURE5);
-        gl.bindTexture(gl.TEXTURE_2D, src);
-        gl.uniform1i(SU.uPrev!, 5);
-        gl.uniform1i(SU.uFlow!, 3);
-        gl.uniform1f(SU.uT!, tSec);
-        // Time-based, so clouds settle back (and storms build) at the same pace on any machine.
-        gl.uniform1f(SU.uDt!, dtSec);
-        gl.uniform1f(SU.uFirst!, simFirst ? 1 : 0);
-        gl.uniform4fv(SU["uStorm[0]"]!, stormData);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.viewport(0, 0, canvas.width, canvas.height);
+      const drawWisps = (g: { cx: number; cy: number; fw: number; fh: number }, p: number, tSec: number) => {
+        if (!wisps || !wProg || !wBufA || !wBufS || wisps.count === 0) return;
+        gl.useProgram(wProg);
+        gl.uniform2f(WU.uRes!, canvas.width, canvas.height);
+        gl.uniform2f(WU.uFrameC!, g.cx, g.cy);
+        gl.uniform2f(WU.uFrameS!, g.fw, g.fh);
+        gl.uniform1f(WU.uP!, p);
+        gl.uniform1f(WU.uDpr!, dpr);
+        gl.uniform1f(WU.uT!, tSec);
+        gl.uniform4fv(WU["uStorm[0]"]!, stormData);
+        gl.uniform1f(WU.uBright!, smooth(2.0, 5.2, tSec) * (0.07 + 0.93 * smooth(0, 1, p)));
+        gl.bindBuffer(gl.ARRAY_BUFFER, wBufA);
+        gl.bufferData(gl.ARRAY_BUFFER, wisps.a.subarray(0, wisps.count * 4), gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(wLocA);
+        gl.vertexAttribPointer(wLocA, 4, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, wBufS);
+        gl.bufferData(gl.ARRAY_BUFFER, wisps.s.subarray(0, wisps.count * 2), gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(wLocS);
+        gl.vertexAttribPointer(wLocS, 2, gl.FLOAT, false, 0, 0);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.drawArrays(gl.POINTS, 0, wisps.count);
+        gl.disable(gl.BLEND);
+        if (wLocA !== loc) gl.disableVertexAttribArray(wLocA);
+        if (wLocS !== loc) gl.disableVertexAttribArray(wLocS);
         gl.useProgram(prog);
-        gl.activeTexture(gl.TEXTURE5);
-        gl.bindTexture(gl.TEXTURE_2D, dst);
-        gl.uniform1i(u("uClouds"), 5);
-        simIdx = 1 - simIdx;
-        simFirst = false;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       };
       // Adaptive quality: lower the planet's render scale if frames run long.
       const quality = { scale: 1, ema: 16, last: 0, changed: 0 };
@@ -1223,6 +1211,8 @@ export function HeroScene({
         pointer.x += (pointer.tx - pointer.x) * 0.09;
         pointer.y += (pointer.ty - pointer.y) * 0.09;
         if (!transparent) {
+          strandDt = strandLast ? Math.min(6, (now - strandLast) / 16.67) : 1;
+          strandLast = now;
           if (pointer.tx > -9000) {
             head.x = head.x < -9000 ? pointer.tx : head.x + (pointer.tx - head.x) * 0.18;
             head.y = head.y < -9000 ? pointer.ty : head.y + (pointer.ty - head.y) * 0.18;
@@ -1252,7 +1242,7 @@ export function HeroScene({
           // Only as the rocks clear: faint while the last ones leave, full once gone.
           const clear = smooth(0.72, 0.97, progress.current);
           const want = head.x > -9000 && out > 8 && reach < pr * 1.3 && clear > 0 && !reduced ? clear : 0;
-          strand.on += (want - strand.on) * (want > strand.on ? 0.04 : 0.06);
+          strand.on += (want - strand.on) * (1 - Math.pow(1 - (want > strand.on ? 0.04 : 0.06), strandDt));
           strandA.fill(0);
           strandT.fill(0);
           if (strand.on > 0.002) {
@@ -1268,26 +1258,47 @@ export function HeroScene({
             const baseAng = Math.atan2(ay - pcy, ax - pcx) + 0.1;
             const mrx = pcx + Math.cos(baseAng) * (pr - 14);
             const mry = pcy + Math.sin(baseAng) * (pr - 14);
-            for (let k = 0; k < 6; k++) {
-              const s = k - 2.5;
-              const ra = baseAng + s * 0.075;
+            for (let k = 0; k < 4; k++) {
+              const s = k - 1.5;
+              const ra = baseAng + s * 0.09;
               const rx = pcx + Math.cos(ra) * (pr - 14);
               const ry = pcy + Math.sin(ra) * (pr - 14);
-              const reachK = Math.hypot(head.x - rx, head.y - ry);
-              const tx = head.x + px * s * 2.5;
-              const ty = head.y + py * s * 2.5;
-              // Concave: each strand bows in toward the shared middle line (root
-              // middle → cursor), leaning slightly along the streams.
+              // Ethereal, not elastic: each strand's tip and bend drift after the
+              // cursor at their own unhurried pace, with a slow independent sway,
+              // so they trail and settle like smoke rather than snapping.
+              const st = flowState[k]!;
+              // Frame-rate independent (≈ 0.025–0.06 per 60 Hz frame).
+              const ease = 1 - Math.pow(1 - (0.025 + 0.012 * k), strandDt);
+              const wob = Math.sin(((now - clock.current) / 1000) * (0.35 + 0.07 * k) + k * 2.3);
+              const tgx = head.x + px * s * 6 + px * wob * 10;
+              const tgy = head.y + py * s * 6 + py * wob * 10;
+              if (st.tx < -9000) {
+                st.tx = rx;
+                st.ty = ry;
+              }
+              st.tx += (tgx - st.tx) * ease;
+              st.ty += (tgy - st.ty) * ease;
+              const tx = st.tx, ty = st.ty;
+              const reachK = Math.hypot(tx - rx, ty - ry);
+              // Concave: bowing in toward the shared middle line, leaning along the streams.
               const midx = (rx + tx) / 2, midy = (ry + ty) / 2;
-              const axmx = (mrx + head.x) / 2, axmy = (mry + head.y) / 2;
-              const cxp = midx + (axmx - midx) * 1.15 + tx0 * reachK * 0.1;
-              const cyp = midy + (axmy - midy) * 1.15 + ty0 * reachK * 0.1;
-              x0 = Math.min(x0, rx);
-              y0 = Math.min(y0, ry);
-              x1 = Math.max(x1, rx);
-              y1 = Math.max(y1, ry);
+              const axmx = (mrx + tx) / 2, axmy = (mry + ty) / 2;
+              const gcx = midx + (axmx - midx) * 1.15 + tx0 * reachK * 0.12 + px * wob * reachK * 0.04;
+              const gcy = midy + (axmy - midy) * 1.15 + ty0 * reachK * 0.12 + py * wob * reachK * 0.04;
+              if (st.cx < -9000) {
+                st.cx = gcx;
+                st.cy = gcy;
+              }
+              const ease2 = 1 - Math.pow(1 - (0.025 + 0.012 * k) * 0.7, strandDt);
+              st.cx += (gcx - st.cx) * ease2;
+              st.cy += (gcy - st.cy) * ease2;
+              const cxp = st.cx, cyp = st.cy;
+              x0 = Math.min(x0, rx, tx);
+              y0 = Math.min(y0, ry, ty);
+              x1 = Math.max(x1, rx, tx);
+              y1 = Math.max(y1, ry, ty);
               strandA.set([rx, ry, cxp, cyp], k * 4);
-              strandT.set([tx, ty, 1.5 + 0.6 * (k % 2), strand.on * (k === 2 || k === 3 ? 1 : 0.75) * (1 - 0.5 * Math.min(1, reach / (pr * 1.3)))], k * 4);
+              strandT.set([tx, ty, 1.5 + 0.6 * (k % 2), strand.on * (k === 1 || k === 2 ? 1 : 0.75) * (1 - 0.5 * Math.min(1, reach / (pr * 1.3)))], k * 4);
               x0 = Math.min(x0, cxp);
               y0 = Math.min(y0, cyp);
               x1 = Math.max(x1, cxp);
@@ -1297,6 +1308,7 @@ export function HeroScene({
             const pad = 90 + reach * 0.25;
             gl.uniform4f(U.strandBox, x0 - pad, y0 - pad, x1 + pad, y1 + pad);
           } else {
+            for (const st of flowState) st.tx = st.cx = -9999;
             gl.uniform4f(U.strandBox, 0, 0, -1, -1);
           }
           gl.uniform4fv(U.strandA, strandA);
@@ -1345,6 +1357,10 @@ export function HeroScene({
           const dmy = stir && Number.isFinite(ly) ? my - ly! : 0;
           // The pointer's wake gently moves the air, and the air carries the cloud.
           flow.step(mx, my, dmx, dmy, dt);
+          if (wisps) {
+            if (stir) wisps.spawn(mx, my, dmx, dmy, dt);
+            wisps.step(flow, dt);
+          }
           prevSim.disc = [mx, my];
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
@@ -1360,11 +1376,9 @@ export function HeroScene({
           fieldNear.step((0.5 + (fx - 0.5) / sN) * fieldNear.w, (0.95 + (fy - 0.95) / sN) * fieldNear.h, enabled, release, dt);
         }
         if ((flow && flow.dirty) || (fieldFar && (fieldFar.awake || fieldNear!.awake))) uploadSims();
-        if (flow) {
-          stepClouds(reduced ? 10 : tSec, dt / 60);
-        }
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        drawWisps(g, p, tSec);
       };
 
       const loop = (now: number) => {
