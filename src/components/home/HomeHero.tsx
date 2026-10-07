@@ -40,8 +40,8 @@ export interface HeroProps {
   observations: HeroObservation[];
   /** Notes that pop up out in space (around the streams). */
   spaceNotes: HeroObservation[];
-  /** Short machine-style readout under the glyph panel (real data, e.g. release). */
-  code: string;
+  /** Short machine-style readout (real data, e.g. release); currently not shown. */
+  code?: string;
 }
 
 /** From the GM's intro ("The Tide - Intro"). */
@@ -49,7 +49,7 @@ const HAIKU = ["Waves crash upon shores,", "As the Tide's eternal song,", "Echoe
 
 const pin = (x: number, y: number) => ({ "--x": `${x}%`, "--y": `${y}%` }) as React.CSSProperties;
 
-export function HomeHero({ callouts, observations, spaceNotes, code }: HeroProps) {
+export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
@@ -157,11 +157,6 @@ export function HomeHero({ callouts, observations, spaceNotes, code }: HeroProps
             <Observations items={observations} active={revealed} />
             <Observations items={spaceNotes} active={revealed} startDelay={4800} calc />
           </div>
-          {/* Glyph panel, bottom right (decorative script, no meaning). */}
-          <div aria-hidden="true" className="absolute bottom-24 right-4 font-[family-name:var(--font-mono)] text-white/70 sm:right-10">
-            <div className="flex items-center gap-3 border-x border-white/40 px-3 py-1 text-sm tracking-[0.5em]">⟁ ⋎ ⍙ ⊼ ⨯ ⟊</div>
-            <div className="tracked mt-2 border-l border-white/40 pl-3 text-[0.62rem] text-faint">{code}</div>
-          </div>
           {/* Top-right note from the mockup. */}
           <div className="absolute right-4 top-[calc(var(--header-h)+1rem)] flex items-center gap-3 sm:right-10">
             <span className="tracked text-right text-[0.6rem] leading-4 text-faint">
@@ -179,7 +174,6 @@ export function HomeHero({ callouts, observations, spaceNotes, code }: HeroProps
             <span className="flex items-center gap-4">
               A living atlas of worlds <span aria-hidden="true" className="hidden h-px w-14 bg-white/25 sm:inline-block" /> The Tide
             </span>
-            <span>Observe / Discover / Preserve</span>
           </div>
         </div>
 
@@ -208,7 +202,6 @@ export function HomeHero({ callouts, observations, spaceNotes, code }: HeroProps
             <h1 id="hero-title" className="mt-8 whitespace-nowrap font-[family-name:var(--font-display)] text-[clamp(2.6rem,7.4vw,9rem)] font-light uppercase leading-none tracking-[0.32em] text-white sm:tracking-[0.42em]">
               The Tide
             </h1>
-            <p className="tracked mt-7 text-[clamp(0.8rem,0.55rem+0.55vw,1.2rem)] text-muted">Worlds in equilibrium</p>
           </div>
         </div>
 
@@ -315,13 +308,14 @@ function Observations({ items, active, startDelay = 1600, calc = false }: { item
       <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />
       <span className={`obs-line absolute top-0 h-px bg-white/50 ${o.side === "right" ? "left-2 origin-left" : "right-2 origin-right"}`} />
       <div className={`absolute -top-2.5 w-max max-w-[16rem] ${o.side === "right" ? "left-[4.5rem]" : "right-[4.5rem] text-right"}`}>
+        {/* In space, the identification is worked out first; the name replaces it. */}
+        {calc ? <Working key={`w${index}`} active={on} seed={index} /> : null}
         <span className="tracked block text-white">
-          <Typed key={`t${index}`} text={o.title} active={on} delay={250} />
+          <Typed key={`t${index}`} text={o.title} active={on} delay={(calc ? WORKING_MS : 0) + 250} />
         </span>
         <span className="tracked block text-[0.68rem] leading-5 text-muted">
-          <Typed key={`l${index}`} text={o.line} active={on} delay={250 + o.title.length * 28 + 150} speed={18} />
+          <Typed key={`l${index}`} text={o.line} active={on} delay={(calc ? WORKING_MS : 0) + 250 + o.title.length * 28 + 150} speed={18} />
         </span>
-        {calc ? <Working key={`w${index}`} active={on} seed={index} /> : null}
       </div>
     </div>
   );
@@ -331,36 +325,36 @@ function Observations({ items, active, startDelay = 1600, calc = false }: { item
 const GLYPHS = ["⟁", "⋎", "⍙", "⊼", "⨯", "⟊", "⌖", "⍜", "⟟", "⏃"];
 const OPS = ["∫", "Σ", "Δ", "∂", "√", "λ", "θ", "≈", "∝", "∇"];
 
+const WORKING_MS = 1500;
+
 /**
- * A few lines of "working" under a note in space: formulas mixing maths and the
- * made-up glyphs churn for a moment as the object is identified, then settle.
+ * Two lines of "working" where a note in space will appear: formulas mixing
+ * maths and the made-up glyphs churn as the object is identified, lock in,
+ * then clear so the name can type out in their place.
  */
 function Working({ active, seed }: { active: boolean; seed: number }) {
   const [lines, setLines] = useState<string[]>([]);
+  const [done, setDone] = useState(false);
   useEffect(() => {
     if (!active) return;
-    let rnd = seed * 9301 + 49297;
-    const r = () => ((rnd = (rnd * 9301 + 49297) % 233280) / 233280);
     const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]!;
     const num = () => (Math.random() * 9.99).toFixed(3);
-    const line = () => `${pick(OPS)}${pick(GLYPHS)} ${num()} ${pick(["·", "×", "/", "→"])} ${pick(GLYPHS)}${pick(GLYPHS)} ${num()}`;
-    const final = [0, 1, 2].map(() => `${OPS[Math.floor(r() * OPS.length)]}${GLYPHS[Math.floor(r() * GLYPHS.length)]} ${(r() * 9.99).toFixed(3)} → ${GLYPHS[Math.floor(r() * GLYPHS.length)]}${GLYPHS[Math.floor(r() * GLYPHS.length)]} ${(r() * 9.99).toFixed(3)}`);
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const id = window.setTimeout(() => setLines(final), 0);
-      return () => window.clearTimeout(id);
-    }
+    const line = () => `${pick(OPS)}${pick(GLYPHS)} ${num()} ${pick(["·", "×", "→"])} ${pick(GLYPHS)}${pick(GLYPHS)} ${num()}`;
+    const final = [line(), line()];
     let ticks = 0;
     const timer = window.setInterval(() => {
       ticks += 1;
-      // Lines lock in one by one as the identification resolves.
-      setLines([0, 1, 2].map((i) => (ticks > 14 + i * 6 ? final[i]! : line())).slice(0, Math.min(3, 1 + Math.floor(ticks / 4))));
-      if (ticks > 30) window.clearInterval(timer);
+      setLines([0, 1].map((i) => (ticks > 9 + i * 4 ? final[i]! : line())).slice(0, ticks > 3 ? 2 : 1));
+      if (ticks * 70 >= WORKING_MS) {
+        window.clearInterval(timer);
+        setDone(true);
+      }
     }, 70);
     return () => window.clearInterval(timer);
   }, [active, seed]);
-  if (!active) return null;
+  if (!active || done) return null;
   return (
-    <span className="mt-1 block font-[family-name:var(--font-mono)] text-[0.58rem] leading-4 tracking-[0.12em] text-white/35">
+    <span className="absolute inset-x-0 top-0 block font-[family-name:var(--font-mono)] text-[0.6rem] leading-4 tracking-[0.12em] text-white/40">
       {lines.map((l, i) => (
         <span key={i} className="block whitespace-nowrap">
           {l}

@@ -19,7 +19,7 @@
  * Geometry matches the CSS .hero-frame so DOM callouts stay pinned to the art.
  */
 import { useEffect, useRef } from "react";
-import { FlowSim, GravityField } from "./heroPhysics";
+import { CloudParticles, FlowSim, RockBodies } from "./heroPhysics";
 import { heroSignal } from "./heroSound";
 import { ROCKS } from "./rocks";
 
@@ -70,13 +70,13 @@ float stormAmount(vec2 sph) {
   float st = 0.0;
   for (int k = 0; k < 3; k++) {
     float sa = uStorm[k].z;
-    if (sa < 0.0 || sa > 40.0) continue;
-    float grow = smoothstep(0.0, 1.5, sa) * (1.0 - smoothstep(24.0, 40.0, sa));
+    if (sa < 0.0 || sa > 3.0) continue;
+    float grow = smoothstep(0.0, 0.5, sa) * (1.0 - smoothstep(1.8, 3.0, sa));
     vec2 d = sph - uStorm[k].xy;
     float r = length(d) / 0.13;
     if (r > 1.6) continue;
     float th = atan(d.y, d.x);
-    float arms = 0.5 + 0.5 * sin(2.0 * th + 6.0 * log(r + 0.06) - sa * 1.4 + uStorm[k].w * 6.0);
+    float arms = 0.5 + 0.5 * sin(2.0 * th + 6.0 * log(r + 0.06) - sa * 2.5 + uStorm[k].w * 6.0);
     float body = smoothstep(1.35, 0.35, r) * smoothstep(0.06, 0.2, r);
     st = max(st, body * (0.3 + 0.7 * arms) * grow);
   }
@@ -100,10 +100,13 @@ precision highp float;
 uniform sampler2D uPlanet, uFar, uNear;
 uniform sampler2D uFlow;          // planet: weather flow (z: where the clouds were brushed thin)
 uniform sampler2D uClouds;        // planet: simulated cloud amount (carried by the air)
+uniform sampler2D uMasks;         // planet: baked masks (R land, G light streams on the disc)
+uniform sampler2D uPart;          // planet: cloud particles, accumulated (amount, offset, coverage)
+uniform float uPartOn;            // planet: 1 while any cloud particle is displaced
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
 uniform sampler2D uCentFar, uCentNear;   // meteors: each rock pixel's rock centre + movable flag
-uniform sampler2D uFieldFar, uFieldNear; // meteors: gravity displacement field (±128 source px)
+uniform sampler2D uStateFar, uStateNear; // meteors: rock bodies (offsets, spins, search hints), 64×64
 // uLayer is a compile-time constant (0 = planet, opaque; 1 = meteors, premultiplied
 // alpha): each canvas compiles only its own code, which keeps first-load compile short.
 uniform vec2 uRes;
@@ -161,6 +164,44 @@ vec2 gSp;
 
 
 const vec2 PINCH = vec2(0.20, 0.453); // where the streams cross, in artwork uv
+
+// Cloud amount at a disc point: from the particles while any are displaced,
+// otherwise straight from the cloud simulation. disp: how far the cloud piece
+// here has travelled; cover: 1 normally, < 1 where torn apart, > 1 piled up.
+float cloudAt(vec2 sph, out vec2 disp, out float cover) {
+  vec2 tuv = clamp(sph * 0.5 + 0.5, 0.0, 1.0);
+  if (uPartOn < 0.5) {
+    disp = vec2(0.0);
+    cover = 1.0;
+    return texture2D(uClouds, tuv).r;
+  }
+  vec4 a = texture2D(uPart, tuv);
+  float ws = max(a.a, 0.002);
+  disp = (a.gb / ws - 0.5) * 0.5;
+  cover = a.a / 0.5;
+  return a.r / ws;
+}
+
+// Planted storms knock out the power grid light by light: each light near the
+// storm fails at its own moment (spreading outward), flickers, and comes back
+// on within the storm's few seconds.
+float gridOutage(vec2 id, vec2 sph) {
+  float outage = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float sa = uStorm[k].z;
+    if (sa < 0.0 || sa > 3.2) continue;
+    float dd = length(sph - uStorm[k].xy);
+    float hL = hash(id + uStorm[k].w * 31.0);
+    if (dd > 0.22 || hL > 1.2 * (1.0 - dd / 0.22)) continue;
+    float tFail = dd * 2.5 + hL * 0.4;
+    float tBack = tFail + 0.6 + 1.0 * hash(id + 3.0 + uStorm[k].w);
+    float flick = step(0.5, hash(id + floor(uT * 16.0)));
+    if (sa > tFail - 0.25 && sa < tFail) outage = max(outage, flick);
+    else if (sa >= tFail && sa < tBack) outage = 1.0;
+    else if (sa >= tBack && sa < tBack + 0.3) outage = max(outage, flick);
+  }
+  return outage;
+}
 
 // Black-hole-like horizon plus a flowing tide, always in motion and kept light.
 // The stream lines themselves are never displaced (that chopped them up): only
@@ -299,10 +340,14 @@ vec3 planetWithLimb(vec2 uv) {
     // it, so pushing moves real cloud); fine detail is added here, crisp.
     vec2 pw = cloudCoords(sph);
     vec2 sunStepS = normalize(sunDir.xy) * 0.012;
-    float baseHere = texture2D(uClouds, clamp(sph * 0.5 + 0.5, 0.0, 1.0)).r;
-    float baseSun = texture2D(uClouds, clamp((sph + sunStepS) * 0.5 + 0.5, 0.0, 1.0)).r;
-    float dens = cloudDetail(baseHere, pw);
-    float densSun = cloudDetail(baseSun, pw + normalize(sunDir.xy) * 0.035);
+    vec2 dispH, dispS;
+    float coverH, coverS;
+    float baseHere = cloudAt(sph, dispH, coverH);
+    float baseSun = cloudAt(sph + sunStepS, dispS, coverS);
+    // Fine detail travels with its particle; torn-apart cloud thins out.
+    float dens = clamp(cloudDetail(baseHere, cloudCoords(sph - dispH)) * coverH, 0.0, 1.0);
+    float densSun = clamp(cloudDetail(baseSun, cloudCoords(sph + sunStepS - dispS) + normalize(sunDir.xy) * 0.035) * coverS, 0.0, 1.0);
+    cleared = max(cleared, clamp(1.0 - coverH, 0.0, 1.0));
     vec2 eyes[3];
     eyes[0] = vec2(-0.4127, -0.0255);
     eyes[1] = vec2(-0.45, -0.55);
@@ -316,15 +361,16 @@ vec3 planetWithLimb(vec2 uv) {
     float alpha = pow(dens, 1.3) * 0.88 * smoothstep(0.0, 0.15, z);
     col = mix(col, cloudCol, inside * alpha);
 
-    // Lightning inside the storms: each eye (and a few roaming cells) flashes now
-    // and then, lighting the cloud from within.
+    // Lightning inside the storms: now and then (rarely) a flash lights a cloud
+    // from within.
     float flash = 0.0;
     for (int k = 0; k < 5; k++) {
       float fk = float(k);
       vec2 cell = k < 3 ? eyes[k] + vec2(0.06, -0.04) : vec2(hash(vec2(fk, floor(uT * 0.05))) * 1.4 - 0.7, hash(vec2(floor(uT * 0.05), fk)) * 1.4 - 0.7);
-      float slot = floor(uT * 1.7 + fk * 3.1);
-      float on = step(0.86, hash(vec2(slot, fk * 7.3)));
-      float ph = fract(uT * 1.7 + fk * 3.1);
+      // Rare: on average one flash somewhere every ~10 s.
+      float slot = floor(uT * 1.2 + fk * 3.1);
+      float on = step(0.975, hash(vec2(slot, fk * 7.3)));
+      float ph = fract(uT * 1.2 + fk * 3.1);
       float strobe = on * exp(-ph * 9.0) * (0.6 + 0.4 * step(0.5, fract(ph * 6.0)));
       vec2 dc = sph - flowD - cell - (vec2(hash(vec2(slot, 1.0)), hash(vec2(slot, 2.0))) - 0.5) * 0.12;
       flash += strobe * exp(-dot(dc, dc) / 0.004);
@@ -332,8 +378,8 @@ vec3 planetWithLimb(vec2 uv) {
     // Planted storms: lightning flickering inside each one.
     for (int k = 0; k < 3; k++) {
       float sa = uStorm[k].z;
-      if (sa < 0.0 || sa > 40.0) continue;
-      float grow = smoothstep(0.0, 2.5, sa) * (1.0 - smoothstep(22.0, 40.0, sa));
+      if (sa < 0.0 || sa > 3.0) continue;
+      float grow = smoothstep(0.0, 0.4, sa) * (1.0 - smoothstep(1.8, 3.0, sa));
       float slot = floor(sa * 3.0);
       float on = step(0.6, hash(vec2(slot, uStorm[k].w * 13.0)));
       float ph = fract(sa * 3.0);
@@ -346,59 +392,82 @@ vec3 planetWithLimb(vec2 uv) {
     // Dusk: the lower right of the visible disc lies past the day–night line.
     col *= 1.0 - 0.72 * nightSide;
 
-    // City lights on the night side, through gaps in the cloud. Placed in true
-    // latitude/longitude on the sphere, so they foreshorten with the globe;
-    // tiny points at the scale of an Earth-sized planet, clustered into metro
-    // areas along coasts.
-    if (nightSide > 0.01) {
-      vec2 tx2 = vec2(3.0) / SRC;
-      float lumA = dot(tex(uPlanet, uv).rgb, vec3(0.3333));
-      float land = smoothstep(0.1, 0.3, lumA);
-      float coast = smoothstep(0.03, 0.12, abs(dot(tex(uPlanet, uv + vec2(tx2.x, 0.0)).rgb - tex(uPlanet, uv - vec2(tx2.x, 0.0)).rgb, vec3(0.3333)))
-                                       + abs(dot(tex(uPlanet, uv + vec2(0.0, tx2.y)).rgb - tex(uPlanet, uv - vec2(0.0, tx2.y)).rgb, vec3(0.3333))));
+    // City lights, like the planet seen from orbit at night: bright metro cores
+    // with soft glow, towns strung along road networks between them, sparse
+    // scattered settlements, and (it is a future world) some planned districts
+    // laid out on regular lattices and long straight transit corridors.
+    // Placed in latitude/longitude on the sphere, on land only (baked mask: the
+    // light streams crossing the disc are excluded). Strongest past dusk,
+    // faint on the day side.
+    float landHere = texture2D(uMasks, uv).r;
+    if (landHere > 0.01) {
       float lat = asin(clamp(sph.y, -1.0, 1.0));
       float lon = atan(sph.x, z);
       vec2 sc = vec2(lon * cos(lat), lat);
-      float metro = smoothstep(0.48, 0.76, fbm(sc * 7.0 + 3.0) + 0.25 * coast) * max(land, 0.6 * coast);
-      vec2 cg = sc * 900.0;
-      vec2 ci = floor(cg);
-      float h = hash(ci);
-      vec2 cp = ci + 0.3 + 0.4 * vec2(hash(ci + 1.3), hash(ci + 2.9));
-      float twinkle = 0.85 + 0.15 * sin(uT * (1.5 + 3.0 * h) + h * 40.0);
-      float pts = step(0.62, h) * exp(-dot(cg - cp, cg - cp) * 9.0) * (0.5 + 0.9 * hash(ci + 7.0)) * twinkle;
-      float sprawl = metro * (0.2 + 0.8 * fbm(sc * 150.0));
-      // A muted mix: about half the towns softly warm, the rest near white.
-      vec3 sodium = mix(vec3(0.95, 0.95, 0.97), vec3(1.0, 0.86, 0.68), step(0.5, hash(ci + 13.0)));
-      vec3 lights = sodium * (pts * (0.04 + metro) * 1.9 + sprawl * 0.14);
-      // Planted storms knock out the power grid light by light: each light near
-      // the storm fails at its own moment (the failure spreads outward from the
-      // storm), flickers as it goes, and comes back on a second or two later.
-      float outage = 0.0;
-      for (int k = 0; k < 3; k++) {
-        float sa = uStorm[k].z;
-        if (sa < 0.0 || sa > 8.0) continue;
-        float dd = length(sph - uStorm[k].xy);
-        float hL = hash(ci + uStorm[k].w * 31.0);
-        if (dd > 0.22 || hL > 1.2 * (1.0 - dd / 0.22)) continue;
-        float tFail = dd * 5.0 + hL * 1.0;
-        float tBack = tFail + 1.0 + 1.6 * hash(ci + 3.0 + uStorm[k].w);
-        float flick = step(0.5, hash(ci + floor(uT * 16.0)));
-        float o = 0.0;
-        if (sa > tFail - 0.25 && sa < tFail) o = flick;
-        else if (sa >= tFail && sa < tBack) o = 1.0;
-        else if (sa >= tBack && sa < tBack + 0.3) o = flick;
-        outage = max(outage, o);
+      // A post-ravage world: settled pockets here and there, dark between them.
+      float region = smoothstep(0.58, 0.8, fbm(sc * 4.0 + 3.0));
+      if (region < 0.01) { landHere = 0.0; }
+      vec3 warm = vec3(1.0, 0.87, 0.68);
+      vec3 cool = vec3(0.93, 0.95, 1.0);
+      vec3 lights = vec3(0.0);
+      // Cities and the roads between them (cells of a jittered grid).
+      vec2 cg = sc * 55.0;
+      vec2 cb = floor(cg);
+      for (int a = -1; a <= 1; a++) {
+        for (int b = -1; b <= 1; b++) {
+          vec2 c0 = cb + vec2(float(a), float(b));
+          float h0 = hash(c0 + 17.0);
+          if (h0 < 0.55) continue;
+          vec2 p0 = c0 + 0.2 + 0.6 * vec2(hash(c0 + 5.0), hash(c0 + 6.0));
+          float pop = pow(hash(c0 + 9.0), 3.0) * region;
+          float out0 = gridOutage(c0, sph);
+          float d0 = length(cg - p0);
+          float rc = 0.05 + 0.16 * pop;
+          lights += mix(warm, cool, 0.3) * (exp(-d0 * d0 / (rc * rc)) * (0.6 + 1.6 * pop) + exp(-d0 * d0 / (9.0 * rc * rc)) * 0.18 * pop) * region * (1.0 - out0);
+          // Roads to the right and lower neighbours, dotted with towns.
+          for (int e = 0; e < 2; e++) {
+            vec2 c1 = c0 + (e == 0 ? vec2(1.0, 0.0) : vec2(0.0, 1.0));
+            if (hash(c1 + 17.0) < 0.55 || hash(c0 + float(e) * 3.0 + 41.0) < 0.45) continue;
+            vec2 p1 = c1 + 0.2 + 0.6 * vec2(hash(c1 + 5.0), hash(c1 + 6.0));
+            vec2 ed = p1 - p0;
+            float t = clamp(dot(cg - p0, ed) / dot(ed, ed), 0.0, 1.0);
+            float dl2 = length(cg - p0 - ed * t);
+            float towns = 0.35 + 0.65 * smoothstep(0.55, 0.9, vnoise(vec2(t * 9.0, h0 * 40.0 + float(e))));
+            lights += warm * exp(-dl2 * dl2 * 1800.0) * towns * 0.32 * region * (1.0 - out0);
+          }
+          // A few planned districts: lights on a tight regular lattice.
+          if (hash(c0 + 23.0) > 0.92) {
+            float ang = hash(c0 + 24.0) * 1.57;
+            vec2 rel = (cg - p0) * mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
+            vec2 lat2 = abs(fract(rel * 14.0) - 0.5);
+            float dots = exp(-dot(lat2, lat2) * 90.0);
+            lights += cool * dots * smoothstep(0.42, 0.15, length(rel)) * 0.55 * (1.0 - out0);
+          }
+        }
       }
-      // Sprawl dims with its lights.
-      lights *= 1.0 - 0.95 * outage;
-      col += lights * nightSide * (1.0 - 0.85 * dens) * inside * 1.3;
+      // Scattered settlements.
+      vec2 tg = sc * 210.0;
+      vec2 ti = floor(tg);
+      float th = hash(ti + 3.0);
+      vec2 tp = ti + 0.3 + 0.4 * vec2(hash(ti + 1.0), hash(ti + 2.0));
+      float town = step(0.97 - 0.12 * region, th) * region * exp(-dot(tg - tp, tg - tp) * 7.0) * (0.25 + 0.5 * hash(ti + 8.0));
+      lights += warm * town * (1.0 - gridOutage(ti, sph));
+      // Long straight transit corridors, in segments.
+      vec2 dirA = normalize(vec2(0.86, 0.5));
+      float lane = abs(fract(dot(sc, vec2(-dirA.y, dirA.x)) * 9.0) - 0.5);
+      float seg = smoothstep(0.66, 0.72, vnoise(sc * 6.0 + 11.0)) * region;
+      float beads = 0.5 + 0.5 * step(0.5, fract(dot(sc, dirA) * 260.0));
+      lights += cool * exp(-lane * lane * 9000.0) * seg * beads * 0.35;
+      float twinkle = 0.9 + 0.1 * sin(uT * 2.3 + hash(cb) * 30.0);
+      float shown = mix(0.16, 1.0, nightSide);
+      col += lights * landHere * shown * twinkle * (1.0 - 0.85 * dens) * inside;
     }
 
     // Sun glint: a soft specular sheen on open water, toward the sun.
     float water = 1.0 - smoothstep(0.05, 0.16, dot(tex(uPlanet, uv).rgb, vec3(0.3333)));
     vec3 halfV = normalize(sunDir + vec3(0.0, 0.0, 1.0));
-    float spec = pow(clamp(dot(nrm3, halfV), 0.0, 1.0), 28.0);
-    col += vec3(0.9, 0.94, 1.0) * spec * water * (1.0 - dens) * 0.7 * (0.75 + 0.25 * fbm(sph * 60.0 + uT * 0.3));
+    float spec = pow(clamp(dot(nrm3, halfV), 0.0, 1.0), 48.0);
+    col += vec3(0.9, 0.94, 1.0) * spec * water * (1.0 - dens) * 0.22 * (0.75 + 0.25 * fbm(sph * 60.0 + uT * 0.3));
 
     // Meteors entering the atmosphere: a short burning streak near the limb
     // every few seconds, gone in about a second.
@@ -497,55 +566,50 @@ float rockId(sampler2D ids, vec2 uv) {
   vec4 t = texture2D(ids, uv);
   return floor(t.r * 255.0 + 0.5) + floor(t.g * 255.0 + 0.5) * 256.0;
 }
-// Gravity push. Every movable rock is a rigid body: it moves by the gravity
-// field at its centre scaled by its mass (small rocks fly further, big ones
-// barely budge), turns a little, and floats gently. Rocks cut by the frame only
-// ever move outward past the edges they are cut by, so the cut never shows.
-// A pixel finds which rock lands on it by trying a few candidates.
-vec2 fieldAt(sampler2D field, vec2 uv) {
-  return (texture2D(field, clamp(uv, 0.0, 1.0)).rg - 0.5) * 256.0 / ROCK_SZ;
+// Rocks are independent bodies (simulated on the CPU, see RockBodies): each
+// has its own offset and spin. A pixel finds which rock (if any) now covers it
+// by trying a few candidates: the search hint, its own position, and a short
+// fixed-point walk; then it checks the rock really covers it.
+vec4 stateAt(sampler2D st, vec2 cell) { return texture2D(st, (cell + 0.5) / 64.0); }
+float dec16(float hi, float lo) { return (floor(hi * 255.0 + 0.5) * 256.0 + floor(lo * 255.0 + 0.5)) / 65535.0 - 0.5; }
+// Offset (uv) and turn of a rock.
+vec3 rockState(sampler2D st, float id) {
+  vec2 c = vec2(mod(id, 32.0), floor(id / 32.0));
+  vec4 o = stateAt(st, c);
+  vec4 a = stateAt(st, c + vec2(32.0, 0.0));
+  return vec3(vec2(dec16(o.r, o.g), dec16(o.b, o.a)) * 256.0 / ROCK_SZ, dec16(a.r, a.g) * 8.0);
 }
+vec2 hintAt(sampler2D st, vec2 uv) {
+  vec2 cell = clamp(floor(uv * vec2(48.0, 27.0)), vec2(0.0), vec2(47.0, 26.0));
+  return (stateAt(st, cell + vec2(0.0, 32.0)).rg - 0.5) * 256.0 / ROCK_SZ;
+}
+float flagsAt(sampler2D cent, vec2 uv) { return floor(texture2D(cent, clamp(uv, 0.0, 1.0)).b * 255.0 + 0.5); }
 float bit(float flags, float b) { return mod(floor(flags / pow(2.0, b)), 2.0); }
-// Displacement (uv) and turn for a rock, from its centre/flags texel.
-vec3 rockMotion(sampler2D field, vec4 cen, float id, float bobAmp) {
-  float flags = floor(cen.b * 255.0 + 0.5);
-  float size = floor(flags / 32.0);
-  float h = hash(vec2(id, 7.0));
-  float massK = (1.1 - 0.09 * size) * (0.85 + 0.3 * h);
-  vec2 d = fieldAt(field, cen.rg) * max(0.1, massK);
-  d += vec2(sin(uT * 0.33 + h * 6.28), cos(uT * 0.27 + h * 9.1)) * bobAmp / ROCK_SZ;
-  if (bit(flags, 1.0) > 0.5) d.x = min(d.x, 0.0);
-  if (bit(flags, 2.0) > 0.5) d.x = max(d.x, 0.0);
-  if (bit(flags, 3.0) > 0.5) d.y = min(d.y, 0.0);
-  if (bit(flags, 4.0) > 0.5) d.y = max(d.y, 0.0);
-  float edge = bit(flags, 1.0) + bit(flags, 2.0) + bit(flags, 3.0) + bit(flags, 4.0);
-  float turn = edge > 0.5 ? 0.0 : (d.x * 1672.0 * 0.002 - d.y * 941.0 * 0.0015) * (h - 0.5) * (1.6 - 0.15 * size);
-  return vec3(d, turn);
-}
-vec2 rigidMove(sampler2D ids, sampler2D cent, sampler2D field, vec2 uv, float bobAmp, out float keep) {
+vec2 rigidMove(sampler2D ids, sampler2D cent, sampler2D st, vec2 uv, float bobAmp, out float keep) {
   keep = 1.0;
   float idP = rockId(ids, uv);
-  vec4 cP = texture2D(cent, clamp(uv, 0.0, 1.0));
-  float movP = bit(floor(cP.b * 255.0 + 0.5), 0.0);
-  if (idP > 0.5 && movP < 0.5) return uv;                  // a rock that stays put
-  vec2 dP = fieldAt(field, uv);
-  // Candidates: step back along the field by a few amounts and around it.
-  for (int k = 0; k < 7; k++) {
-    float fk = float(k);
-    vec2 off = k < 4 ? dP * (fk == 0.0 ? 1.0 : fk == 1.0 ? 0.0 : fk == 2.0 ? 0.5 : 1.6)
-                     : dP + vec2(k == 4 ? 12.0 : k == 5 ? -12.0 : 0.0, k == 6 ? 12.0 : 0.0) / ROCK_SZ;
-    if (k > 1 && dot(dP, dP) * 1672.0 * 1672.0 < 0.25) break;   // no push here: the plain cases suffice
-    vec2 q = uv - off;
+  if (idP > 0.5 && bit(flagsAt(cent, uv), 0.0) < 0.5) return uv;     // a rock that stays put
+  vec2 hint = hintAt(st, uv);
+  vec2 q = uv - hint;
+  for (int k = 0; k < 5; k++) {
+    if (k == 1) q = uv;
+    else if (k == 2) q = uv - hint * 0.5;
     float idQ = rockId(ids, q);
     if (idQ < 0.5) continue;
     vec4 cQ = texture2D(cent, clamp(q, 0.0, 1.0));
-    if (bit(floor(cQ.b * 255.0 + 0.5), 0.0) < 0.5) continue;
-    vec3 m = rockMotion(field, cQ, idQ, bobAmp);
+    float fl = floor(cQ.b * 255.0 + 0.5);
+    if (bit(fl, 0.0) < 0.5) continue;
+    vec3 m = rockState(st, idQ);
+    // Gentle individual float, for rocks not cut by the frame.
+    float h = hash(vec2(idQ, 7.0));
+    float edge = fl > 1.5 ? 1.0 : 0.0;
+    m.xy += (1.0 - edge) * vec2(sin(uT * 0.21 + h * 6.28), cos(uT * 0.17 + h * 9.1)) * bobAmp / ROCK_SZ;
     vec2 c = cQ.rg;
     vec2 rel = (uv - c - m.xy) * ROCK_SZ;
     float cs = cos(-m.z), sn = sin(-m.z);
     vec2 s2 = c + vec2(cs * rel.x - sn * rel.y, sn * rel.x + cs * rel.y) / ROCK_SZ;
     if (abs(rockId(ids, s2) - idQ) < 0.5) return s2;
+    q = uv - m.xy;                                         // walk toward the rock's new place
   }
   if (idP > 0.5) keep = 0.0;                               // this rock has moved away
   return uv;
@@ -618,7 +682,7 @@ vec4 scene(vec2 sp) {
   vec2 oF = vec2(0.5);
   vec2 uvF = oF + (f - oF) / sF;
   float keepF = 1.0;
-  uvF = rigidMove(uIdsFar, uCentFar, uFieldFar, uvF, 2.5, keepF);
+  uvF = rigidMove(uIdsFar, uCentFar, uStateFar, uvF, 2.5, keepF);
   vec4 far = keepF * flyby(uFar, uvF, oF, 0.012 * depth + 0.02 * rush,
                    mix(0.22, 0.4, uP), mix(0.22, 0.4, uP), px / sF, 1.6 + 3.5 * depth);
   // Stays solid through most of the scroll; gone by the last frame (only the planet remains).
@@ -631,7 +695,7 @@ vec4 scene(vec2 sp) {
   vec2 uvN = oN + (f - oN) / sN;
   float glint = 0.35 + 0.5 * sin(3.14159 * clamp(uP * 1.4, 0.0, 1.0));
   float keepN = 1.0;
-  uvN = rigidMove(uIdsNear, uCentNear, uFieldNear, uvN, 4.0, keepN);
+  uvN = rigidMove(uIdsNear, uCentNear, uStateNear, uvN, 4.0, keepN);
   vec4 near = keepN * flyby(uNear, uvN, oN, 0.02 * depth + 0.035 * rush, 0.8, glint, px / sN, 7.0 * depth * depth);
   // Fully opaque until the very end of the scroll, then gone by the last frame.
   near *= iNear * (1.0 - smoothstep(0.84, 0.97, uP));
@@ -668,7 +732,7 @@ void main() {
   if (uLayer == 0) {
     // The lens bends space, not the planet: no warp over the planet's disc (its
     // clouds still part, and the light ring, prism and flares still show).
-    float onSpace = smoothstep(0.0, 40.0, planetDl(sp));
+    float onSpace = smoothstep(0.0, 90.0, planetDl(sp));
     warped = mix(sp, warped, onSpace);
     dir *= onSpace;
   }
@@ -684,7 +748,6 @@ void main() {
   // its compile time); a faint colour fringe on the lens ring stands in for it.
   vec4 cg = scene(warped);
   vec3 col = cg.rgb;
-  col *= 1.0 + vec3(0.6, 0.0, -0.4) * ca * 0.04 * onSpaceCA;
   col *= 1.0 + e * (0.55 * ring + 0.15 * fall) * pointerInSpace;
 
   if (uLayer == 0) {
@@ -735,6 +798,36 @@ void main() {
 }
 `;
 
+// Cloud particles: each is a small piece of the cloud deck, splatted with a tent
+// weight into a disc-space texture (576², 96 particles across). Undisturbed the
+// tents sum exactly to the deck; displaced, each piece carries its own patch.
+// Output: amount, offset (x, y) and weight, all weighted (summed by blending).
+const PART_VERT = `
+attribute vec4 aP;            // home x, y; offset x, y (disc units)
+varying vec2 vPos;
+varying vec2 vOff;
+void main() {
+  vPos = aP.xy + aP.zw;
+  vOff = aP.zw;
+  gl_Position = vec4(vPos, 0.0, 1.0);
+  gl_PointSize = 12.0;
+}
+`;
+
+const PART_FRAG = `
+precision highp float;
+uniform sampler2D uClouds;
+varying vec2 vPos;
+varying vec2 vOff;
+void main() {
+  vec2 f = gl_FragCoord.xy / 576.0 * 2.0 - 1.0;
+  vec2 d = (f - vPos) / (2.0 / 96.0);
+  float w = max(0.0, 1.0 - abs(d.x)) * max(0.0, 1.0 - abs(d.y));
+  float amount = texture2D(uClouds, clamp((f - vOff) * 0.5 + 0.5, 0.0, 1.0)).r;
+  gl_FragColor = vec4(amount, clamp(vOff * 2.0 + 0.5, 0.0, 1.0), 1.0) * w * 0.5;
+}
+`;
+
 function compile(gl: WebGLRenderingContext, type: number, src: string) {
   const s = gl.createShader(type)!;
   gl.shaderSource(s, src);
@@ -762,7 +855,7 @@ export function frameGeometry(w: number, h: number) {
 }
 
 const SOURCES = {
-  planet: { files: ["/brand/planet-v2.webp"], uniforms: ["uPlanet"] },
+  planet: { files: ["/brand/planet-v2.webp", "/brand/planet-masks.png"], uniforms: ["uPlanet", "uMasks"] },
   meteors: {
     files: ["/brand/meteors-far.webp", "/brand/meteors-near.webp", "/brand/meteors-far-ids.png", "/brand/meteors-near-ids.png", "/brand/meteors-far-centres.png", "/brand/meteors-near-centres.png"],
     uniforms: ["uFar", "uNear", "uIdsFar", "uIdsNear", "uCentFar", "uCentNear"],
@@ -855,8 +948,8 @@ export function HeroScene({
       let dpr = 1;
       // Pointer-driven simulations: weather over the planet, rocks in the meteor layer.
       const flow = layer === "planet" ? new FlowSim() : null;
-      const fieldFar = layer === "meteors" ? new GravityField(ROCKS.far.w, ROCKS.far.h, 130, 0.4) : null;
-      const fieldNear = layer === "meteors" ? new GravityField(ROCKS.near.w, ROCKS.near.h, 240, 0.25) : null;
+      const fieldFar = layer === "meteors" ? new RockBodies(ROCKS.far.rocks, ROCKS.far.w, ROCKS.far.h, 110, 0.012) : null;
+      const fieldNear = layer === "meteors" ? new RockBodies(ROCKS.near.rocks, ROCKS.near.w, ROCKS.near.h, 200, 0.006) : null;
       const prevSim = { disc: [NaN, NaN] };
       let lastFrame = 0;
       // Storms planted by clicking the planet (up to three): disc position, time, seed.
@@ -866,15 +959,15 @@ export function HeroScene({
 
       // Small data textures (weather flow, gravity fields), updated in place.
       const dataTex = new Map<number, WebGLTexture>();
-      const uploadData = (unit: number, uniform: string, w: number, h: number, data: Uint8Array) => {
+      const uploadData = (unit: number, uniform: string, w: number, h: number, data: Uint8Array, exact = false) => {
         gl.activeTexture(gl.TEXTURE0 + unit);
         let t = dataTex.get(unit);
         if (!t) {
           t = gl.createTexture()!;
           dataTex.set(unit, t);
           gl.bindTexture(gl.TEXTURE_2D, t);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, exact ? gl.NEAREST : gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, exact ? gl.NEAREST : gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
@@ -886,8 +979,8 @@ export function HeroScene({
       };
       const uploadSims = () => {
         if (flow) uploadData(3, "uFlow", flow.n, flow.n, flow.data);
-        if (fieldFar) uploadData(6, "uFieldFar", fieldFar.gw, fieldFar.gh, fieldFar.data);
-        if (fieldNear) uploadData(7, "uFieldNear", fieldNear.gw, fieldNear.gh, fieldNear.data);
+        if (fieldFar) uploadData(6, "uStateFar", 64, 64, fieldFar.state, true);
+        if (fieldNear) uploadData(7, "uStateNear", 64, 64, fieldNear.state, true);
       };
 
       // Cloud simulation: ping-pong between two 256² textures through a framebuffer.
@@ -948,6 +1041,70 @@ export function HeroScene({
         gl.uniform1i(u("uClouds"), 5);
         simIdx = 1 - simIdx;
         simFirst = false;
+      };
+      // Cloud particles (planet only).
+      const parts = layer === "planet" ? new CloudParticles() : null;
+      let partProg: WebGLProgram | null = null;
+      let partBuf: WebGLBuffer | null = null;
+      let partTex: WebGLTexture | null = null;
+      let partFb: WebGLFramebuffer | null = null;
+      let partAttr = -1;
+      let partUClouds: WebGLUniformLocation | null = null;
+      if (parts) {
+        try {
+          partProg = gl.createProgram()!;
+          gl.attachShader(partProg, compile(gl, gl.VERTEX_SHADER, PART_VERT));
+          gl.attachShader(partProg, compile(gl, gl.FRAGMENT_SHADER, PART_FRAG));
+          gl.linkProgram(partProg);
+          if (!gl.getProgramParameter(partProg, gl.LINK_STATUS)) throw new Error("link");
+          partAttr = gl.getAttribLocation(partProg, "aP");
+          partUClouds = gl.getUniformLocation(partProg, "uClouds");
+          partBuf = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, partBuf);
+          gl.bufferData(gl.ARRAY_BUFFER, parts.attrs, gl.DYNAMIC_DRAW);
+          gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          gl.activeTexture(gl.TEXTURE6);
+          partTex = gl.createTexture()!;
+          gl.bindTexture(gl.TEXTURE_2D, partTex);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 576, 576, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          partFb = gl.createFramebuffer();
+          gl.useProgram(prog);
+          gl.uniform1i(u("uPart"), 6);
+        } catch {
+          partProg = null; // clouds still render, just without the particles
+          gl.useProgram(prog);
+        }
+      }
+      const drawParticles = () => {
+        if (!parts || !partProg || !partFb || !partTex || !partBuf) return;
+        gl.useProgram(prog);
+        gl.uniform1f(u("uPartOn"), parts.awake ? 1 : 0);
+        if (!parts.awake) return;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, partFb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, partTex, 0);
+        gl.viewport(0, 0, 576, 576);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(partProg);
+        gl.uniform1i(partUClouds, 5);
+        gl.bindBuffer(gl.ARRAY_BUFFER, partBuf);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, parts.attrs);
+        gl.enableVertexAttribArray(partAttr);
+        gl.vertexAttribPointer(partAttr, 4, gl.FLOAT, false, 0, 0);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        gl.drawArrays(gl.POINTS, 0, parts.count);
+        gl.disable(gl.BLEND);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.useProgram(prog);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       };
       // Adaptive quality: lower the planet's render scale if frames run long.
       const quality = { scale: 1, ema: 16, last: 0, changed: 0 };
@@ -1013,7 +1170,9 @@ export function HeroScene({
           const stir = hasPointer && p > 0.6;
           const dmx = stir && Number.isFinite(lx) ? mx - lx! : 0;
           const dmy = stir && Number.isFinite(ly) ? my - ly! : 0;
-          flow.step(mx, my, dmx, dmy);
+          // The air only turns for planted storms; the pointer moves cloud particles.
+          flow.step(mx, my, 0, 0);
+          parts?.step(mx, my, dmx, dmy, stir, dt);
           prevSim.disc = [mx, my];
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
@@ -1029,7 +1188,10 @@ export function HeroScene({
           fieldNear.step((0.5 + (fx - 0.5) / sN) * fieldNear.w, (0.95 + (fy - 0.95) / sN) * fieldNear.h, enabled, release, dt);
         }
         if ((flow && flow.awake) || (fieldFar && (fieldFar.awake || fieldNear!.awake))) uploadSims();
-        if (flow) stepClouds(reduced ? 10 : tSec, dt / 60);
+        if (flow) {
+          stepClouds(reduced ? 10 : tSec, dt / 60);
+          drawParticles();
+        }
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       };

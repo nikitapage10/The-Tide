@@ -1,11 +1,9 @@
 /**
  * Small, allocation-free simulations driven by the pointer on the home hero.
  *
- * - GravityField: a coarse grid over a meteor layer holding a smooth
- *   displacement field. The pointer acts as a soft reverse singularity that
- *   pushes the field outward; it has inertia, a gentle spring home and some
- *   coupling between neighbours, so rocks drift away together and float back.
- *   The shader moves each rock rigidly by the field at the rock's centre.
+ * - RockBodies: every rock is its own body in space (momentum, spin, a slow
+ *   drift home); the pointer is a soft repulsor.
+ * - CloudParticles: the cloud deck as particles you can fly through.
  * - FlowSim: a 64×64 "stable fluids" grid over the planet's disc. The pointer
  *   stirs the air (and planted storms set it turning); the GPU cloud
  *   simulation is carried by this air, and a "cleared" channel thins the haze
@@ -14,117 +12,269 @@
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 
-export class GravityField {
-  readonly gw = 48;
-  readonly gh = 27;
-  private dx: Float32Array;
-  private dy: Float32Array;
+/**
+ * Rocks as independent bodies in space. Each has its own momentum and spin;
+ * there is almost no drag, so a pushed rock glides, slows gradually and drifts
+ * back home slowly. The pointer is a soft repulsor whose push falls off with
+ * distance and is divided by the rock's mass (big rocks barely move). Rocks cut
+ * by the frame only move outward past the edges they are cut by.
+ *
+ * Shader data, one 64×64 RGBA texture: per-rock offset (16-bit x, y) at
+ * (id % 32, id / 32), angle at (32 + id % 32, id / 32), and a coarse 48×27
+ * "hint" grid of offsets (rows 32–58) telling the shader where to look for a
+ * rock that moved onto a pixel.
+ */
+export class RockBodies {
+  readonly n: number;
+  private cx: Float32Array;
+  private cy: Float32Array;
+  private mass: Float32Array;
+  private reachR: Float32Array;
+  private flags: Uint8Array;
+  private ox: Float32Array;
+  private oy: Float32Array;
   private vx: Float32Array;
   private vy: Float32Array;
+  private a: Float32Array;
+  private va: Float32Array;
   private presence = 0;
-  readonly data: Uint8Array;
-  awake = true;
+  readonly state = new Uint8Array(64 * 64 * 4);
+  readonly gw = 48;
+  readonly gh = 27;
+  private hintMag = new Float32Array(48 * 27);
+  awake = false;
 
   constructor(
+    rocks: readonly (readonly number[])[],
     readonly w: number,
     readonly h: number,
-    /** Reach of the push, in source px. */
+    /** Reach of the push around the pointer (source px). */
     readonly reach: number,
     /** Strength of the push. */
     readonly strength: number,
   ) {
-    const n = this.gw * this.gh;
-    this.dx = new Float32Array(n);
-    this.dy = new Float32Array(n);
+    const n = (this.n = Math.min(rocks.length, 1023));
+    this.cx = Float32Array.from(rocks.slice(0, n), (r) => r[0]!);
+    this.cy = Float32Array.from(rocks.slice(0, n), (r) => r[1]!);
+    this.reachR = Float32Array.from(rocks.slice(0, n), (r) => r[2]!);
+    this.mass = Float32Array.from(rocks.slice(0, n), (r) => 0.6 + (r[2]! / 22) ** 2);
+    this.flags = Uint8Array.from(rocks.slice(0, n), (r) => r[3]!);
+    this.ox = new Float32Array(n);
+    this.oy = new Float32Array(n);
     this.vx = new Float32Array(n);
     this.vy = new Float32Array(n);
-    this.data = new Uint8Array(n * 4);
+    this.a = new Float32Array(n);
+    this.va = new Float32Array(n);
     this.pack();
   }
 
-  /**
-   * mx, my: pointer in source px. `enabled`: the pointer may push. `release`:
-   * send everything home quickly. dt: frames elapsed (≈1).
-   */
+  /** mx, my: pointer in source px. dt: frames elapsed (≈1). */
   step(mx: number, my: number, enabled: boolean, release: boolean, dt: number) {
-    const { gw, gh, dx, dy, vx, vy } = this;
     const on = enabled && Number.isFinite(mx) && Number.isFinite(my);
-    this.presence += ((on ? 1 : 0) - this.presence) * Math.min(1, 0.008 * dt);
-    if (!this.awake && this.presence < 0.001) return;
+    this.presence += ((on ? 1 : 0) - this.presence) * Math.min(1, 0.01 * dt);
+    if (!this.awake && this.presence < 0.002) return;
     const R = this.reach;
     const G = this.strength * this.presence;
-    // Overdamped: rocks glide out and settle back without bouncing.
-    const k = release ? 0.04 : 0.0025;
-    const c = release ? 0.35 : 0.24;
+    // Nearly frictionless; a very soft pull home (stronger when leaving the hero).
+    const drag = release ? 0.9 : 0.986;
+    const k = release ? 0.02 : 0.00012;
     let live = 0;
-    for (let j = 0; j < gh; j++)
-      for (let i = 0; i < gw; i++) {
-        const q = j * gw + i;
-        let fx = 0;
-        let fy = 0;
-        if (G > 0.0001) {
-          const rx = ((i + 0.5) / gw) * this.w + dx[q]! - mx;
-          const ry = ((j + 0.5) / gh) * this.h + dy[q]! - my;
-          const d2 = rx * rx + ry * ry;
+    for (let i = 0; i < this.n; i++) {
+      const f = this.flags[i]!;
+      let fx = 0;
+      let fy = 0;
+      if (G > 0.0005) {
+        const rx = this.cx[i]! + this.ox[i]! - mx;
+        const ry = this.cy[i]! + this.oy[i]! - my;
+        const d2 = rx * rx + ry * ry;
+        const RR = R + this.reachR[i]!;
+        if (d2 < 9 * RR * RR) {
           const d = Math.sqrt(d2) || 1;
-          // Soft repulsion: strongest near the pointer, smooth, gone well beyond reach.
-          const f = ((G * R * R) / (d2 + R * R * 0.4)) * Math.exp(-d2 / (9 * R * R));
-          fx = (rx / d) * f;
-          fy = (ry / d) * f;
+          const push = (G * Math.exp(-d2 / (RR * RR))) / this.mass[i]!;
+          fx = (rx / d) * push;
+          fy = (ry / d) * push;
+          // A little spin from an off-centre push.
+          this.va[i] = this.va[i]! + ((rx * fy - ry * fx) / (RR * RR)) * 0.002 * dt;
         }
-        // Neighbour coupling: velocities lean toward the local average.
-        let ax = 0;
-        let ay = 0;
-        let cnt = 0;
-        if (i > 0) {
-          ax += vx[q - 1]!;
-          ay += vy[q - 1]!;
-          cnt++;
-        }
-        if (i < gw - 1) {
-          ax += vx[q + 1]!;
-          ay += vy[q + 1]!;
-          cnt++;
-        }
-        if (j > 0) {
-          ax += vx[q - gw]!;
-          ay += vy[q - gw]!;
-          cnt++;
-        }
-        if (j < gh - 1) {
-          ax += vx[q + gw]!;
-          ay += vy[q + gw]!;
-          cnt++;
-        }
-        const cx = cnt ? ax / cnt - vx[q]! : 0;
-        const cy = cnt ? ay / cnt - vy[q]! : 0;
-        vx[q] = vx[q]! + (fx - k * dx[q]! - c * vx[q]! + 0.15 * cx) * dt;
-        vy[q] = vy[q]! + (fy - k * dy[q]! - c * vy[q]! + 0.15 * cy) * dt;
-        // Never fast: a gentle speed limit (source px per frame).
-        vx[q] = clamp(vx[q]!, -0.7, 0.7);
-        vy[q] = clamp(vy[q]!, -0.7, 0.7);
-        dx[q] = clamp(dx[q]! + vx[q]! * dt, -60, 60);
-        dy[q] = clamp(dy[q]! + vy[q]! * dt, -60, 60);
-        live = Math.max(live, Math.abs(dx[q]!), Math.abs(dy[q]!), Math.abs(vx[q]!) * 10);
       }
-    this.awake = live > 0.05 || this.presence > 0.001;
-    if (live <= 0.05 && this.presence <= 0.001) {
-      dx.fill(0);
-      dy.fill(0);
-      vx.fill(0);
-      vy.fill(0);
+      let vx = (this.vx[i]! + (fx - k * this.ox[i]!) * dt) * Math.pow(drag, dt);
+      let vy = (this.vy[i]! + (fy - k * this.oy[i]!) * dt) * Math.pow(drag, dt);
+      // Never fast.
+      const sp = Math.hypot(vx, vy);
+      if (sp > 0.45) {
+        vx *= 0.45 / sp;
+        vy *= 0.45 / sp;
+      }
+      let ox = this.ox[i]! + vx * dt;
+      let oy = this.oy[i]! + vy * dt;
+      // Cut rocks only ever move outward past their cut edges.
+      if (f & 1 && ox > 0) {
+        ox = 0;
+        vx = Math.min(vx, 0);
+      }
+      if (f & 2 && ox < 0) {
+        ox = 0;
+        vx = Math.max(vx, 0);
+      }
+      if (f & 4 && oy > 0) {
+        oy = 0;
+        vy = Math.min(vy, 0);
+      }
+      if (f & 8 && oy < 0) {
+        oy = 0;
+        vy = Math.max(vy, 0);
+      }
+      this.ox[i] = Math.max(-120, Math.min(120, ox));
+      this.oy[i] = Math.max(-120, Math.min(120, oy));
+      this.vx[i] = vx;
+      this.vy[i] = vy;
+      const va = (this.va[i]! - k * 0.6 * this.a[i]! * dt) * Math.pow(drag, dt);
+      this.va[i] = f ? 0 : clamp(va, -0.004, 0.004);
+      this.a[i] = f ? 0 : clamp(this.a[i]! + this.va[i]! * dt, -1.2, 1.2);
+      live = Math.max(live, Math.abs(this.ox[i]!), Math.abs(this.oy[i]!), Math.abs(this.a[i]!) * 40, sp * 20);
+    }
+    this.awake = live > 0.05 || this.presence > 0.002;
+    if (!this.awake) {
+      this.ox.fill(0);
+      this.oy.fill(0);
+      this.vx.fill(0);
+      this.vy.fill(0);
+      this.a.fill(0);
+      this.va.fill(0);
     }
     this.pack();
   }
 
   private pack() {
-    const { dx, dy, data } = this;
-    for (let q = 0; q < dx.length; q++) {
-      data[q * 4] = clamp(Math.round((dx[q]! / 256 + 0.5) * 255), 0, 255);
-      data[q * 4 + 1] = clamp(Math.round((dy[q]! / 256 + 0.5) * 255), 0, 255);
-      data[q * 4 + 2] = 0;
-      data[q * 4 + 3] = 255;
+    const enc16 = (v: number, range: number) => clamp(Math.round((v / range + 0.5) * 65535), 0, 65535);
+    const S = this.state;
+    const at = (x: number, y: number) => (y * 64 + x) * 4;
+    this.hintMag.fill(0);
+    for (let j = 0; j < this.gh; j++)
+      for (let i = 0; i < this.gw; i++) {
+        const o = at(i, 32 + j);
+        S[o] = 128;
+        S[o + 1] = 128;
+        S[o + 2] = 0;
+        S[o + 3] = 255;
+      }
+    for (let i = 0; i < this.n; i++) {
+      const id = i + 1;
+      const x = enc16(this.ox[i]!, 256);
+      const y = enc16(this.oy[i]!, 256);
+      const an = enc16(this.a[i]!, 8);
+      const o = at(id % 32, Math.floor(id / 32));
+      S[o] = x >> 8;
+      S[o + 1] = x & 255;
+      S[o + 2] = y >> 8;
+      S[o + 3] = y & 255;
+      const oa = at(32 + (id % 32), Math.floor(id / 32));
+      S[oa] = an >> 8;
+      S[oa + 1] = an & 255;
+      S[oa + 3] = 255;
+      // Hint grid: cells the moved rock now covers point back by its offset.
+      const mag = Math.hypot(this.ox[i]!, this.oy[i]!);
+      if (mag < 0.5) continue;
+      const r = this.reachR[i]! * 1.3 + 6;
+      const nx = this.cx[i]! + this.ox[i]!;
+      const ny = this.cy[i]! + this.oy[i]!;
+      const i0 = Math.max(0, Math.floor(((nx - r) / this.w) * this.gw));
+      const i1 = Math.min(this.gw - 1, Math.floor(((nx + r) / this.w) * this.gw));
+      const j0 = Math.max(0, Math.floor(((ny - r) / this.h) * this.gh));
+      const j1 = Math.min(this.gh - 1, Math.floor(((ny + r) / this.h) * this.gh));
+      for (let j = j0; j <= j1; j++)
+        for (let ii = i0; ii <= i1; ii++) {
+          const q = j * this.gw + ii;
+          if (mag <= this.hintMag[q]!) continue;
+          this.hintMag[q] = mag;
+          const oh = at(ii, 32 + j);
+          S[oh] = clamp(Math.round((this.ox[i]! / 256 + 0.5) * 255), 0, 255);
+          S[oh + 1] = clamp(Math.round((this.oy[i]! / 256 + 0.5) * 255), 0, 255);
+        }
     }
+  }
+}
+
+/**
+ * Clouds as particles: a grid of small pieces of the cloud deck. Undisturbed,
+ * they tile the deck exactly; the pointer flies through them like a bird,
+ * throwing pieces along its path and tearing them apart (each piece responds a
+ * little differently), and they drift slowly back together.
+ */
+export class CloudParticles {
+  readonly g = 96;
+  readonly count: number;
+  /** Per particle: home x, y and current offset x, y (disc units). */
+  readonly attrs: Float32Array;
+  private vx: Float32Array;
+  private vy: Float32Array;
+  private rnd: Float32Array;
+  awake = false;
+
+  constructor() {
+    const homes: number[] = [];
+    for (let j = 0; j < this.g; j++)
+      for (let i = 0; i < this.g; i++) {
+        const x = ((i + 0.5) / this.g) * 2 - 1;
+        const y = ((j + 0.5) / this.g) * 2 - 1;
+        if (x * x + y * y < 1.08) homes.push(x, y);
+      }
+    this.count = homes.length / 2;
+    this.attrs = new Float32Array(this.count * 4);
+    for (let k = 0; k < this.count; k++) {
+      this.attrs[k * 4] = homes[k * 2]!;
+      this.attrs[k * 4 + 1] = homes[k * 2 + 1]!;
+    }
+    this.vx = new Float32Array(this.count);
+    this.vy = new Float32Array(this.count);
+    this.rnd = Float32Array.from({ length: this.count }, () => Math.random());
+  }
+
+  /** Pointer and its motion this frame, in disc units. */
+  step(mx: number, my: number, mvx: number, mvy: number, enabled: boolean, dt: number) {
+    mvx = clamp(mvx, -0.02, 0.02);
+    mvy = clamp(mvy, -0.02, 0.02);
+    const speed = Math.hypot(mvx, mvy);
+    const stirring = enabled && speed > 0.0003;
+    if (!this.awake && !stirring) return;
+    const R = 0.075;
+    let live = 0;
+    for (let k = 0; k < this.count; k++) {
+      const o = k * 4;
+      const px = this.attrs[o]! + this.attrs[o + 2]!;
+      const py = this.attrs[o + 1]! + this.attrs[o + 3]!;
+      let vx = this.vx[k]!;
+      let vy = this.vy[k]!;
+      if (stirring) {
+        const rx = px - mx;
+        const ry = py - my;
+        const d2 = rx * rx + ry * ry;
+        if (d2 < R * R) {
+          const d = Math.sqrt(d2) || 1e-4;
+          const w = (1 - d / R) ** 2;
+          const r = this.rnd[k]!;
+          // Thrown along the flight path and parted to the sides, unevenly.
+          vx += (mvx * (0.25 + 0.6 * r) + (rx / d) * speed * (0.15 + 0.35 * (1 - r))) * w;
+          vy += (mvy * (0.25 + 0.6 * r) + (ry / d) * speed * (0.15 + 0.35 * (1 - r))) * w;
+        }
+      }
+      // Drift on, slowing gently, and slowly gather back home.
+      vx = (vx - this.attrs[o + 2]! * 0.0009 * dt) * Math.pow(0.965, dt);
+      vy = (vy - this.attrs[o + 3]! * 0.0009 * dt) * Math.pow(0.965, dt);
+      this.vx[k] = vx;
+      this.vy[k] = vy;
+      this.attrs[o + 2] = clamp(this.attrs[o + 2]! + vx * dt, -0.24, 0.24);
+      this.attrs[o + 3] = clamp(this.attrs[o + 3]! + vy * dt, -0.24, 0.24);
+      live = Math.max(live, Math.abs(this.attrs[o + 2]!), Math.abs(this.attrs[o + 3]!));
+    }
+    this.awake = live > 0.0008 || stirring;
+    if (!this.awake)
+      for (let k = 0; k < this.count; k++) {
+        this.attrs[k * 4 + 2] = 0;
+        this.attrs[k * 4 + 3] = 0;
+        this.vx[k] = 0;
+        this.vy[k] = 0;
+      }
   }
 }
 
