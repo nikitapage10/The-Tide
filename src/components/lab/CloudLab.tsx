@@ -342,34 +342,49 @@ void main() {
 }
 `;
 
-// Layered mode, bottom: the natural deck drifting slowly (not interactive),
-// lit by the cursor's light from its height field.
+// Layered mode, bottom: the planet's own clouds, using the same formulas,
+// drift speed and lighting as the home page, over a patch of the planet
+// artwork. Not affected by the cursor, apart from its light.
 const LAYER_BASE = `
 precision highp float;
 varying vec2 vUv;
+uniform sampler2D uPlanet;
 uniform float uAspect, uT, uLight;
-uniform vec2 uM, uWind;
+uniform vec2 uM;
 ${NOISE}
-float hgt(vec2 uv) { return deck(vec2(uv.x * uAspect, uv.y) * 2.0 + uWind * uT); }
+float fbm5(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) { v += a * vnoise(p); p = p * 2.02 + vec2(3.1, 1.7); a *= 0.5; }
+  return v / 0.97;
+}
+vec2 coords(vec2 uv) { return vec2(uv.x * uAspect, uv.y) * 2.0 + vec2(uT * 0.012, uT * 0.003); }
+float cbase(vec2 p) {
+  vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
+  return fbm5(p * 1.7 + 0.45 * w);
+}
+float cdens(vec2 p) {
+  float detail = fbm5(p * 5.0 + vec2(uT * 0.04, 0.0));
+  return smoothstep(0.38, 0.7, cbase(p) + (detail - 0.5) * 0.4);
+}
 void main() {
-  vec2 p = vec2(vUv.x * uAspect, vUv.y);
-  float land = smoothstep(0.52, 0.56, fbm(p * 1.6 + 20.0));
-  vec3 ground = mix(vec3(0.06, 0.075, 0.09), vec3(0.15, 0.16, 0.16) * (0.8 + 0.4 * fbm(p * 12.0)), land);
-  float c = hgt(vUv);
-  vec2 q = p * 2.0 + uWind * uT;
-  float tex = fbm(q * 11.0) * 0.5 + fbm(q * 25.0) * 0.5;
-  float dens = smoothstep(0.05, 0.85, c * (0.75 + 0.5 * tex)) * 0.75;
-  float e = 0.004;
-  float hx = hgt(vUv + vec2(e, 0.0)) - hgt(vUv - vec2(e, 0.0));
-  float hy = hgt(vUv + vec2(0.0, e)) - hgt(vUv - vec2(0.0, e));
-  vec3 n = normalize(vec3(-hx * 5.0, -hy * 5.0, 1.0));
-  vec3 lp = vec3((uM.x - vUv.x) * uAspect, uM.y - vUv.y, 0.15);
-  float dist = length(lp);
-  float diff = clamp(dot(n, lp / dist), 0.0, 1.0) / (1.0 + dist * dist * 14.0);
-  ground *= 1.0 - 0.4 * smoothstep(0.05, 0.85, hgt(vUv + vec2(-0.01, 0.01))) * (1.0 - dens);
-  vec3 cloud = vec3(0.72, 0.76, 0.82) * (0.6 + 0.35 * tex) * (0.75 + 0.3 * n.x - 0.2 * n.y);
-  vec3 col = mix(ground, cloud, dens);
-  col *= 1.0 + uLight * diff * 1.6;
+  // A patch of the planet artwork (the lit middle of the disc).
+  vec2 img = vec2(mix(1260.0, 1880.0, vUv.x), mix(820.0, 360.0, vUv.y)) / vec2(2000.0, 1126.0);
+  vec3 col = texture2D(uPlanet, img).rgb;
+  vec2 pw = coords(vUv);
+  vec2 sunStep = normalize(vec2(-0.85, -0.35)) * 0.035;
+  float dens = cdens(pw);
+  float densSun = cdens(pw + sunStep);
+  col *= 1.0 - 0.4 * densSun * (1.0 - dens);
+  float tops = fbm5(pw * 18.0 + vec2(uT * 0.05, 0.0));
+  float shade = clamp(0.8 - (densSun - dens) * 1.4, 0.35, 1.0);
+  float bright = 0.7 * shade * (0.72 + 0.4 * tops);
+  vec3 cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
+  col = mix(col, cloudCol, pow(dens, 1.3) * 0.8);
+  // The cursor's light, raised on the cloud tops.
+  vec2 dl = vec2((uM.x - vUv.x) * uAspect, uM.y - vUv.y);
+  float near = exp(-dot(dl, dl) / 0.05);
+  float face = clamp(0.5 + (densSun - dens) * -3.0, 0.0, 1.0);
+  col *= 1.0 + uLight * near * (0.25 + 0.6 * dens * face);
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -378,7 +393,8 @@ const PUFF_VERT = `
 attribute vec4 aP;     // x, y (uv); size px; alpha
 varying float vA;
 varying float vSeed;
-uniform float uDpr, uAspect, uLight;
+uniform float uDpr, uAspect, uLight, uSoft;
+varying float vSoft;
 uniform vec2 uM;
 varying float vL;
 varying vec2 vToLight;
@@ -389,6 +405,7 @@ void main() {
   vec2 dl = vec2((uM.x - aP.x) * uAspect, uM.y - aP.y);
   vL = uLight * exp(-dot(dl, dl) / 0.025);
   vToLight = normalize(dl + 1e-4);
+  vSoft = uSoft;
   vSeed = fract(aP.x * 91.7 + aP.y * 37.3);
 }
 `;
@@ -399,6 +416,7 @@ varying float vA;
 varying float vSeed;
 varying float vL;
 varying vec2 vToLight;
+varying float vSoft;
 float h1(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float n1(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -411,6 +429,8 @@ void main() {
   if (d > 1.0) discard;
   float n = n1(c * 2.4 + vSeed * 40.0) * 0.6 + n1(c * 5.0 + vSeed * 13.0) * 0.4;
   float puff = smoothstep(1.0, 0.25, d) * smoothstep(0.2, 0.7, n + 0.3 * (1.0 - d));
+  // Soft mode: broad, wispy sheets that blend into each other.
+  puff = mix(puff, pow(1.0 - d, 1.6) * (0.55 + 0.6 * n), vSoft);
   float lit = 0.8 + 0.25 * (-c.x - c.y) * 0.5;
   // The cursor's light: the side of each puff facing it brightens.
   vec2 cf = vec2(c.x, -c.y);
@@ -643,7 +663,7 @@ export function CloudLab() {
       pCount = 0;
       let tries = 0;
       const layered = params.current.mode === "layered";
-      const want = layered ? 6800 : 5200;
+      const want = layered ? 2600 : 5200;
       while (pCount < want && tries < 90000) {
         tries++;
         const x = Math.random(), y = Math.random();
@@ -653,7 +673,7 @@ export function CloudLab() {
         const i = pCount++;
         homes[i * 2] = x;
         homes[i * 2 + 1] = y;
-        pA.set([x, y, layered ? 7 + Math.random() * 13 : 10 + Math.random() * 16, layered ? 0.14 + 0.32 * d : 0.18 + 0.3 * d], i * 4);
+        pA.set([x, y, layered ? 34 + Math.random() * 46 : 10 + Math.random() * 16, layered ? 0.06 + 0.14 * d : 0.18 + 0.3 * d], i * 4);
         pv[i * 2] = pv[i * 2 + 1] = 0;
       }
     };
@@ -661,6 +681,22 @@ export function CloudLab() {
     // Wisps for mode 4 (separate pool appended after nothing; reuse arrays).
     const wisps: { x: number; y: number; vx: number; vy: number; age: number; life: number; size: number; a: number }[] = [];
     const puffBuf = gl.createBuffer();
+    // The planet artwork, for the Layered mode's ground.
+    const planetTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, planetTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([12, 14, 18, 255]));
+    {
+      const img = new Image();
+      img.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, planetTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      };
+      img.src = "/brand/planet-v2.webp";
+    }
     let stir = 0;
     let air = new FlowSim();
 
@@ -921,7 +957,7 @@ export function CloudLab() {
         gl.uniform1f(P.layerBase!.u("uT"), now / 1000);
         gl.uniform1f(P.layerBase!.u("uLight"), lightAmt);
         gl.uniform2f(P.layerBase!.u("uM"), pointer.x, pointer.y);
-        gl.uniform2f(P.layerBase!.u("uWind"), -0.006, -0.002);
+        gl.uniform1i(P.layerBase!.u("uPlanet"), tex(2, planetTex));
       } else if (mode === "light") {
         gl.useProgram(P.light!.p);
         gl.uniform1f(P.light!.u("uAspect"), aspect);
@@ -946,6 +982,7 @@ export function CloudLab() {
         gl.uniform1f(P.puff!.u("uAspect"), aspect);
         gl.uniform2f(P.puff!.u("uM"), pointer.x, pointer.y);
         gl.uniform1f(P.puff!.u("uLight"), mode === "layered" ? lightAmt : 0);
+        gl.uniform1f(P.puff!.u("uSoft"), mode === "layered" ? 1 : 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, puffBuf);
         gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
         const la = gl.getAttribLocation(P.puff!.p, "aP");
