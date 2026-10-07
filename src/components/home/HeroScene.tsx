@@ -866,7 +866,10 @@ void main() {
         // Near its root a strand loosens into faint wisps and fades into the
         // marked spot (no hard line end): wider, broken and dimmer there.
         float rootW = 1.0 - smoothstep(0.0, 0.12, bestT);
-        float w = wid * (1.0 - 0.6 * bestT) * (1.0 + 1.5 * rootW);
+        // Width swells and pinches along the strand (slowly flowing outward), so
+        // it reads as a wisp rather than a drawn line.
+        float swell = vnoise(vec2(bestT * 4.5 - uT * 0.35, float(k) * 5.3)) * 0.7 + vnoise(vec2(bestT * 11.0 - uT * 0.6, float(k) * 2.1 + 4.0)) * 0.3;
+        float w = wid * (1.0 - 0.6 * bestT) * (1.0 + 1.5 * rootW) * (0.35 + 1.5 * swell * swell);
         float flow = 0.55 + 0.45 * vnoise(vec2(bestT * 9.0 - uT * 1.6, float(k) * 7.0));
         float wisp = mix(1.0, smoothstep(0.35, 0.8, vnoise(vec2(best * 0.25 + float(k) * 3.0, bestT * 22.0 - uT * 0.8))), rootW);
         float fadeTip = (1.0 - smoothstep(0.7, 1.0, bestT)) * mix(0.55, 1.0, smoothstep(0.0, 0.1, bestT)) * mix(1.0, wisp, 0.6);
@@ -875,7 +878,7 @@ void main() {
         sc3 = max(sc3, vec3(exp(-dot(dA, dA) / 30.0) * 0.9 * str + exp(-dot(dA, dA) / 260.0) * 0.25 * str));
         // Soft cores that melt into a wide glow (they read as part of the sheet).
         float line = 0.55 * exp(-best * best / (w * w)) + 0.4 * exp(-best * best / (14.0 * w * w));
-        sc3 = max(sc3, vec3(line * flow * fadeTip * str));
+        sc3 = max(sc3, vec3(line * flow * fadeTip * str * (0.6 + 0.6 * swell)));
       }
       // The sheet between them: a soft gradient filling the fan, brightest along
       // its middle, with faint striations flowing outward.
@@ -1211,13 +1214,15 @@ export function HeroScene({
         // The cursor's light on the puffs, while it is over the revealed planet.
         gl.uniform2f(WU.uM!, pointer.tx, pointer.ty);
         gl.uniform1f(WU.uLight!, heroSignal.overPlanet && !reduced ? 1 : 0);
-        gl.uniform1f(WU.uBright!, smooth(2.0, 5.2, tSec) * (0.07 + 0.93 * smooth(0, 1, p)));
         gl.bindBuffer(gl.ARRAY_BUFFER, wBufA);
         gl.enableVertexAttribArray(wLocA);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        const bright = smooth(2.0, 5.2, tSec) * (0.07 + 0.93 * smooth(0, 1, p));
         for (const set of [wisps, stormPuffs]) {
           if (!set || set.count === 0) continue;
+          // Storms a touch brighter than the open cloud, so they read clearly.
+          gl.uniform1f(WU.uBright!, bright * (set === stormPuffs ? 1.35 : 1));
           gl.bufferData(gl.ARRAY_BUFFER, set.attrs.subarray(0, set.count * 4), gl.DYNAMIC_DRAW);
           gl.vertexAttribPointer(wLocA, 4, gl.FLOAT, false, 0, 0);
           gl.drawArrays(gl.POINTS, 0, set === wisps && quality.level >= 2 ? Math.floor(set.count / 2) : set.count);
@@ -1287,7 +1292,7 @@ export function HeroScene({
           // Present while the cursor is out in space, not too far off; eases in/out.
           // Only as the rocks clear: faint while the last ones leave, full once gone.
           const clear = smooth(0.72, 0.97, progress.current);
-          const want = head.x > -9000 && out > 8 && out < pr * 0.9 && clear > 0 && !reduced ? clear : 0;
+          const want = head.x > -9000 && out > 8 && clear > 0 && !reduced ? clear : 0;
           strand.on += (want - strand.on) * (1 - Math.pow(1 - (want > strand.on ? 0.04 : 0.06), strandDt));
           strandA.fill(0);
           strandT.fill(0);
@@ -1339,10 +1344,12 @@ export function HeroScene({
               const tx = st.tx, ty = st.ty;
               const reachK = Math.hypot(tx - rx, ty - ry);
               // Concave: bowing in toward the shared middle line, leaning along the streams.
-              const midx = (rx + tx) / 2, midy = (ry + ty) / 2;
-              const axmx = (mrx + tx) / 2, axmy = (mry + ty) / 2;
-              const gcx = midx + (axmx - midx) * 1.15 + nox * reachK * 0.18 + px * wob * reachK * 0.04;
-              const gcy = midy + (axmy - midy) * 1.15 + noy * reachK * 0.18 + py * wob * reachK * 0.04;
+              // The bend sits on the shared line, a third of the way out: each strand
+              // leaves its spot, curves in to meet the others, and they run on to
+              // the cursor as one loose bundle.
+              const axmx = mrx + (tx - mrx) * 0.32, axmy = mry + (ty - mry) * 0.32;
+              const gcx = axmx + px * s * reachK * 0.015 + nox * reachK * 0.05 + px * wob * reachK * 0.03;
+              const gcy = axmy + py * s * reachK * 0.015 + noy * reachK * 0.05 + py * wob * reachK * 0.03;
               if (st.cx < -9000) {
                 st.cx = gcx;
                 st.cy = gcy;
@@ -1451,17 +1458,17 @@ export function HeroScene({
       let firstWarm = 0;
       const loop = (now: number) => {
         if (disposed) return;
+        // Start the shared intro once both layers have warmed up (a few frames
+        // drawn: textures uploaded, shaders ready; a layer scrolled out of view
+        // counts as warm), or after a few seconds if the other never gets there.
+        if (!clock.current.start && !document.hidden) {
+          warmFrames = visible ? warmFrames + 1 : Math.max(warmFrames, 3);
+          if (warmFrames === 3 || !visible) clock.current.ready |= bit;
+          if (warmFrames >= 3 && !firstWarm) firstWarm = now;
+          if (warmFrames >= 3 && (clock.current.ready === 3 || now - firstWarm > 5000)) clock.current.start = now;
+        }
         if (visible && !document.hidden) {
           draw(now);
-          // Start the shared intro once both layers have warmed up (a few frames
-          // drawn: textures uploaded, shaders ready), or after a few seconds if
-          // the other layer never gets there.
-          if (!clock.current.start) {
-            warmFrames += 1;
-            if (warmFrames === 3) clock.current.ready |= bit;
-            if (warmFrames >= 3 && !firstWarm) firstWarm = now;
-            if (warmFrames >= 3 && (clock.current.ready === 3 || now - firstWarm > 5000)) clock.current.start = now;
-          }
           // Adaptive quality (planet only): if frames run long, render a little
           // smaller; recover when there is headroom. At most one change per 2s.
           if (layer === "planet" && quality.last) {

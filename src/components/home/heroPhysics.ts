@@ -529,8 +529,11 @@ export class CloudPuffs {
         if (d > 0.3 || d < 1e-4) continue;
         const life = Math.min(1, st.age / 1.5) * (1 - Math.min(1, Math.max(0, st.age - 7) / 4));
         const w = Math.exp(-(d * d) / (0.12 * 0.12)) * life;
-        tx += (-ey / d) * 0.05 * w - (ex / d) * 0.012 * w;
-        ty += (ex / d) * 0.05 * w - (ey / d) * 0.012 * w;
+        // Inflow stronger than before, so the storm gathers cloud instead of
+        // clearing a dark ring around itself.
+        const inflow = 0.03 * Math.min(1, d / 0.03);
+        tx += (-ey / d) * 0.04 * w - (ex / d) * inflow * w;
+        ty += (ex / d) * 0.04 * w - (ey / d) * inflow * w;
       }
       let vx = this.vx[i]! + (tx - this.vx[i]!) * Math.min(1, s * k);
       let vy = this.vy[i]! + (ty - this.vy[i]!) * Math.min(1, s * k);
@@ -561,8 +564,8 @@ export class CloudPuffs {
  * attrs layout matches CloudPuffs.
  */
 export class StormPuffs {
-  readonly max = 1400;
-  readonly attrs = new Float32Array(1400 * 4);
+  readonly max = 2400;
+  readonly attrs = new Float32Array(2400 * 4);
   count = 0;
   /** Active storms: centre (disc), age (s), for the upper layer to swirl into. */
   readonly centres: { x: number; y: number; age: number }[] = [];
@@ -581,18 +584,18 @@ export class StormPuffs {
     this.centres.push({ x, y, age: 0 });
     if (this.centres.length > 3) this.centres.shift();
     const id = this.centres[this.centres.length - 1]!;
-    const n = 420;
-    const arms = 4;
+    const n = 760;
+    const arms = 3;
     const phase = Math.random() * Math.PI * 2;
     for (let q = 0; q < n; q++) {
       if (this.ang.length >= this.max) this.drop(0);
-      const wall = q < n * 0.28;
-      // Angular radius on the sphere (radians): eyewall ~0.03, bands out to ~0.17,
-      // with ragged, uneven outer reach (not a neat circle).
-      // A small eye: the eyewall hugs it closely.
-      const r = wall ? 0.008 + Math.random() * 0.012 : 0.022 + Math.pow(Math.random(), 0.7) * (0.08 + 0.08 * Math.random());
+      // Like a hurricane from orbit: a bright, dense central mass around a
+      // pinhole eye, and three spiral bands trailing out, thinning and breaking.
+      // Radii are angular (radians on the sphere).
+      const core = q < n * 0.42;
+      const r = core ? 0.006 + Math.pow(Math.random(), 1.4) * 0.04 : 0.02 + Math.pow(Math.random(), 0.85) * 0.13;
       const arm = Math.floor(Math.random() * arms);
-      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.022) * 1.9 + (Math.random() - 0.5) * 0.9;
+      const a = core ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.02) * 1.5 + (Math.random() - 0.5) * (0.25 + 1.6 * r);
       this.sid.push(this.centres.indexOf(id));
       this.ang.push(a);
       this.rad.push(r);
@@ -601,8 +604,10 @@ export class StormPuffs {
       this.vx.push(0);
       this.vy.push(0);
       this.age.push(-Math.random() * 1.2);
-      this.base.push((wall ? 0.15 : 0.08) + Math.random() * 0.08);
-      this.size.push(Math.floor(wall ? 16 + Math.random() * 14 : 30 + Math.random() * 40) + Math.random() * 0.98);
+      const out = Math.min(1, r / 0.15);
+      this.base.push(core ? 0.3 + Math.random() * 0.14 : (0.26 - 0.18 * out) + Math.random() * 0.08);
+      // Small puffs hug the eye (so it stays a pinhole); larger ones further out.
+      this.size.push(Math.floor(core ? 10 + Math.min(1, r / 0.03) * 18 + Math.random() * 8 : 22 + Math.random() * 26) + Math.random() * 0.98);
     }
     this.cx.push(x);
     this.cy.push(y);
@@ -644,13 +649,17 @@ export class StormPuffs {
         continue;
       }
       const spin = (1 - Math.min(1, Math.max(0, age) / 10)) * 0.9;
-      this.ang[i] = this.ang[i]! + (spin * 0.02 / Math.max(0.012, this.rad[i]!)) * s;
-      this.rad[i] = Math.max(0.006, this.rad[i]! - 0.0012 * s);
+      this.ang[i] = this.ang[i]! + (spin * 0.014 / Math.max(0.012, this.rad[i]!)) * s;
+      // The bands wind in slowly; the eye never closes up or opens out.
+      this.rad[i] = Math.max(0.006, this.rad[i]! * (1 - 0.025 * s));
       const k = this.sid[i]!;
       const [x, y] = this.onSphere(this.cx[k]!, this.cy[k]!, this.rad[i]!, this.ang[i]!);
       const [ax, ay] = flow.velocityAt(x + this.ox[i]!, y + this.oy[i]!);
-      this.vx[i] = (this.vx[i]! + (ax * 60 * 6 - this.vx[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8);
-      this.vy[i] = (this.vy[i]! + (ay * 60 * 6 - this.vy[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8);
+      // Pushed by the stirred air (the cursor), but the storm's own spin is
+      // already in its orbit, and a gentle pull brings pushed puffs back, so
+      // the air's vortex never flings the core outward and hollows the eye.
+      this.vx[i] = (this.vx[i]! + (ax * 60 * 3 - this.vx[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8) - this.ox[i]! * 1.2 * s;
+      this.vy[i] = (this.vy[i]! + (ay * 60 * 3 - this.vy[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8) - this.oy[i]! * 1.2 * s;
       this.ox[i] = clamp(this.ox[i]! + this.vx[i]! * s, -0.3, 0.3);
       this.oy[i] = clamp(this.oy[i]! + this.vy[i]! * s, -0.3, 0.3);
     }
