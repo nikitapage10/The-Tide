@@ -321,8 +321,9 @@ export class FlowSim {
     const { clr, data } = this;
     for (let k = 0; k < clr.length; k++) {
       // Velocity in grid cells per frame (±2), then the cleared amount.
-      data[k * 4] = clamp(Math.round((this.u[k]! / 4 + 0.5) * 255), 0, 255);
-      data[k * 4 + 1] = clamp(Math.round((this.v[k]! / 4 + 0.5) * 255), 0, 255);
+      // 128 = still air exactly; ±127 = ±2 cells per frame.
+      data[k * 4] = clamp(128 + Math.round((this.u[k]! / 2) * 127), 1, 255);
+      data[k * 4 + 1] = clamp(128 + Math.round((this.v[k]! / 2) * 127), 1, 255);
       data[k * 4 + 2] = clamp(Math.round(clr[k]! * 255), 0, 255);
       data[k * 4 + 3] = 255;
     }

@@ -123,6 +123,8 @@ uniform float uE;
 uniform float uDpr;
 uniform float uS;         // smoothed scroll speed (progress per second, >= 0)
 uniform float uMenuH;     // header height (CSS px); rocks are kept off the menu at rest
+uniform vec4 uTrail[24];  // planet: cursor strand, newest first (x, y CSS px; age s; length along, px)
+uniform vec4 uTrailBox;   // planet: its bounding box (min x, min y, max x, max y), padded
 
 const vec2 SRC = vec2(2000.0, 1126.0);
 const vec2 LIMB_C = vec2(1.0122, 0.6500); // planet centre in artwork uv (fitted to the horizon)
@@ -407,11 +409,13 @@ vec3 planetWithLimb(vec2 uv) {
       float lat = asin(clamp(sph.y, -1.0, 1.0));
       float lon = atan(sph.x, z);
       vec2 sc = vec2(lon * cos(lat), lat);
-      float region = smoothstep(0.42, 0.6, fbm(sc * 3.2 + 3.0));
+      // Busier and quieter regions, but every landmass has some settlement.
+      float region = 0.35 + 0.65 * smoothstep(0.4, 0.6, fbm(sc * 3.2 + 3.0));
       // Light density here: city cores and the roads between them.
       vec2 cg = sc * 30.0;
       vec2 cb = floor(cg);
       float ld = 0.0;
+      float road = 0.0;
       float planned = 0.0;
       vec2 plannedC = vec2(0.0);
       float plannedA = 0.0;
@@ -420,7 +424,7 @@ vec3 planetWithLimb(vec2 uv) {
         for (int b = -1; b <= 1; b++) {
           vec2 c0 = cb + vec2(float(a), float(b));
           float h0 = hash(c0 + 17.0);
-          if (h0 < 0.35) continue;
+          if (h0 < 0.25) continue;
           vec2 p0 = c0 + 0.2 + 0.6 * vec2(hash(c0 + 5.0), hash(c0 + 6.0));
           float pop = pow(hash(c0 + 9.0), 1.6);
           float r = 0.08 + 0.3 * pop;
@@ -437,23 +441,24 @@ vec3 planetWithLimb(vec2 uv) {
           }
           for (int e = 0; e < 2; e++) {
             vec2 c1 = c0 + (e == 0 ? vec2(1.0, 0.0) : vec2(0.0, 1.0));
-            if (hash(c1 + 17.0) < 0.35 || hash(c0 + float(e) * 3.0 + 41.0) < 0.4) continue;
+            if (hash(c1 + 17.0) < 0.25 || hash(c0 + float(e) * 3.0 + 41.0) < 0.2) continue;
             vec2 p1 = c1 + 0.2 + 0.6 * vec2(hash(c1 + 5.0), hash(c1 + 6.0));
             vec2 ed = p1 - p0;
             float t = clamp(dot(dv, ed) / dot(ed, ed), 0.0, 1.0);
             float dr = length(dv - ed * t);
-            ld += exp(-dr * dr * 900.0) * 0.55;
+            ld += exp(-dr * dr * 500.0) * 0.9;
+            road = max(road, exp(-dr * dr * 2500.0));
           }
         }
       }
       ld = (ld * region + 0.05 * region + 0.012) * (1.0 - 0.95 * out0);
       // Individual lights: a fine grid; each cell lit with probability = density.
-      vec2 fg = sc * 520.0;
+      vec2 fg = sc * 380.0;
       vec2 fi = floor(fg);
       float fh = hash(fi + 71.0);
       vec2 fp = fi + 0.25 + 0.5 * vec2(hash(fi + 72.0), hash(fi + 73.0));
       float lit = step(1.0 - clamp(ld, 0.0, 0.9), fh);
-      float pt = lit * exp(-dot(fg - fp, fg - fp) * 5.0) * (0.45 + 0.9 * hash(fi + 74.0));
+      float pt = lit * exp(-dot(fg - fp, fg - fp) * 4.0) * (0.6 + 1.0 * hash(fi + 74.0));
       // Planned districts: a perfectly regular lattice instead.
       if (planned > 0.15) {
         vec2 rel = (cg - plannedC) * 34.0;
@@ -465,12 +470,13 @@ vec3 planetWithLimb(vec2 uv) {
       vec3 warm = vec3(1.0, 0.86, 0.66);
       vec3 cool = vec3(0.93, 0.95, 1.0);
       vec3 lights = mix(warm, cool, planned > 0.15 ? 0.7 : 0.15) * pt * 1.6
-                  + warm * smoothstep(0.05, 0.9, ld) * 0.09;           // skyglow
+                  + warm * smoothstep(0.05, 0.9, ld) * 0.12            // skyglow
+                  + warm * road * region * 0.3 * (1.0 - 0.95 * out0);  // the road network itself
       float twinkle = 0.9 + 0.1 * sin(uT * 2.3 + fh * 30.0);
       // Faint where the sun is strong (the lit left), bright where it is dim
       // (lower right and toward the middle), brightest past dusk.
       float sunny = smoothstep(0.1, 0.55, light);
-      float shown = mix(1.3, 0.1, sunny) + 0.35 * nightSide;
+      float shown = mix(1.35, 0.35, sunny) + 0.35 * nightSide;
       col += lights * smoothstep(0.1, 0.5, landHere) * shown * twinkle * (1.0 - 0.85 * dens) * inside;
     }
 
@@ -759,7 +765,9 @@ void main() {
   // its compile time); a faint colour fringe on the lens ring stands in for it.
   vec4 cg = scene(warped);
   vec3 col = cg.rgb;
+#if uLayer == 1
   col *= 1.0 + e * (0.55 * ring + 0.15 * fall) * pointerInSpace;
+#endif
 
   if (uLayer == 0) {
     // Small ghost flares thrown off the pointer through the screen centre.
@@ -772,6 +780,29 @@ void main() {
       ghosts += smoothstep(gr, gr * 0.35, length(sp - gpos)) * (0.07 - 0.012 * fi);
     }
     col += vec3(0.85, 0.92, 1.0) * ghosts * e * pointerInSpace;
+    // The cursor's strand: in space, a new filament of the same energy as the
+    // streams trails the pointer, thin and bright at its head, spreading into
+    // soft wisps as it fades, with light rippling along it. The planet crops it.
+    if (sp.x > uTrailBox.x && sp.y > uTrailBox.y && sp.x < uTrailBox.z && sp.y < uTrailBox.w) {
+      float strand = 0.0;
+      for (int i = 0; i < 23; i++) {
+        vec4 a = uTrail[i];
+        vec4 b = uTrail[i + 1];
+        if (b.z < 0.0) break;
+        vec2 ab = b.xy - a.xy;
+        float ll = max(dot(ab, ab), 1e-4);
+        float t = clamp(dot(sp - a.xy, ab) / ll, 0.0, 1.0);
+        float d = length(sp - a.xy - ab * t);
+        float age = mix(a.z, b.z, t);
+        float along = mix(a.w, b.w, t);
+        float fade = pow(max(0.0, 1.0 - age / 1.6), 2.0);
+        float w = 2.2 + 9.0 * age;
+        float wisp = 0.55 + 0.6 * vnoise(vec2(along * 0.035 - uT * 2.2, 3.0)) * (0.6 + 0.4 * vnoise(vec2(along * 0.11, d * 0.2 + uT)));
+        float c = exp(-d * d / (w * w)) + 0.3 * exp(-d * d / (12.0 * w * w));
+        strand = max(strand, c * fade * wisp);
+      }
+      col += vec3(0.82, 0.88, 0.98) * strand * 0.8 * pointerInSpace;
+    }
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
     col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 9.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
@@ -802,7 +833,9 @@ ${CLOUDS}
 void main() {
   vec2 uv = gl_FragCoord.xy / 256.0;
   vec2 sph = uv * 2.0 - 1.0;
-  vec2 vel = (texture2D(uFlow, uv).rg - 0.5) * 4.0 * (2.0 / 64.0);
+  // Decoded so that the stored 128 is exactly still air (a 0.5 offset here was a
+  // phantom breeze that slowly slid the whole deck away).
+  vec2 vel = (floor(texture2D(uFlow, uv).rg * 255.0 + 0.5) - 128.0) / 127.0 * 2.0 * (2.0 / 64.0);
   float prev = texture2D(uPrev, clamp((sph - vel) * 0.5 + 0.5, 0.0, 1.0)).r;
   float target = dot(sph, sph) < 1.2 ? cloudBase(sph) : 0.0;
   // Moved cloud keeps its new shape and only slowly rejoins the natural weather
@@ -924,13 +957,17 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), storm: u("uStorm[0]") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), storm: u("uStorm[0]"), trail: u("uTrail[0]"), trailBox: u("uTrailBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
       // builds up / settles slowly over a couple of seconds.
       const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
       let dpr = 1;
+      const trail: { x: number; y: number; age: number; len: number }[] = [];
+      const head = { x: -9999, y: -9999 };
+      const trailData = new Float32Array(24 * 4);
+      let trailT = performance.now();
       // Pointer-driven simulations: weather over the planet, rocks in the meteor layer.
       const flow = layer === "planet" ? new FlowSim() : null;
       const fieldFar = layer === "meteors" ? new RockBodies(ROCKS.far.rocks, ROCKS.far.w, ROCKS.far.h, 110, 0.012) : null;
@@ -1051,6 +1088,36 @@ export function HeroScene({
         const g = frameGeometry(rect.width, rect.height);
         pointer.x += (pointer.tx - pointer.x) * 0.09;
         pointer.y += (pointer.ty - pointer.y) * 0.09;
+        // Cursor strand (planet layer): points laid along the eased pointer path.
+        if (!transparent) {
+          // Follows the cursor itself (lightly smoothed), not the slow lens easing.
+          if (pointer.tx > -9000) {
+            head.x = head.x < -9000 ? pointer.tx : head.x + (pointer.tx - head.x) * 0.45;
+            head.y = head.y < -9000 ? pointer.ty : head.y + (pointer.ty - head.y) * 0.45;
+          }
+          const last = trail[0];
+          const moved = last ? Math.hypot(head.x - last.x, head.y - last.y) : Infinity;
+          for (const q of trail) q.age += (now - trailT) / 1000;
+          trailT = now;
+          if (head.x > -9000 && moved > 5) {
+            trail.unshift({ x: head.x, y: head.y, age: 0, len: last ? last.len + moved : 0 });
+          } else if (last && head.x > -9000) {
+            last.x = head.x;
+            last.y = head.y;
+          }
+          while (trail.length > 24 || (trail.length && trail[trail.length - 1]!.age > 1.6)) trail.pop();
+          let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+          trailData.fill(-1);
+          trail.forEach((q, i) => {
+            trailData.set([q.x, q.y, q.age, q.len], i * 4);
+            x0 = Math.min(x0, q.x);
+            y0 = Math.min(y0, q.y);
+            x1 = Math.max(x1, q.x);
+            y1 = Math.max(y1, q.y);
+          });
+          gl.uniform4fv(U.trail, trailData);
+          gl.uniform4f(U.trailBox, x0 - 70, y0 - 70, x1 + 70, y1 + 70);
+        }
         pointer.target *= 0.988;
         pointer.e += (pointer.target - pointer.e) * 0.012;
         pointer.svx += (pointer.vx - pointer.svx) * 0.015;
