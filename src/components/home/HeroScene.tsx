@@ -104,7 +104,8 @@ uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
 uniform sampler2D uCentFar, uCentNear;   // meteors: each rock pixel's rock centre + movable flag
 uniform sampler2D uFieldFar, uFieldNear; // meteors: gravity displacement field (±128 source px)
-uniform int uLayer;       // 0 = planet (opaque), 1 = meteors (premultiplied alpha)
+// uLayer is a compile-time constant (0 = planet, opaque; 1 = meteors, premultiplied
+// alpha): each canvas compiles only its own code, which keeps first-load compile short.
 uniform vec2 uRes;
 uniform vec2 uFrameC;
 uniform vec2 uFrameS;
@@ -679,13 +680,11 @@ void main() {
   // actually there (streams, limb, rock rims) with a slight prism split.
   float ring = exp(-pow((r - R * 0.55) / (R * 0.16), 2.0));
   float ca = e * (1.2 * fall + 3.0 * ring);
+  // One scene evaluation per pixel (a prism split would triple the shader, and
+  // its compile time); a faint colour fringe on the lens ring stands in for it.
   vec4 cg = scene(warped);
   vec3 col = cg.rgb;
-  // The prism split only costs extra samples where the lens is actually active.
-  if (ca * onSpaceCA > 0.05) {
-    col.r = scene(warped + dir * ca).r;
-    col.b = scene(warped - dir * ca).b;
-  }
+  col *= 1.0 + vec3(0.6, 0.0, -0.4) * ca * 0.04 * onSpaceCA;
   col *= 1.0 + e * (0.55 * ring + 0.15 * fall) * pointerInSpace;
 
   if (uLayer == 0) {
@@ -811,321 +810,349 @@ export function HeroScene({
     let raf = 0;
     let visible = true;
 
-    let prog: WebGLProgram;
-    try {
-      prog = gl.createProgram()!;
-      gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
-      gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
-      gl.linkProgram(prog);
-      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error("link");
-    } catch {
-      onFail?.();
-      return;
-    }
-    gl.useProgram(prog);
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, "a");
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const u = (n: string) => gl.getUniformLocation(prog, n);
-    const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), storm: u("uStorm[0]") };
-    gl.uniform1i(u("uLayer"), transparent ? 1 : 0);
-    gl.clearColor(0, 0, 0, 0);
+    // Compile without blocking the page where the browser allows it
+    // (KHR_parallel_shader_compile); link status is only read once it is done.
+    const parallel = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
+    const prog = gl.createProgram()!;
+    const vs = gl.createShader(gl.VERTEX_SHADER)!;
+    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+    gl.shaderSource(vs, VERT);
+    gl.shaderSource(fs, `#define uLayer ${transparent ? 1 : 0}\n` + FRAG);
+    gl.compileShader(vs);
+    gl.compileShader(fs);
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    const linked = () =>
+      new Promise<boolean>((resolve) => {
+        const check = () => {
+          if (disposed) return resolve(false);
+          if (parallel && !gl.getProgramParameter(prog, parallel.COMPLETION_STATUS_KHR)) {
+            setTimeout(check, 50);
+            return;
+          }
+          resolve(!!gl.getProgramParameter(prog, gl.LINK_STATUS));
+        };
+        check();
+      });
+    // Everything that touches the program waits until it has finished compiling.
+    let teardown: (() => void) | undefined;
+    const setup = (): (() => void) | undefined => {
+      gl.useProgram(prog);
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, "a");
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      const u = (n: string) => gl.getUniformLocation(prog, n);
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), storm: u("uStorm[0]") };
+      gl.clearColor(0, 0, 0, 0);
 
-    // Pointer state: the lens follows the cursor closely, while its strength
-    // builds up / settles slowly over a couple of seconds.
-    const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
-    let dpr = 1;
-    // Pointer-driven simulations: weather over the planet, rocks in the meteor layer.
-    const flow = layer === "planet" ? new FlowSim() : null;
-    const fieldFar = layer === "meteors" ? new GravityField(ROCKS.far.w, ROCKS.far.h, 130, 0.55) : null;
-    const fieldNear = layer === "meteors" ? new GravityField(ROCKS.near.w, ROCKS.near.h, 240, 0.35) : null;
-    const prevSim = { disc: [NaN, NaN] };
-    let lastFrame = 0;
-    // Storms planted by clicking the planet (up to three): disc position, time, seed.
-    const storms = [0, 1, 2].map(() => ({ x: 0, y: 0, t: -1e9, seed: Math.random() }));
-    let nextStorm = 0;
-    const stormData = new Float32Array(12);
+      // Pointer state: the lens follows the cursor closely, while its strength
+      // builds up / settles slowly over a couple of seconds.
+      const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
+      let dpr = 1;
+      // Pointer-driven simulations: weather over the planet, rocks in the meteor layer.
+      const flow = layer === "planet" ? new FlowSim() : null;
+      const fieldFar = layer === "meteors" ? new GravityField(ROCKS.far.w, ROCKS.far.h, 130, 0.4) : null;
+      const fieldNear = layer === "meteors" ? new GravityField(ROCKS.near.w, ROCKS.near.h, 240, 0.25) : null;
+      const prevSim = { disc: [NaN, NaN] };
+      let lastFrame = 0;
+      // Storms planted by clicking the planet (up to three): disc position, time, seed.
+      const storms = [0, 1, 2].map(() => ({ x: 0, y: 0, t: -1e9, seed: Math.random() }));
+      let nextStorm = 0;
+      const stormData = new Float32Array(12);
 
-    // Small data textures (weather flow, gravity fields), updated in place.
-    const dataTex = new Map<number, WebGLTexture>();
-    const uploadData = (unit: number, uniform: string, w: number, h: number, data: Uint8Array) => {
-      gl.activeTexture(gl.TEXTURE0 + unit);
-      let t = dataTex.get(unit);
-      if (!t) {
-        t = gl.createTexture()!;
-        dataTex.set(unit, t);
-        gl.bindTexture(gl.TEXTURE_2D, t);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
-        gl.uniform1i(u(uniform), unit);
-      } else {
-        gl.bindTexture(gl.TEXTURE_2D, t);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      }
-    };
-    const uploadSims = () => {
-      if (flow) uploadData(3, "uFlow", flow.n, flow.n, flow.data);
-      if (fieldFar) uploadData(6, "uFieldFar", fieldFar.gw, fieldFar.gh, fieldFar.data);
-      if (fieldNear) uploadData(7, "uFieldNear", fieldNear.gw, fieldNear.gh, fieldNear.data);
-    };
-
-    // Cloud simulation: ping-pong between two 256² textures through a framebuffer.
-    let simProg: WebGLProgram | null = null;
-    const simTex: WebGLTexture[] = [];
-    let simFb: WebGLFramebuffer | null = null;
-    let simIdx = 0;
-    let simFirst = true;
-    const SU: Record<string, WebGLUniformLocation | null> = {};
-    if (layer === "planet") {
-      try {
-        simProg = gl.createProgram()!;
-        gl.attachShader(simProg, compile(gl, gl.VERTEX_SHADER, VERT));
-        gl.attachShader(simProg, compile(gl, gl.FRAGMENT_SHADER, SIM_FRAG));
-        gl.bindAttribLocation(simProg, loc, "a");
-        gl.linkProgram(simProg);
-        if (!gl.getProgramParameter(simProg, gl.LINK_STATUS)) throw new Error("link");
-        for (const n of ["uPrev", "uFlow", "uT", "uRelax", "uStorm[0]"]) SU[n] = gl.getUniformLocation(simProg, n);
-        for (let i = 0; i < 2; i++) {
-          const t = gl.createTexture()!;
+      // Small data textures (weather flow, gravity fields), updated in place.
+      const dataTex = new Map<number, WebGLTexture>();
+      const uploadData = (unit: number, uniform: string, w: number, h: number, data: Uint8Array) => {
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        let t = dataTex.get(unit);
+        if (!t) {
+          t = gl.createTexture()!;
+          dataTex.set(unit, t);
           gl.bindTexture(gl.TEXTURE_2D, t);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-          simTex.push(t);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+          gl.uniform1i(u(uniform), unit);
+        } else {
+          gl.bindTexture(gl.TEXTURE_2D, t);
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
         }
-        simFb = gl.createFramebuffer();
-      } catch {
+      };
+      const uploadSims = () => {
+        if (flow) uploadData(3, "uFlow", flow.n, flow.n, flow.data);
+        if (fieldFar) uploadData(6, "uFieldFar", fieldFar.gw, fieldFar.gh, fieldFar.data);
+        if (fieldNear) uploadData(7, "uFieldNear", fieldNear.gw, fieldNear.gh, fieldNear.data);
+      };
+
+      // Cloud simulation: ping-pong between two 256² textures through a framebuffer.
+      let simProg: WebGLProgram | null = null;
+      const simTex: WebGLTexture[] = [];
+      let simFb: WebGLFramebuffer | null = null;
+      let simIdx = 0;
+      let simFirst = true;
+      const SU: Record<string, WebGLUniformLocation | null> = {};
+      if (layer === "planet") {
+        try {
+          simProg = gl.createProgram()!;
+          gl.attachShader(simProg, compile(gl, gl.VERTEX_SHADER, VERT));
+          gl.attachShader(simProg, compile(gl, gl.FRAGMENT_SHADER, SIM_FRAG));
+          gl.bindAttribLocation(simProg, loc, "a");
+          gl.linkProgram(simProg);
+          if (!gl.getProgramParameter(simProg, gl.LINK_STATUS)) throw new Error("link");
+          for (const n of ["uPrev", "uFlow", "uT", "uRelax", "uStorm[0]"]) SU[n] = gl.getUniformLocation(simProg, n);
+          for (let i = 0; i < 2; i++) {
+            const t = gl.createTexture()!;
+            gl.bindTexture(gl.TEXTURE_2D, t);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            simTex.push(t);
+          }
+          simFb = gl.createFramebuffer();
+        } catch {
+          onFail?.();
+          return;
+        }
+        gl.useProgram(prog);
+      }
+      const stepClouds = (tSec: number, dtSec: number) => {
+        if (!simProg || !simFb) return;
+        const src = simTex[simIdx]!;
+        const dst = simTex[1 - simIdx]!;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, simFb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, dst, 0);
+        gl.viewport(0, 0, 256, 256);
+        gl.useProgram(simProg);
+        gl.activeTexture(gl.TEXTURE5);
+        gl.bindTexture(gl.TEXTURE_2D, src);
+        gl.uniform1i(SU.uPrev!, 5);
+        gl.uniform1i(SU.uFlow!, 3);
+        gl.uniform1f(SU.uT!, tSec);
+        // Time-based, so clouds settle back (and storms build) at the same pace on any machine.
+        gl.uniform1f(SU.uRelax!, simFirst ? 1 : 1 - Math.exp(-dtSec * 0.75));
+        gl.uniform4fv(SU["uStorm[0]"]!, stormData);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.useProgram(prog);
+        gl.activeTexture(gl.TEXTURE5);
+        gl.bindTexture(gl.TEXTURE_2D, dst);
+        gl.uniform1i(u("uClouds"), 5);
+        simIdx = 1 - simIdx;
+        simFirst = false;
+      };
+      // Adaptive quality: lower the planet's render scale if frames run long.
+      const quality = { scale: 1, ema: 16, last: 0, changed: 0 };
+      const menuH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 84;
+      // Scroll speed, smoothed, so streaks swell while you scroll and settle after.
+      const scroll = { p: progress.current, t: 0, v: 0 };
+
+      const smooth = (a: number, b: number, x: number) => {
+        const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+        return t * t * (3 - 2 * t);
+      };
+      const resize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2) * quality.scale;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = Math.round(rect.width * dpr);
+        canvas.height = Math.round(rect.height * dpr);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      };
+
+      const draw = (now: number) => {
+        const rect = canvas.getBoundingClientRect();
+        const g = frameGeometry(rect.width, rect.height);
+        pointer.x += (pointer.tx - pointer.x) * 0.09;
+        pointer.y += (pointer.ty - pointer.y) * 0.09;
+        pointer.target *= 0.988;
+        pointer.e += (pointer.target - pointer.e) * 0.012;
+        pointer.svx += (pointer.vx - pointer.svx) * 0.015;
+        pointer.svy += (pointer.vy - pointer.svy) * 0.015;
+        pointer.vx *= 0.96;
+        pointer.vy *= 0.96;
+        gl.uniform2f(U.res, canvas.width, canvas.height);
+        gl.uniform2f(U.fc, g.cx, g.cy);
+        gl.uniform2f(U.fs, g.fw, g.fh);
+        gl.uniform1f(U.p, progress.current);
+        gl.uniform1f(U.t, reduced ? 10 : (now - clock.current) / 1000 + timeShift);
+        gl.uniform2f(U.m, pointer.x, pointer.y);
+        gl.uniform2f(U.v, pointer.svx, pointer.svy);
+        gl.uniform1f(U.e, reduced ? 0 : pointer.e);
+        gl.uniform1f(U.dpr, dpr);
+        const sdt = scroll.t ? Math.min(0.1, (now - scroll.t) / 1000) : 0;
+        if (sdt > 0) {
+          const inst = Math.abs(progress.current - scroll.p) / sdt;
+          scroll.v += (inst - scroll.v) * (inst > scroll.v ? 0.12 : 0.05);
+        }
+        scroll.p = progress.current;
+        scroll.t = now;
+        gl.uniform1f(U.s, reduced ? 0 : scroll.v);
+        gl.uniform1f(U.menu, menuH);
+        const tSec = (now - clock.current) / 1000 + timeShift;
+        const p = progress.current;
+        const fx = (pointer.tx - (g.cx - g.fw / 2)) / g.fw;
+        const fy = (pointer.ty - (g.cy - g.fh / 2)) / g.fh;
+        const hasPointer = pointer.tx > -9000 && !reduced;
+        const dt = lastFrame ? Math.min(3, Math.max(0.5, (now - lastFrame) / 16.67)) : 1;
+        lastFrame = now;
+        if (flow) {
+          const sP = 1.25 - 0.25 * p;
+          const mx = ((0.85 + (fx - 0.85) / sP - 1.0122) * 2000) / 883;
+          const my = ((0.58 + (fy - 0.58) / sP - 0.65) * 1126) / 883;
+          const [lx, ly] = prevSim.disc;
+          // The weather only responds once the planet is revealed (later in the scroll);
+          // before that, the rocks are the only thing the pointer moves.
+          const stir = hasPointer && p > 0.6;
+          const dmx = stir && Number.isFinite(lx) ? mx - lx! : 0;
+          const dmy = stir && Number.isFinite(ly) ? my - ly! : 0;
+          flow.step(mx, my, dmx, dmy);
+          prevSim.disc = [mx, my];
+          heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
+          storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
+          gl.uniform4fv(U.storm, stormData);
+        }
+        if (fieldFar && fieldNear) {
+          // Before scrolling, the pointer is a soft reverse singularity among the rocks.
+          const enabled = hasPointer && p < 0.08 && tSec > 1.5;
+          const release = p > 0.08;
+          const sF = 1 + 0.9 * p + 0.08 * (1 - smooth(0.8, 3.0, tSec));
+          const sN = 1.05 + 1.7 * p + 0.1 * (1 - smooth(0.4, 2.4, tSec));
+          fieldFar.step((0.5 + (fx - 0.5) / sF) * fieldFar.w, (0.5 + (fy - 0.5) / sF) * fieldFar.h, enabled, release, dt);
+          fieldNear.step((0.5 + (fx - 0.5) / sN) * fieldNear.w, (0.95 + (fy - 0.95) / sN) * fieldNear.h, enabled, release, dt);
+        }
+        if ((flow && flow.awake) || (fieldFar && (fieldFar.awake || fieldNear!.awake))) uploadSims();
+        if (flow) stepClouds(reduced ? 10 : tSec, dt / 60);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      };
+
+      const loop = (now: number) => {
+        if (disposed) return;
+        if (visible && !document.hidden) {
+          draw(now);
+          // Adaptive quality (planet only): if frames run long, render a little
+          // smaller; recover when there is headroom. At most one change per 2s.
+          if (layer === "planet" && quality.last) {
+            quality.ema += (Math.min(100, now - quality.last) - quality.ema) * 0.05;
+            if (now - quality.changed > 2000) {
+              const next = quality.ema > 24 ? Math.max(0.55, quality.scale - 0.15) : quality.ema < 15 ? Math.min(1, quality.scale + 0.1) : quality.scale;
+              if (next !== quality.scale) {
+                quality.scale = next;
+                quality.changed = now;
+                resize();
+              }
+            }
+          }
+          quality.last = now;
+        } else quality.last = 0;
+        raf = requestAnimationFrame(loop);
+      };
+
+      const onMove = (e: PointerEvent) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+        const now = performance.now();
+        const dt = Math.max(8, now - pointer.lt);
+        const vx = ((x - pointer.lx) / dt) * 16;
+        const vy = ((y - pointer.ly) / dt) * 16;
+        pointer.vx = pointer.vx * 0.7 + vx * 0.3;
+        pointer.vy = pointer.vy * 0.7 + vy * 0.3;
+        pointer.lx = x;
+        pointer.ly = y;
+        pointer.lt = now;
+        if (pointer.e < 0.005) {
+          pointer.x = x;
+          pointer.y = y;
+        }
+        pointer.tx = x;
+        pointer.ty = y;
+        pointer.target = Math.min(1, pointer.target + Math.min(0.04, Math.hypot(vx, vy) / 400));
+      };
+
+      const src = SOURCES[layer];
+      Promise.all(src.files.map(loadImage))
+        .then((imgs) => {
+          if (disposed) return;
+          imgs.forEach((img, i) => {
+            const t = gl.createTexture();
+            gl.activeTexture(gl.TEXTURE0 + i);
+            gl.bindTexture(gl.TEXTURE_2D, t);
+            // Rock id maps must be read exactly: nearest filtering, no colour conversion.
+            const ids = src.uniforms[i]!.startsWith("uIds") || src.uniforms[i]!.startsWith("uCent");
+            const filter = ids ? gl.NEAREST : gl.LINEAR;
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, ids ? gl.NONE : gl.BROWSER_DEFAULT_WEBGL);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            gl.uniform1i(u(src.uniforms[i]!), i);
+          });
+          uploadSims();
+          resize();
+          if (!clock.current) clock.current = performance.now();
+          onReady?.();
+          raf = requestAnimationFrame(loop);
+        })
+        .catch(() => onFail?.());
+
+      const ro = new ResizeObserver(resize);
+      ro.observe(canvas);
+      const io = new IntersectionObserver(([entry]) => {
+        visible = entry?.isIntersecting ?? true;
+      });
+      io.observe(canvas);
+      // Clicking the planet plants a small storm there.
+      const onDown = (e: PointerEvent) => {
+        if (!flow || reduced || progress.current < 0.6) return;
+        const rect = canvas.getBoundingClientRect();
+        const g = frameGeometry(rect.width, rect.height);
+        const fx = (e.clientX - rect.left - (g.cx - g.fw / 2)) / g.fw;
+        const fy = (e.clientY - rect.top - (g.cy - g.fh / 2)) / g.fh;
+        const sP = 1.25 - 0.25 * progress.current;
+        const mx = ((0.85 + (fx - 0.85) / sP - 1.0122) * 2000) / 883;
+        const my = ((0.58 + (fy - 0.58) / sP - 0.65) * 1126) / 883;
+        if (mx * mx + my * my > 1) return;
+        const st = storms[nextStorm]!;
+        nextStorm = (nextStorm + 1) % storms.length;
+        st.x = mx;
+        st.y = my;
+        st.t = performance.now();
+        st.seed = Math.random();
+        heroSignal.surgeAt = st.t;
+        flow.vortex(mx, my);
+      };
+      window.addEventListener("pointermove", onMove, { passive: true });
+      window.addEventListener("pointerdown", onDown, { passive: true });
+      return () => {
+        window.removeEventListener("pointerdown", onDown);
+        cancelAnimationFrame(raf);
+        ro.disconnect();
+        io.disconnect();
+        window.removeEventListener("pointermove", onMove);
+      };
+    };
+    void linked().then((ok) => {
+      if (disposed) return;
+      if (!ok) {
         onFail?.();
         return;
       }
-      gl.useProgram(prog);
-    }
-    const stepClouds = (tSec: number, dtSec: number) => {
-      if (!simProg || !simFb) return;
-      const src = simTex[simIdx]!;
-      const dst = simTex[1 - simIdx]!;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, simFb);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, dst, 0);
-      gl.viewport(0, 0, 256, 256);
-      gl.useProgram(simProg);
-      gl.activeTexture(gl.TEXTURE5);
-      gl.bindTexture(gl.TEXTURE_2D, src);
-      gl.uniform1i(SU.uPrev!, 5);
-      gl.uniform1i(SU.uFlow!, 3);
-      gl.uniform1f(SU.uT!, tSec);
-      // Time-based, so clouds settle back (and storms build) at the same pace on any machine.
-      gl.uniform1f(SU.uRelax!, simFirst ? 1 : 1 - Math.exp(-dtSec * 0.75));
-      gl.uniform4fv(SU["uStorm[0]"]!, stormData);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.useProgram(prog);
-      gl.activeTexture(gl.TEXTURE5);
-      gl.bindTexture(gl.TEXTURE_2D, dst);
-      gl.uniform1i(u("uClouds"), 5);
-      simIdx = 1 - simIdx;
-      simFirst = false;
-    };
-    // Adaptive quality: lower the planet's render scale if frames run long.
-    const quality = { scale: 1, ema: 16, last: 0, changed: 0 };
-    const menuH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 84;
-    // Scroll speed, smoothed, so streaks swell while you scroll and settle after.
-    const scroll = { p: progress.current, t: 0, v: 0 };
-
-    const smooth = (a: number, b: number, x: number) => {
-      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-      return t * t * (3 - 2 * t);
-    };
-    const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2) * quality.scale;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
-      gl.viewport(0, 0, canvas.width, canvas.height);
-    };
-
-    const draw = (now: number) => {
-      const rect = canvas.getBoundingClientRect();
-      const g = frameGeometry(rect.width, rect.height);
-      pointer.x += (pointer.tx - pointer.x) * 0.09;
-      pointer.y += (pointer.ty - pointer.y) * 0.09;
-      pointer.target *= 0.988;
-      pointer.e += (pointer.target - pointer.e) * 0.012;
-      pointer.svx += (pointer.vx - pointer.svx) * 0.015;
-      pointer.svy += (pointer.vy - pointer.svy) * 0.015;
-      pointer.vx *= 0.96;
-      pointer.vy *= 0.96;
-      gl.uniform2f(U.res, canvas.width, canvas.height);
-      gl.uniform2f(U.fc, g.cx, g.cy);
-      gl.uniform2f(U.fs, g.fw, g.fh);
-      gl.uniform1f(U.p, progress.current);
-      gl.uniform1f(U.t, reduced ? 10 : (now - clock.current) / 1000 + timeShift);
-      gl.uniform2f(U.m, pointer.x, pointer.y);
-      gl.uniform2f(U.v, pointer.svx, pointer.svy);
-      gl.uniform1f(U.e, reduced ? 0 : pointer.e);
-      gl.uniform1f(U.dpr, dpr);
-      const sdt = scroll.t ? Math.min(0.1, (now - scroll.t) / 1000) : 0;
-      if (sdt > 0) {
-        const inst = Math.abs(progress.current - scroll.p) / sdt;
-        scroll.v += (inst - scroll.v) * (inst > scroll.v ? 0.12 : 0.05);
-      }
-      scroll.p = progress.current;
-      scroll.t = now;
-      gl.uniform1f(U.s, reduced ? 0 : scroll.v);
-      gl.uniform1f(U.menu, menuH);
-      const tSec = (now - clock.current) / 1000 + timeShift;
-      const p = progress.current;
-      const fx = (pointer.tx - (g.cx - g.fw / 2)) / g.fw;
-      const fy = (pointer.ty - (g.cy - g.fh / 2)) / g.fh;
-      const hasPointer = pointer.tx > -9000 && !reduced;
-      const dt = lastFrame ? Math.min(3, Math.max(0.5, (now - lastFrame) / 16.67)) : 1;
-      lastFrame = now;
-      if (flow) {
-        const sP = 1.25 - 0.25 * p;
-        const mx = ((0.85 + (fx - 0.85) / sP - 1.0122) * 2000) / 883;
-        const my = ((0.58 + (fy - 0.58) / sP - 0.65) * 1126) / 883;
-        const [lx, ly] = prevSim.disc;
-        // The weather only responds once the planet is revealed (later in the scroll);
-        // before that, the rocks are the only thing the pointer moves.
-        const stir = hasPointer && p > 0.6;
-        const dmx = stir && Number.isFinite(lx) ? mx - lx! : 0;
-        const dmy = stir && Number.isFinite(ly) ? my - ly! : 0;
-        flow.step(mx, my, dmx, dmy);
-        prevSim.disc = [mx, my];
-        heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
-        storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
-        gl.uniform4fv(U.storm, stormData);
-      }
-      if (fieldFar && fieldNear) {
-        // Before scrolling, the pointer is a soft reverse singularity among the rocks.
-        const enabled = hasPointer && p < 0.08 && tSec > 1.5;
-        const release = p > 0.08;
-        const sF = 1 + 0.9 * p + 0.08 * (1 - smooth(0.8, 3.0, tSec));
-        const sN = 1.05 + 1.7 * p + 0.1 * (1 - smooth(0.4, 2.4, tSec));
-        fieldFar.step((0.5 + (fx - 0.5) / sF) * fieldFar.w, (0.5 + (fy - 0.5) / sF) * fieldFar.h, enabled, release, dt);
-        fieldNear.step((0.5 + (fx - 0.5) / sN) * fieldNear.w, (0.95 + (fy - 0.95) / sN) * fieldNear.h, enabled, release, dt);
-      }
-      if ((flow && flow.awake) || (fieldFar && (fieldFar.awake || fieldNear!.awake))) uploadSims();
-      if (flow) stepClouds(reduced ? 10 : tSec, dt / 60);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    };
-
-    const loop = (now: number) => {
-      if (disposed) return;
-      if (visible && !document.hidden) {
-        draw(now);
-        // Adaptive quality (planet only): if frames run long, render a little
-        // smaller; recover when there is headroom. At most one change per 2s.
-        if (layer === "planet" && quality.last) {
-          quality.ema += (Math.min(100, now - quality.last) - quality.ema) * 0.05;
-          if (now - quality.changed > 2000) {
-            const next = quality.ema > 24 ? Math.max(0.55, quality.scale - 0.15) : quality.ema < 15 ? Math.min(1, quality.scale + 0.1) : quality.scale;
-            if (next !== quality.scale) {
-              quality.scale = next;
-              quality.changed = now;
-              resize();
-            }
-          }
-        }
-        quality.last = now;
-      } else quality.last = 0;
-      raf = requestAnimationFrame(loop);
-    };
-
-    const onMove = (e: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
-      const now = performance.now();
-      const dt = Math.max(8, now - pointer.lt);
-      const vx = ((x - pointer.lx) / dt) * 16;
-      const vy = ((y - pointer.ly) / dt) * 16;
-      pointer.vx = pointer.vx * 0.7 + vx * 0.3;
-      pointer.vy = pointer.vy * 0.7 + vy * 0.3;
-      pointer.lx = x;
-      pointer.ly = y;
-      pointer.lt = now;
-      if (pointer.e < 0.005) {
-        pointer.x = x;
-        pointer.y = y;
-      }
-      pointer.tx = x;
-      pointer.ty = y;
-      pointer.target = Math.min(1, pointer.target + Math.min(0.04, Math.hypot(vx, vy) / 400));
-    };
-
-    const src = SOURCES[layer];
-    Promise.all(src.files.map(loadImage))
-      .then((imgs) => {
-        if (disposed) return;
-        imgs.forEach((img, i) => {
-          const t = gl.createTexture();
-          gl.activeTexture(gl.TEXTURE0 + i);
-          gl.bindTexture(gl.TEXTURE_2D, t);
-          // Rock id maps must be read exactly: nearest filtering, no colour conversion.
-          const ids = src.uniforms[i]!.startsWith("uIds") || src.uniforms[i]!.startsWith("uCent");
-          const filter = ids ? gl.NEAREST : gl.LINEAR;
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-          gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, ids ? gl.NONE : gl.BROWSER_DEFAULT_WEBGL);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-          gl.uniform1i(u(src.uniforms[i]!), i);
-        });
-        uploadSims();
-        resize();
-        if (!clock.current) clock.current = performance.now();
-        onReady?.();
-        raf = requestAnimationFrame(loop);
-      })
-      .catch(() => onFail?.());
-
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-    const io = new IntersectionObserver(([entry]) => {
-      visible = entry?.isIntersecting ?? true;
+      teardown = setup();
     });
-    io.observe(canvas);
-    // Clicking the planet plants a small storm there.
-    const onDown = (e: PointerEvent) => {
-      if (!flow || reduced || progress.current < 0.6) return;
-      const rect = canvas.getBoundingClientRect();
-      const g = frameGeometry(rect.width, rect.height);
-      const fx = (e.clientX - rect.left - (g.cx - g.fw / 2)) / g.fw;
-      const fy = (e.clientY - rect.top - (g.cy - g.fh / 2)) / g.fh;
-      const sP = 1.25 - 0.25 * progress.current;
-      const mx = ((0.85 + (fx - 0.85) / sP - 1.0122) * 2000) / 883;
-      const my = ((0.58 + (fy - 0.58) / sP - 0.65) * 1126) / 883;
-      if (mx * mx + my * my > 1) return;
-      const st = storms[nextStorm]!;
-      nextStorm = (nextStorm + 1) % storms.length;
-      st.x = mx;
-      st.y = my;
-      st.t = performance.now();
-      st.seed = Math.random();
-      heroSignal.surgeAt = st.t;
-      flow.vortex(mx, my);
-    };
-    window.addEventListener("pointermove", onMove, { passive: true });
-    window.addEventListener("pointerdown", onDown, { passive: true });
     return () => {
-      window.removeEventListener("pointerdown", onDown);
       disposed = true;
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-      io.disconnect();
-      window.removeEventListener("pointermove", onMove);
+      teardown?.();
     };
   }, [layer, progress, clock, onReady, onFail]);
 

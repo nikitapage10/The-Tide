@@ -19,11 +19,10 @@ const OBSERVATIONS: HeroObservation[] = [
 
 /** Notes out in space: they describe what is visible there, not lore. */
 const SPACE_NOTES: HeroObservation[] = [
-  { x: 44, y: 49, side: "right", title: "Gravitic stream", line: "Flowing in · flowing out" },
-  { x: 30, y: 58, side: "right", title: "Debris field", line: "Drifting, slowly" },
-  { x: 55, y: 64, side: "left", title: "Light bending", line: "Source unknown" },
-  { x: 50, y: 40, side: "right", title: "Unlisted object", line: "Last seen here" },
-  { x: 36, y: 70, side: "right", title: "Signal", line: "Faint · repeating" },
+  { x: 40, y: 59, side: "right", title: "Gravitic stream", line: "Flowing in · flowing out" },
+  { x: 58, y: 29, side: "right", title: "Light bending", line: "Source unknown" },
+  { x: 27, y: 63, side: "right", title: "Debris field", line: "Drifting, slowly" },
+  { x: 60, y: 19, side: "right", title: "Signal", line: "Faint · repeating" },
 ];
 import { PrintCard } from "@/components/live/PrintCard";
 import { Badge, DemoBadge } from "@/components/ui/Badge";

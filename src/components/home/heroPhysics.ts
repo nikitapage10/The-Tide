@@ -49,13 +49,13 @@ export class GravityField {
   step(mx: number, my: number, enabled: boolean, release: boolean, dt: number) {
     const { gw, gh, dx, dy, vx, vy } = this;
     const on = enabled && Number.isFinite(mx) && Number.isFinite(my);
-    this.presence += ((on ? 1 : 0) - this.presence) * Math.min(1, 0.015 * dt);
+    this.presence += ((on ? 1 : 0) - this.presence) * Math.min(1, 0.008 * dt);
     if (!this.awake && this.presence < 0.001) return;
     const R = this.reach;
     const G = this.strength * this.presence;
     // Overdamped: rocks glide out and settle back without bouncing.
-    const k = release ? 0.05 : 0.005;
-    const c = release ? 0.35 : 0.16;
+    const k = release ? 0.04 : 0.0025;
+    const c = release ? 0.35 : 0.24;
     let live = 0;
     for (let j = 0; j < gh; j++)
       for (let i = 0; i < gw; i++) {
@@ -100,6 +100,9 @@ export class GravityField {
         const cy = cnt ? ay / cnt - vy[q]! : 0;
         vx[q] = vx[q]! + (fx - k * dx[q]! - c * vx[q]! + 0.15 * cx) * dt;
         vy[q] = vy[q]! + (fy - k * dy[q]! - c * vy[q]! + 0.15 * cy) * dt;
+        // Never fast: a gentle speed limit (source px per frame).
+        vx[q] = clamp(vx[q]!, -0.7, 0.7);
+        vy[q] = clamp(vy[q]!, -0.7, 0.7);
         dx[q] = clamp(dx[q]! + vx[q]! * dt, -60, 60);
         dy[q] = clamp(dy[q]! + vy[q]! * dt, -60, 60);
         live = Math.max(live, Math.abs(dx[q]!), Math.abs(dy[q]!), Math.abs(vx[q]!) * 10);
