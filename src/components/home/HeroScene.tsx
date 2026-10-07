@@ -865,11 +865,14 @@ void main() {
         }
         // Near its root a strand loosens into faint wisps and fades into the
         // marked spot (no hard line end): wider, broken and dimmer there.
-        float rootW = 1.0 - smoothstep(0.0, 0.3, bestT);
-        float w = wid * (1.0 - 0.6 * bestT) * (1.0 + 2.5 * rootW);
+        float rootW = 1.0 - smoothstep(0.0, 0.12, bestT);
+        float w = wid * (1.0 - 0.6 * bestT) * (1.0 + 1.5 * rootW);
         float flow = 0.55 + 0.45 * vnoise(vec2(bestT * 9.0 - uT * 1.6, float(k) * 7.0));
         float wisp = mix(1.0, smoothstep(0.35, 0.8, vnoise(vec2(best * 0.25 + float(k) * 3.0, bestT * 22.0 - uT * 0.8))), rootW);
-        float fadeTip = (1.0 - smoothstep(0.7, 1.0, bestT)) * smoothstep(0.0, 0.28, bestT) * wisp;
+        float fadeTip = (1.0 - smoothstep(0.7, 1.0, bestT)) * mix(0.55, 1.0, smoothstep(0.0, 0.1, bestT)) * mix(1.0, wisp, 0.6);
+        // A soft glowing point where the strand meets the planet.
+        vec2 dA = sp - A;
+        sc3 = max(sc3, vec3(exp(-dot(dA, dA) / 30.0) * 0.9 * str + exp(-dot(dA, dA) / 260.0) * 0.25 * str));
         // Soft cores that melt into a wide glow (they read as part of the sheet).
         float line = 0.55 * exp(-best * best / (w * w)) + 0.4 * exp(-best * best / (14.0 * w * w));
         sc3 = max(sc3, vec3(line * flow * fadeTip * str));
@@ -898,7 +901,7 @@ void main() {
       // Made of many faint filaments (not a flat fill), so the strands dissolve into it.
       float fil = vnoise(vec2(across * 12.0 + 0.6 * sin(tC * 6.0 + uT * 0.4), tC * 4.0 - uT * 1.1));
       fil = 0.3 * fil + 0.7 * pow(vnoise(vec2(across * 26.0, tC * 7.0 - uT * 1.6)), 2.0) + 0.25 * fil * fil;
-      float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.32, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
+      float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.18, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
       float sheetStr = max(uStrandT[1].w, uStrandT[2].w);
       // Fade out well inside the region it is drawn in (no visible mask edges).
       vec2 e2 = min(sp - uStrandBox.xy, uStrandBox.zw - sp);
@@ -1290,38 +1293,15 @@ export function HeroScene({
             // Roots: the marked spots on the planet (the callouts and notes) nearest
             // the cursor, as if the strands were drawn out of those places;
             // fallback roots along the limb if too few are in view.
-            // Fixed roots: when the strands appear, each picks one of the marked
-            // spots nearest the cursor and stays rooted there (only the tips follow
-            // the cursor); new spots are picked only after the strands fade away.
-            const cands: { id: number; x: number; y: number; d: number }[] = [];
-            (anchors?.current ?? []).forEach((a, id) => {
-              const ax2 = (a.x / 100) * 2000, ay2 = (a.y / 100) * 1126;
-              if (Math.hypot(ax2 - 2024.4, ay2 - 731.9) > 883 - 30) return;
-              const [sx2, sy2] = toScreen(ax2, ay2);
-              cands.push({ id, x: sx2, y: sy2, d: Math.hypot(sx2 - head.x, sy2 - head.y) });
-            });
-            cands.sort((c1, c2) => c1.d - c2.d);
-            const near = cands.slice(0, 6);
+            // Fixed roots: the four marked spots on the planet, always the same
+            // (the notes appear there too); only the tips follow the cursor.
+            const spotsNow = (anchors?.current ?? []).map((a) => toScreen((a.x / 100) * 2000, (a.y / 100) * 1126));
             const baseAng = Math.atan2(ay - pcy, ax - pcx) + 0.1;
-            const taken = new Set<number>();
-            for (const st of flowState) if (st.anchor >= 0) taken.add(st.anchor);
             flowState.forEach((st, k) => {
-              if (st.anchor === -99) {
-                const free = near.find((c) => !taken.has(c.id));
-                st.anchor = free ? free.id : -1 - k;
-                if (free) taken.add(free.id);
-              }
-              const c = cands.find((cc) => cc.id === st.anchor);
               const ra = baseAng + (k - 1.5) * 0.09;
-              const gx = c ? c.x : pcx + Math.cos(ra) * (pr - 14);
-              const gy = c ? c.y : pcy + Math.sin(ra) * (pr - 14);
-              if (st.rx < -9000) {
-                st.rx = gx;
-                st.ry = gy;
-              }
-              const re = 1 - Math.pow(0.96, strandDt);
-              st.rx += (gx - st.rx) * re;
-              st.ry += (gy - st.ry) * re;
+              const sp2 = spotsNow[k];
+              st.rx = sp2 ? sp2[0] : pcx + Math.cos(ra) * (pr - 14);
+              st.ry = sp2 ? sp2[1] : pcy + Math.sin(ra) * (pr - 14);
             });
             const use = flowState.map((st) => [st.rx, st.ry] as [number, number]);
             const mrx = use.reduce((a2, r) => a2 + r[0], 0) / use.length;

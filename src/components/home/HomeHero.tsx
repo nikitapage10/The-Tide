@@ -40,6 +40,8 @@ export interface HeroProps {
   observations: HeroObservation[];
   /** Notes that pop up out in space (around the streams). */
   spaceNotes: HeroObservation[];
+  /** Fixed spots on the planet where the cursor's strands are rooted. */
+  spots: { x: number; y: number }[];
   /** Short machine-style readout (real data, e.g. release); currently not shown. */
   code?: string;
 }
@@ -49,7 +51,7 @@ const HAIKU = ["Waves crash upon shores,", "As the Tide's eternal song,", "Echoe
 
 const pin = (x: number, y: number) => ({ "--x": `${x}%`, "--y": `${y}%` }) as React.CSSProperties;
 
-export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
+export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProps) {
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
@@ -58,8 +60,8 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
   // Marked spots on the planet, where the cursor's strands rise from.
   const anchors = useRef<{ x: number; y: number }[]>([]);
   useEffect(() => {
-    anchors.current = [...callouts, ...observations].map((c) => ({ x: c.x, y: c.y }));
-  }, [callouts, observations]);
+    anchors.current = spots;
+  }, [spots]);
   const progress = useRef(0);
   // The interface (callouts) is revealed late in the scroll; it types itself in.
   const [revealed, setRevealed] = useState(false);

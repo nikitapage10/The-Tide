@@ -7,14 +7,18 @@ import { HomeHero, type HeroCallout, type HeroObservation } from "@/components/h
  * lore unresolved). Positions are on the artwork (percent).
  * "Storm cell" describes the animated weather, not lore.
  */
+/** The four marked spots on the planet: the cursor's strands rise from them and
+ * the rotating notes appear there (percent of the artwork). */
+const SPOTS = { a: { x: 68, y: 28 }, b: { x: 78, y: 42 }, c: { x: 70, y: 60 }, d: { x: 84, y: 76 } };
+
 const OBSERVATIONS: HeroObservation[] = [
-  { x: 80, y: 62, side: "left", title: "Storm cell", line: "Atmosphere unstable" },
-  { x: 70, y: 22, side: "right", title: "The Drowning", line: "Shorelines that no longer hold" },
-  { x: 76, y: 40, side: "right", title: "The Divergence", line: "Something woke" },
-  { x: 82, y: 47, side: "left", title: "The Drift", line: "Arrivals from elsewhere" },
-  { x: 74, y: 52, side: "right", title: "The Undertow", line: "Before the Veil" },
-  { x: 78, y: 30, side: "left", title: "Age of the Veil", line: "Records scarce" },
-  { x: 70, y: 12, side: "right", title: "Era of Verdancy", line: "Present, for now" },
+  { ...SPOTS.c, side: "right", title: "Storm cell", line: "Atmosphere unstable" },
+  { ...SPOTS.a, side: "right", title: "The Drowning", line: "Shorelines that no longer hold" },
+  { ...SPOTS.b, side: "right", title: "The Divergence", line: "Something woke" },
+  { ...SPOTS.d, side: "left", title: "The Drift", line: "Arrivals from elsewhere" },
+  { ...SPOTS.c, side: "right", title: "The Undertow", line: "Before the Veil" },
+  { ...SPOTS.a, side: "right", title: "Age of the Veil", line: "Records scarce" },
+  { ...SPOTS.b, side: "right", title: "Era of Verdancy", line: "Present, for now" },
 ];
 
 /** Notes out in space: they describe what is visible there, not lore. */
@@ -73,7 +77,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <HomeHero callouts={callouts} observations={OBSERVATIONS} spaceNotes={SPACE_NOTES} code={latest ? `Archive · release v${latest.version}` : "Archive · no release yet"} />
+      <HomeHero callouts={callouts} observations={OBSERVATIONS} spots={Object.values(SPOTS)} spaceNotes={SPACE_NOTES} code={latest ? `Archive · release v${latest.version}` : "Archive · no release yet"} />
       <div className="space-y-12 pt-14">
       <section aria-labelledby="observatory">
         <p className="tracked flex items-center gap-3 text-faint">
