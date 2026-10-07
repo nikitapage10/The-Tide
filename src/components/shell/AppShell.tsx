@@ -18,9 +18,9 @@ const NAV: NavItem[] = [
 /** The mark: a ring cut by a vertical meridian. */
 function Mark() {
   return (
-    <svg aria-hidden="true" width="30" height="40" viewBox="0 0 30 40" className="shrink-0">
-      <circle cx="15" cy="20" r="11" fill="none" stroke="currentColor" strokeWidth="1" />
-      <line x1="15" y1="1" x2="15" y2="39" stroke="currentColor" strokeWidth="1" />
+    <svg aria-hidden="true" width="34" height="60" viewBox="0 0 34 60" className="shrink-0">
+      <circle cx="17" cy="30" r="13" fill="none" stroke="currentColor" strokeWidth="0.9" />
+      <line x1="17" y1="0" x2="17" y2="60" stroke="currentColor" strokeWidth="0.9" />
     </svg>
   );
 }
@@ -49,13 +49,13 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:bg-white focus:px-3 focus:py-2 focus:text-black">
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/55 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur-md [text-shadow:0_1px_8px_rgba(0,0,0,.9)]">
         <div className="mx-auto flex h-[var(--header-h)] max-w-[96rem] items-center gap-4 px-4 sm:px-10">
           <Link href="/" className="flex items-center gap-3 text-white no-underline">
             <Mark />
-            <span className="font-[family-name:var(--font-display)] text-lg uppercase tracking-[0.35em]">The Tide</span>
+            <span className="whitespace-nowrap font-[family-name:var(--font-display)] text-lg uppercase tracking-[0.3em] sm:text-xl sm:tracking-[0.4em]">The Tide</span>
           </Link>
-          <span aria-hidden="true" className="hidden h-8 w-px bg-white/15 lg:block" />
+          <span aria-hidden="true" className="mx-4 hidden h-9 w-px bg-white/20 lg:block" />
           <nav aria-label="Primary" className="hidden lg:block">
             <TopNav items={NAV.slice(1)} />
           </nav>
@@ -74,7 +74,7 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
           ) : null}
           {/* Mobile and tablet menu: native disclosure, works without JavaScript. */}
           <details className="group relative ml-auto lg:hidden">
-            <summary className="tracked cursor-pointer list-none border border-white/25 px-3 py-2 text-[0.68rem] text-white">Menu & search</summary>
+            <summary className="tracked cursor-pointer list-none border border-white/25 px-3 py-2 text-[0.68rem] text-white whitespace-nowrap">Menu</summary>
             <div className="fixed inset-x-0 top-[var(--header-h)] max-h-[calc(100svh-var(--header-h))] space-y-4 overflow-y-auto border-b border-white/10 bg-bg px-4 py-5 sm:px-10">
               <SearchForm id="mobile-search" />
               <nav aria-label="Primary (mobile)">

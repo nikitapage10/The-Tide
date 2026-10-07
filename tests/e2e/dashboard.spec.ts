@@ -158,7 +158,7 @@ test("small screens: no horizontal scroll and a working menu", async ({ page }) 
     expect(overflow, url).toBeLessThanOrEqual(0);
   }
   await page.goto("/");
-  await page.getByText("Menu & search").click();
+  await page.getByText("Menu", { exact: true }).click();
   await page.getByRole("navigation", { name: "Primary (mobile)" }).getByRole("link", { name: "Studio", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "The Studio" })).toBeVisible();
   await axe(page);

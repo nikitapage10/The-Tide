@@ -17,7 +17,7 @@ function isActive(pathname: string, href: string) {
 export function TopNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname() ?? "/";
   return (
-    <ul className="flex items-center gap-1 lg:gap-3">
+    <ul className="flex items-center gap-2 xl:gap-8">
       {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
@@ -26,12 +26,12 @@ export function TopNav({ items }: { items: NavItem[] }) {
               href={item.href}
               aria-current={pathname === item.href ? "page" : active ? "true" : undefined}
               className={cx(
-                "tracked transition-tide relative block px-2 py-2 text-[0.7rem] no-underline lg:px-3",
-                active ? "text-white" : "text-muted hover:text-white",
+                "transition-tide relative block px-3 py-2 font-[family-name:var(--font-mono)] text-[0.74rem] uppercase tracking-[0.3em] no-underline",
+                active ? "text-white" : "text-[#d4d4d8] hover:text-white",
               )}
             >
               {item.label}
-              <span aria-hidden="true" className={cx("absolute inset-x-2 -bottom-px h-px lg:inset-x-3", active ? "bg-white" : "bg-transparent")} />
+              <span aria-hidden="true" className={cx("absolute inset-x-3 -bottom-px h-px", active ? "bg-white" : "bg-transparent")} />
             </Link>
           </li>
         );

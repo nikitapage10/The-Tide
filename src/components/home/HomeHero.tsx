@@ -8,8 +8,8 @@
  */
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
-import { GravityField } from "./GravityField";
+import { useCallback, useEffect, useRef } from "react";
+import { HeroScene } from "./HeroScene";
 
 export interface HeroCallout {
   /** Position on the artwork, in percent of its width/height. */
@@ -36,6 +36,8 @@ export function HomeHero({ callouts, code }: HeroProps) {
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
+  const progress = useRef(0);
+  const onSceneReady = useCallback(() => stage.current?.setAttribute("data-gl", "on"), []);
 
   useEffect(() => {
     const t = track.current;
@@ -43,6 +45,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
     if (!t || !s) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       s.style.setProperty("--p", "1");
+      progress.current = 1;
       ui.current?.setAttribute("data-hidden", "false");
       return;
     }
@@ -53,6 +56,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
       const span = Math.max(1, rect.height - window.innerHeight);
       const p = Math.min(1, Math.max(0, -rect.top / span));
       s.style.setProperty("--p", p.toFixed(4));
+      progress.current = p;
       ui.current?.setAttribute("data-hidden", p < 0.45 ? "true" : "false");
       // The header gets its backdrop back once the hero has scrolled away.
       document.body.dataset.pastHero = rect.bottom <= 64 ? "true" : "false";
@@ -69,26 +73,23 @@ export function HomeHero({ callouts, code }: HeroProps) {
       if (raf) cancelAnimationFrame(raf);
       delete document.body.dataset.pastHero;
     };
-  }, []);
+  }, [progress]);
 
-  const skip = () => {
-    const t = track.current;
-    if (t) window.scrollTo({ top: t.offsetTop + t.offsetHeight - window.innerHeight, behavior: "smooth" });
-  };
 
   return (
     <section ref={track} className="hero-track" aria-labelledby="hero-title">
-      {/* Stacking, back to front: planet, lens, interface, meteors, title. */}
+      {/* Stacking, back to front: scene (WebGL, or DOM layers as fallback), interface, title. */}
       <div ref={stage} className="hero-stage">
-        <div className="hero-frame z-0">
-          <div className="hero-layer hero-planet">
-            <div className="hero-land absolute inset-0">
+        <div className="hero-frame hero-dom z-0">
+          <div className="hero-layer hero-planet hero-planet-dom">
+            <div className="hero-land hero-land-3 absolute inset-0">
               <Image src="/brand/planet-v2.webp" alt="" fill priority sizes="100vw" className="object-cover" />
             </div>
           </div>
         </div>
 
-        <GravityField className="hero-layer z-[1] h-full w-full" />
+        {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
+        <HeroScene progress={progress} onReady={onSceneReady} className="hero-layer z-[1] h-full w-full" />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
         <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
@@ -138,15 +139,6 @@ export function HomeHero({ callouts, code }: HeroProps) {
 
         {/* Screen-anchored interface: scroll cue and footer line. */}
         <div className="pointer-events-none absolute inset-0 z-[3] mx-auto flex max-w-[96rem] flex-col justify-end px-4 pb-6 sm:px-10">
-          <button type="button" onClick={skip} className="hero-cue tracked pointer-events-auto mb-10 flex w-max flex-col items-center gap-3 text-faint hover:text-white">
-            <span aria-hidden="true" className="h-20 w-px bg-white/25" />
-            <span aria-hidden="true" className="h-3 w-3 rounded-full border border-white/70" />
-            <span className="leading-5">
-              Scroll
-              <br />
-              inward
-            </span>
-          </button>
           <div className="hero-ui tracked flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-[0.68rem] text-faint">
             <span className="flex items-center gap-4">
               A living atlas of worlds <span aria-hidden="true" className="hidden h-px w-14 bg-white/25 sm:inline-block" /> The Tide
@@ -156,9 +148,9 @@ export function HomeHero({ callouts, code }: HeroProps) {
         </div>
 
         {/* Meteors in front of the interface. */}
-        <div className="hero-frame pointer-events-none z-[4]">
+        <div className="hero-frame hero-dom pointer-events-none z-[4]">
           <div className="hero-layer hero-far">
-            <div className="hero-land-late absolute inset-0">
+            <div className="hero-land hero-land-2 absolute inset-0">
               <Image src="/brand/meteors-far.webp" alt="" fill sizes="100vw" className="object-cover" />
             </div>
           </div>
@@ -172,12 +164,12 @@ export function HomeHero({ callouts, code }: HeroProps) {
 
         {/* Title: the only element in front of the meteors. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[6] mx-auto max-w-[96rem] px-4 pt-[calc(var(--header-h)+2.5rem)] sm:px-10">
-          <div className="hero-land-late max-w-xl">
+          <div className="hero-title max-w-xl">
             <p className="tracked flex items-center gap-3 text-faint">
               <span>01 / Home</span>
               <span aria-hidden="true" className="h-px w-20 bg-white/25" />
             </p>
-            <h1 id="hero-title" className="mt-8 font-[family-name:var(--font-display)] text-5xl font-light uppercase tracking-[0.42em] text-white sm:text-7xl">
+            <h1 id="hero-title" className="mt-8 font-[family-name:var(--font-display)] text-4xl font-light uppercase tracking-[0.3em] text-white sm:text-7xl sm:tracking-[0.42em]">
               The Tide
             </h1>
             <p className="tracked mt-5 text-muted">Worlds in equilibrium</p>

@@ -28,7 +28,7 @@
   --demo: #cdbbe9;
   --focus: #ffffff;
   --contour: rgba(255, 255, 255, 0.05);
-  --header-h: 64px;
+  --header-h: 84px;
 
   --font-display: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
@@ -150,28 +150,37 @@ main:has(> .hero-track) { padding-top: 0; }
 .hero-track { position: relative; height: 280vh; width: 100vw; margin-left: calc(50% - 50vw); }
 .hero-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #000; --p: 0; }
 /* A box with the artwork's aspect ratio that always covers the stage, so callouts stay pinned to the art. */
-.hero-frame { position: absolute; left: 50%; top: 50%; width: max(100vw, 177.6svh); aspect-ratio: 2000 / 1126; translate: -50% -50%; }
+/* Must match frameGeometry() in HeroScene.tsx. Shifted right; wide enough to still cover the left edge. */
+.hero-frame { position: absolute; left: calc(50% + 6vw); top: 50%; width: max(112vw, 177.6svh); aspect-ratio: 2000 / 1126; translate: -50% -50%; }
 .hero-layer { position: absolute; inset: 0; will-change: transform, opacity; pointer-events: none; }
 /* Planet scale S(p) = 1.35 - 0.35p around the planet's centre; the artwork is the final frame.
    Callouts reuse the same maths so they stay pinned to the art. */
-.hero-planet { transform: scale(calc(1.35 - 0.35 * var(--p))); transform-origin: 85% 58%; }
-.hero-pin { position: absolute; left: calc(85% + (var(--x) - 85%) * (1.35 - 0.35 * var(--p))); top: calc(58% + (var(--y) - 58%) * (1.35 - 0.35 * var(--p))); }
+.hero-planet { transform: scale(calc(1.25 - 0.25 * var(--p))); transform-origin: 85% 58%; }
+.hero-planet-dom { filter: brightness(calc(0.16 + 0.84 * var(--p))); }
+.hero-pin { position: absolute; left: calc(85% + (var(--x) - 85%) * (1.25 - 0.25 * var(--p))); top: calc(58% + (var(--y) - 58%) * (1.25 - 0.25 * var(--p))); }
+.hero-stage[data-gl="on"] .hero-dom { visibility: hidden; }
+.hero-title { opacity: clamp(0, calc((var(--p) - 0.1) * 3.5), 1); translate: 0 calc(12px - 12px * clamp(0, calc((var(--p) - 0.1) * 3.5), 1)); }
 /* No header bar over the landing scene. */
 body:has(.hero-track) header { position: fixed; inset-inline: 0; }
 body:has(.hero-track):not([data-past-hero="true"]) header { background: transparent; border-color: transparent; backdrop-filter: none; }
-.hero-far { transform: scale(calc(1 + 0.9 * var(--p))); opacity: calc(1 - 0.55 * var(--p)); filter: drop-shadow(0 0 1px rgba(255,255,255,.55)) drop-shadow(0 0 10px rgba(255,255,255,.08)); }
+/* A soft dark fade behind the menu on the landing scene, instead of a bar. */
+body:has(.hero-track):not([data-past-hero="true"]) header::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 190px; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,.85) 0%, rgba(0,0,0,.55) 45%, rgba(0,0,0,0) 100%);
+}
+.hero-far { transform: scale(calc(1 + 0.9 * var(--p))); opacity: calc(1 - 0.55 * var(--p)); filter: brightness(.5) drop-shadow(0 0 1px rgba(255,255,255,.5)); }
 .hero-near { transform: scale(calc(1.05 + 1.6 * var(--p))); opacity: calc(1 - 1.7 * var(--p)); filter: drop-shadow(0 0 2px rgba(255,255,255,.35)); }
 .hero-ui { opacity: clamp(0, calc((var(--p) - 0.4) * 3), 1); translate: 0 calc(16px - 16px * clamp(0, calc((var(--p) - 0.4) * 3), 1)); }
 .hero-ui[data-hidden="true"] { pointer-events: none; }
-.hero-cue { opacity: clamp(0, calc(1 - 4 * var(--p)), 1); }
 .hero-vignette { background: radial-gradient(120% 90% at 30% 50%, transparent 40%, rgba(0,0,0,.65) 100%), linear-gradient(90deg, rgba(0,0,0,.55) 0%, transparent 45%); }
 @media (max-aspect-ratio: 1/1) {
   /* Portrait: keep the planet in view by anchoring the frame towards its right side. */
   .hero-frame { left: 15%; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .hero-land { animation: hero-land 1.8s cubic-bezier(.2,.7,.1,1) both; }
-  .hero-land-late { animation: hero-land 2.4s cubic-bezier(.2,.7,.1,1) both; }
+  .hero-land { animation: hero-land 1.4s cubic-bezier(.2,.7,.1,1) both; }
+  .hero-land-2 { animation-delay: .55s; }
+  .hero-land-3 { animation-delay: 1.1s; animation-duration: 1.8s; }
 }
 @keyframes hero-land { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
