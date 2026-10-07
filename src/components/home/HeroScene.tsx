@@ -84,11 +84,14 @@ float fbm(vec2 p) { return 0.6 * vnoise(p) + 0.3 * vnoise(p * 2.03 + 7.1) + 0.1 
 
 const vec2 PINCH = vec2(0.20, 0.453); // where the streams cross, in artwork uv
 
-// Black-hole-like horizon plus a flowing tide, always in motion and kept light:
-// - the streams carry slow pulses of light toward the planet and gently undulate
-// - space just outside the horizon is lensed by a turbulent flow that circles the
-//   planet; a thin photon ring with travelling bright knots hugs the limb, with a
-//   fainter second ring and a soft halo.
+// Black-hole-like horizon plus a flowing tide, always in motion and kept light.
+// The stream lines themselves are never displaced (that chopped them up): only
+// light moves along them.
+// - Streams: broad, soft swells of light travel along the strands; some bundles
+//   carry light in toward the planet, others carry it out, at the same time.
+// - Horizon: a gentle turbulent flow circles the planet just above its edge,
+//   bending the light there; a thin photon ring with travelling bright knots
+//   hugs the limb, with a fainter second ring and a soft halo.
 vec3 planetWithLimb(vec2 uv) {
   vec2 q = (uv - LIMB_C) * SRC;
   float rq = length(q);
@@ -97,46 +100,41 @@ vec3 planetWithLimb(vec2 uv) {
   vec2 nrm = q / max(rq, 1.0);
   vec2 tng = vec2(-nrm.y, nrm.x);
   float outside = smoothstep(-2.0, 8.0, dl);
-  float near = exp(-max(dl, 0.0) / 120.0) * outside;
-
-  // Orbiting flow just above the horizon (angle advances with time).
+  // Horizon flow: confined close to the edge and ramped in smoothly, so the
+  // strands that meet the planet are not sheared.
+  float hug = exp(-max(dl, 0.0) / 70.0) * smoothstep(0.0, 30.0, dl);
   float orbit = ang * 7.0 - uT * 0.55;
   float turb = fbm(vec2(orbit, dl * 0.03 - uT * 0.25)) - 0.5;
-  vec2 disp = (nrm * (10.0 + 7.0 * turb) + tng * 9.0 * turb) * near;
+  vec2 disp = (nrm * 6.0 * turb + tng * 7.0 * turb) * hug;
+  vec3 col = sharpPlanet(uv + disp / SRC);
 
-  // Streams: polar coordinates around the crossing point; strands fan out from it.
+  // Streams: coordinates around the crossing point. s runs along the flow
+  // (negative left of the crossing), across picks out bundles of strands.
   vec2 w = (uv - PINCH) * SRC;
   float along = length(w);
-  float across = atan(w.y, abs(w.x));
-  // Signed distance along the flow: negative on the left of the crossing, so the
-  // current runs continuously from the left edge, through the crossing, into the planet.
   float s = w.x < 0.0 ? -along : along;
-  float left = smoothstep(0.0, -200.0, w.x);
-  // Each strand has its own direction: some flow in toward the planet, some flow
-  // out. Keyed on the strand's line through the crossing, so it holds on both sides.
-  float strandId = across * (w.x < 0.0 ? -1.0 : 1.0);
-  float inward = smoothstep(0.38, 0.62, vnoise(vec2(strandId * 22.0, 4.0)));
-  float dsg = inward * 2.0 - 1.0;
-  // Outside the planet, and faded out right at the crossing point (polar singularity).
-  float space = (1.0 - smoothstep(0.0, 40.0, -dl)) * smoothstep(20.0, 90.0, along);
-  // Flow map: the wisps inside each strand slide steadily along it (two phases,
-  // cross-faded, so the motion is continuous without stretching the image).
-  vec2 flowDir = (w.x < 0.0 ? -w : w) / max(along, 1.0);
-  float ph = uT * 0.22;
-  float f1 = fract(ph), f2 = fract(ph + 0.5);
-  float flowLen = 36.0 * space * outside;
-  vec2 o1 = -flowDir * dsg * (f1 - 0.5) * flowLen;
-  vec2 o2 = -flowDir * dsg * (f2 - 0.5) * flowLen;
-  float wgt = abs(1.0 - 2.0 * f1);
-  vec3 col = mix(sharpPlanet(uv + (disp + o1) / SRC), sharpPlanet(uv + (disp + o2) / SRC), wgt);
-
-  // Long, soft pulses of light riding each strand's current (on the strands only).
-  float lum = dot(col, vec3(0.3333));
-  float strand = smoothstep(0.035, 0.4, lum) * outside * smoothstep(20.0, 90.0, along);
-  float pulseIn = fbm(vec2(s * 0.0035 - uT * 0.3, across * 34.0));
-  float pulseOut = fbm(vec2(s * 0.0035 + uT * 0.3, across * 34.0 + 11.0));
-  float pulse = mix(pulseOut, pulseIn, inward);
-  col *= 1.0 + strand * (mix(0.55, 0.8, left) * smoothstep(0.5, 0.85, pulse) - 0.12);
+  // Bundle angle, mirrored on the left so a strand keeps its bundle through the crossing.
+  float across = atan(w.y, abs(w.x)) * (w.x < 0.0 ? -1.0 : 1.0);
+  // Neighbouring bundles alternate: light flows into the planet on some, out on others.
+  float inward = smoothstep(-0.35, 0.35, sin(across * 9.0 + 0.6));
+  // Soft patches of light drifting along the strands (toward the planet on inward
+  // bundles, away from it on the others).
+  float pIn = vnoise(vec2(s * 0.004 - uT * 0.35, across * 4.0));
+  float pOut = vnoise(vec2(s * 0.004 + uT * 0.35, across * 4.0 + 9.0));
+  float flare = smoothstep(0.55, 0.92, mix(pOut, pIn, inward));
+  // The glow is traced from the strands themselves, heavily blurred, and drawn
+  // over them additively, so the light follows the lines without moving them.
+  vec2 tx = 1.0 / SRC;
+  float halo1 = 0.0, halo2 = 0.0;
+  for (int k = 0; k < 8; k++) {
+    float a = float(k) * 0.7854;
+    vec2 d = vec2(cos(a), sin(a));
+    halo1 += dot(tex(uPlanet, uv + d * 9.0 * tx).rgb, vec3(0.3333));
+    halo2 += dot(tex(uPlanet, uv + d * 24.0 * tx).rgb, vec3(0.3333));
+  }
+  float glowSrc = smoothstep(0.03, 0.45, (halo1 * 0.6 + halo2 * 0.4) / 8.0);
+  float streamZone = (1.0 - smoothstep(-40.0, 0.0, -dl)) * smoothstep(30.0, 160.0, along);
+  col += vec3(0.84, 0.9, 1.0) * glowSrc * flare * streamZone * 0.32;
 
   // Photon ring with knots of light circling the planet, a second ring, a halo.
   float knots = 0.45 + 1.1 * smoothstep(0.45, 0.9, fbm(vec2(ang * 22.0 - uT * 1.1, uT * 0.1)));
