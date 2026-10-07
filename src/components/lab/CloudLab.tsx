@@ -364,7 +364,7 @@ float cbase(vec2 p) {
 }
 float cdens(vec2 p) {
   float detail = fbm5(p * 5.0 + vec2(uT * 0.04, 0.0));
-  return smoothstep(0.38, 0.7, cbase(p) + (detail - 0.5) * 0.4);
+  return smoothstep(0.43, 0.73, cbase(p) + (detail - 0.5) * 0.4);
 }
 void main() {
   // A patch of the planet artwork (the lit middle of the disc).
@@ -400,13 +400,14 @@ varying float vL;
 varying vec2 vToLight;
 void main() {
   gl_Position = vec4(aP.xy * 2.0 - 1.0, 0.0, 1.0);
-  gl_PointSize = aP.z * uDpr;
+  gl_PointSize = floor(aP.z) * uDpr;
   vA = aP.w;
   vec2 dl = vec2((uM.x - aP.x) * uAspect, uM.y - aP.y);
   vL = uLight * exp(-dot(dl, dl) / 0.025);
   vToLight = normalize(dl + 1e-4);
   vSoft = uSoft;
-  vSeed = fract(aP.x * 91.7 + aP.y * 37.3);
+  // A fixed seed per puff (deriving it from the position made puffs strobe).
+  vSeed = fract(aP.z);
 }
 `;
 
@@ -673,7 +674,8 @@ export function CloudLab() {
         const i = pCount++;
         homes[i * 2] = x;
         homes[i * 2 + 1] = y;
-        pA.set([x, y, layered ? 34 + Math.random() * 46 : 10 + Math.random() * 16, layered ? 0.06 + 0.14 * d : 0.18 + 0.3 * d], i * 4);
+        const size = Math.floor(layered ? 34 + Math.random() * 46 : 10 + Math.random() * 16) + Math.random() * 0.98;
+        pA.set([x, y, size, layered ? 0.06 + 0.14 * d : 0.18 + 0.3 * d], i * 4);
         pv[i * 2] = pv[i * 2 + 1] = 0;
       }
     };
@@ -865,7 +867,8 @@ export function CloudLab() {
       if (mode === "airpuffs" || mode === "layered") {
         const layered = mode === "layered";
         // Layered: the whole top system drifts with a steady wind (and wraps).
-        const wx0 = layered ? 0.012 : 0, wy0 = layered ? 0.004 : 0;
+        // Same direction and speed as the deck below (its coords drift +0.012, +0.003).
+        const wx0 = layered ? -0.006 / aspect : 0, wy0 = layered ? -0.0015 : 0;
         const mx = pointer.x * 2 - 1, my = pointer.y * 2 - 1;
         air.step(mx, my, moving ? dx * 2 * (0.5 + strength) : 0, moving ? dy * 2 * (0.5 + strength) : 0, dt * 60);
         const k = 0.1 + recover * 1.0;
@@ -881,8 +884,8 @@ export function CloudLab() {
           vy += (wy - vy) * Math.min(1, dt * (2 + 6 * hash(i, 4)));
           if (layered) {
             let hx = homes[i * 2]! + wx0 * dt, hy = homes[i * 2 + 1]! + wy0 * dt;
-            if (hx > 1.05) { hx -= 1.1; x -= 1.1; }
-            if (hy > 1.05) { hy -= 1.1; y -= 1.1; }
+            if (hx < -0.05) { hx += 1.1; x += 1.1; }
+            if (hy < -0.05) { hy += 1.1; y += 1.1; }
             homes[i * 2] = hx;
             homes[i * 2 + 1] = hy;
           }
@@ -1008,7 +1011,10 @@ export function CloudLab() {
     <div className="fixed inset-0 bg-black">
       <canvas ref={ref} className="absolute inset-0 h-full w-full" />
       <div className="absolute left-4 top-4 z-10 max-w-sm space-y-4 border border-white/10 bg-black/70 p-4 backdrop-blur-sm">
-        <p className="tracked text-[0.65rem] text-faint">The Tide · Cloud lab</p>
+        <p className="tracked flex justify-between text-[0.65rem] text-faint">
+          <span>The Tide · Cloud lab</span>
+          <a href="/workshop/cloud-lab" className="text-white/60 no-underline hover:text-white">Workshop</a>
+        </p>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Interaction model">
           {MODES.map((m) => (
             <button

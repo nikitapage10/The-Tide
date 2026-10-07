@@ -15,6 +15,7 @@ export default async function WorkshopPage() {
     builds: `${builds.filter((b) => !["done", "abandoned"].includes(b.status)).length} active`,
     publishing: project.releaseCount ? `v${project.releaseCount}` : "no releases",
     sources: "",
+    "cloud-lab": "lab",
     settings: ctx.mode === "demo" ? "demo" : "connected",
   };
   return (

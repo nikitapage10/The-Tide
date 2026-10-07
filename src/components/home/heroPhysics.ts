@@ -409,3 +409,195 @@ export class CloudWisps {
     }
   }
 }
+
+/** CPU value noise / fbm (for placing the puff layer's cloud system). */
+function h2(x: number, y: number) {
+  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+function vn(x: number, y: number) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = h2(ix, iy), b = h2(ix + 1, iy), c = h2(ix, iy + 1), d = h2(ix + 1, iy + 1);
+  return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+}
+function fbm2(x: number, y: number) {
+  let v = 0, a = 0.5;
+  for (let i = 0; i < 5; i++) {
+    v += a * vn(x, y);
+    x = x * 2.02 + 3.1;
+    y = y * 2.02 + 1.7;
+    a *= 0.5;
+  }
+  return v / 0.97;
+}
+
+/**
+ * The upper cloud layer: large, soft, translucent puffs that overlap into
+ * sheets. They drift with the weather below (same direction and speed, in
+ * latitude/longitude on the sphere) and are carried by the air the cursor
+ * stirs, then settle back into formation.
+ *
+ * attrs per puff: disc x, y; size (integer px) + seed (fraction); alpha.
+ */
+export class CloudPuffs {
+  readonly count: number;
+  readonly attrs: Float32Array;
+  private lon: Float32Array;
+  private lat: Float32Array;
+  private ox: Float32Array;
+  private oy: Float32Array;
+  private vx: Float32Array;
+  private vy: Float32Array;
+  private coupling: Float32Array;
+
+  constructor(n = 2400) {
+    const lon: number[] = [];
+    const lat: number[] = [];
+    const dens: number[] = [];
+    let tries = 0;
+    while (lon.length < n && tries < 200000) {
+      tries++;
+      const la = Math.asin(Math.random() * 2 - 1);
+      const lo = (Math.random() * 2 - 1) * (Math.PI / 2);
+      const d = Math.min(1, Math.max(0, (fbm2(lo * 2.4 + 7.3, la * 2.4 + 3.1) - 0.5) / 0.22));
+      if (Math.random() > d * d) continue;
+      lon.push(lo);
+      lat.push(la);
+      dens.push(d);
+    }
+    this.count = lon.length;
+    this.lon = Float32Array.from(lon);
+    this.lat = Float32Array.from(lat);
+    this.attrs = new Float32Array(this.count * 4);
+    for (let i = 0; i < this.count; i++) {
+      this.attrs[i * 4 + 2] = 34 + Math.floor(Math.random() * 46) + Math.random() * 0.98;
+      this.attrs[i * 4 + 3] = 0.06 + 0.14 * dens[i]!;
+    }
+    this.ox = new Float32Array(this.count);
+    this.oy = new Float32Array(this.count);
+    this.vx = new Float32Array(this.count);
+    this.vy = new Float32Array(this.count);
+    this.coupling = Float32Array.from({ length: this.count }, () => 2 + 6 * Math.random());
+    this.place();
+  }
+
+  private place() {
+    for (let i = 0; i < this.count; i++) {
+      const cl = Math.cos(this.lat[i]!);
+      this.attrs[i * 4] = cl * Math.sin(this.lon[i]!) + this.ox[i]!;
+      this.attrs[i * 4 + 1] = Math.sin(this.lat[i]!) + this.oy[i]!;
+    }
+  }
+
+  /** dt: frames (≈1). The drift matches the lower deck's (see cloudCoords). */
+  step(flow: FlowSim, dt: number, strength = 1) {
+    const s = dt / 60;
+    for (let i = 0; i < this.count; i++) {
+      let lo = this.lon[i]! - 0.004 * s;
+      let la = this.lat[i]! - 0.001 * s;
+      if (lo < -Math.PI / 2) lo += Math.PI;
+      if (la < -1.45) la += 2.9;
+      this.lon[i] = lo;
+      this.lat[i] = la;
+      const x = this.attrs[i * 4]!, y = this.attrs[i * 4 + 1]!;
+      const [ax, ay] = flow.velocityAt(x, y);
+      const k = this.coupling[i]!;
+      // Follow the stirred air (disc units per second), spring gently home.
+      let vx = this.vx[i]! + (ax * 60 * 6 * strength - this.vx[i]!) * Math.min(1, s * k);
+      let vy = this.vy[i]! + (ay * 60 * 6 * strength - this.vy[i]!) * Math.min(1, s * k);
+      vx -= this.ox[i]! * 0.5 * s;
+      vy -= this.oy[i]! * 0.5 * s;
+      vx *= Math.exp(-s * 1.2);
+      vy *= Math.exp(-s * 1.2);
+      this.vx[i] = vx;
+      this.vy[i] = vy;
+      this.ox[i] = clamp(this.ox[i]! + vx * s, -0.25, 0.25);
+      this.oy[i] = clamp(this.oy[i]! + vy * s, -0.25, 0.25);
+    }
+    this.place();
+  }
+}
+
+/**
+ * Storms made of the upper layer's puff material: a click spawns puffs laid
+ * out along spiral bands around a clear eye; they orbit (faster near the eye,
+ * slowing as the storm dies) and are carried by the stirred air like the rest
+ * of the layer, so a storm can be pushed around. Fades out after ~8 s.
+ * attrs layout matches CloudPuffs.
+ */
+export class StormPuffs {
+  readonly max = 900;
+  readonly attrs = new Float32Array(900 * 4);
+  count = 0;
+  private cx: number[] = [];
+  private cy: number[] = [];
+  private ang: number[] = [];
+  private rad: number[] = [];
+  private ox: number[] = [];
+  private oy: number[] = [];
+  private vx: number[] = [];
+  private vy: number[] = [];
+  private age: number[] = [];
+  private base: number[] = [];
+
+  spawn(x: number, y: number) {
+    const n = 300;
+    const arms = 3;
+    const phase = Math.random() * Math.PI * 2;
+    for (let q = 0; q < n; q++) {
+      if (this.cx.length >= this.max) this.drop(0);
+      // Eyewall (a dense ring) plus feathered bands spiralling in.
+      const wall = q < n * 0.3;
+      const r = wall ? 0.018 + Math.random() * 0.012 : 0.03 + Math.pow(Math.random(), 0.8) * 0.11;
+      const arm = Math.floor(Math.random() * arms);
+      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.03) * 1.7 + (Math.random() - 0.5) * 0.6;
+      this.cx.push(x);
+      this.cy.push(y);
+      this.ang.push(a);
+      this.rad.push(r);
+      this.ox.push(0);
+      this.oy.push(0);
+      this.vx.push(0);
+      this.vy.push(0);
+      this.age.push(-Math.random() * 0.8);
+      this.base.push((wall ? 0.16 : 0.1) + Math.random() * 0.08);
+    }
+  }
+
+  private drop(i: number) {
+    for (const arr of [this.cx, this.cy, this.ang, this.rad, this.ox, this.oy, this.vx, this.vy, this.age, this.base]) arr.splice(i, 1);
+  }
+
+  step(flow: FlowSim, dt: number) {
+    const s = dt / 60;
+    for (let i = this.cx.length - 1; i >= 0; i--) {
+      const age = (this.age[i] = this.age[i]! + s);
+      if (age > 8) {
+        this.drop(i);
+        continue;
+      }
+      const spin = (1 - Math.min(1, Math.max(0, age) / 8)) * 0.9;
+      this.ang[i] = this.ang[i]! + (spin * 0.03 / Math.max(0.02, this.rad[i]!)) * s;
+      // Slowly drawn inward as it spins.
+      this.rad[i] = Math.max(0.016, this.rad[i]! - 0.002 * s);
+      const x = this.cx[i]! + Math.cos(this.ang[i]!) * this.rad[i]! + this.ox[i]!;
+      const y = this.cy[i]! + Math.sin(this.ang[i]!) * this.rad[i]! + this.oy[i]!;
+      const [ax, ay] = flow.velocityAt(x, y);
+      this.vx[i] = (this.vx[i]! + (ax * 60 * 6 - this.vx[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8);
+      this.vy[i] = (this.vy[i]! + (ay * 60 * 6 - this.vy[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8);
+      this.ox[i] = clamp(this.ox[i]! + this.vx[i]! * s, -0.3, 0.3);
+      this.oy[i] = clamp(this.oy[i]! + this.vy[i]! * s, -0.3, 0.3);
+    }
+    this.count = this.cx.length;
+    for (let i = 0; i < this.count; i++) {
+      const age = this.age[i]!;
+      const fade = Math.min(1, Math.max(0, age) / 0.9) * (1 - Math.min(1, Math.max(0, age - 5) / 3));
+      this.attrs[i * 4] = this.cx[i]! + Math.cos(this.ang[i]!) * this.rad[i]! + this.ox[i]!;
+      this.attrs[i * 4 + 1] = this.cy[i]! + Math.sin(this.ang[i]!) * this.rad[i]! + this.oy[i]!;
+      this.attrs[i * 4 + 2] = 22 + (i % 30) + ((i * 0.618) % 1) * 0.98;
+      this.attrs[i * 4 + 3] = this.base[i]! * fade;
+    }
+  }
+}

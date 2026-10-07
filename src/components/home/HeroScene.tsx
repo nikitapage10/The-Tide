@@ -19,7 +19,7 @@
  * Geometry matches the CSS .hero-frame so DOM callouts stay pinned to the art.
  */
 import { useEffect, useRef } from "react";
-import { CloudWisps, FlowSim, RockBodies } from "./heroPhysics";
+import { CloudPuffs, FlowSim, RockBodies, StormPuffs } from "./heroPhysics";
 import { heroSignal } from "./heroSound";
 import { ROCKS } from "./rocks";
 
@@ -119,13 +119,14 @@ float cloudBase(vec2 sph) {
   vec2 p = cloudCoords(tw);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
   float base = fbm5(p * 1.7 + 0.45 * w);
-  return max(base, 0.38 + 0.34 * bonus) - eye * eye * 0.45;
+  // (Planted storms are drawn by the puff layer now, so they can be pushed.)
+  return base + 0.0 * (bonus + eye);
 }
 // Final cloud density from the (simulated) base amount plus fine detail.
 float cloudDetail(float base, vec2 pw) {
   // Soft, rounded detail (coarser than before, so no fine streaks).
   float detail = fbm5(pw * 5.0 + vec2(uT * 0.04, 0.0));
-  return smoothstep(0.38, 0.7, base + (detail - 0.5) * 0.4);
+  return smoothstep(0.43, 0.73, base + (detail - 0.5) * 0.4);
 }
 `;
 
@@ -329,7 +330,8 @@ vec3 planetWithLimb(vec2 uv) {
   float z = sqrt(max(0.0, 1.0 - dot(sph, sph)));
   vec4 fl = texture2D(uFlow, clamp(sph * 0.5 + 0.5, 0.0, 1.0));
   vec2 flowD = vec2(0.0); // clouds are never warped by the pointer
-  float cleared = fl.z;
+  // The lower deck is not touched by the cursor (the puff layer above is).
+  float cleared = 0.0 * fl.z;
   vec3 nrm3 = vec3(sph, z);
   vec3 sunDir = normalize(vec3(-0.85, -0.35, 0.4));
   float light = clamp(dot(nrm3, sunDir), 0.0, 1.0);
@@ -395,9 +397,6 @@ vec3 planetWithLimb(vec2 uv) {
     vec3 cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
     float alpha = pow(dens, 1.3) * 0.8 * smoothstep(0.0, 0.15, z);
     col = mix(col, cloudCol, inside * alpha);
-    // Storm depth: the eyewall's inner slope falls into shadow toward the
-    // centre (looking down a funnel to the surface).
-    col *= 1.0 - 0.38 * seH * smoothstep(0.0, 0.6, seH);
 
     // Lightning inside the storms: now and then (rarely) a flash lights a cloud
     // from within.
@@ -916,21 +915,20 @@ void main() {
 }
 `;
 
-// Cloud wisps (point sprites): each takes its look from the cloud where it
-// broke off (density computed here from the same weather functions), drifts,
-// swells a little and evaporates.
-const WISP_VERT = `
+// Upper cloud layer (point sprites): large, soft, translucent puffs that
+// overlap into sheets. Each has a fixed seed (a per-frame seed made them
+// strobe), is lit by the sun, darkened past dusk, faded at the limb, and the
+// side facing the cursor catches its light.
+const PUFF_VERT = `
 precision highp float;
-attribute vec4 aP;            // x, y (disc); age 0..1; seed
-attribute vec2 aS;            // where it broke off (disc)
-uniform vec2 uRes, uFrameC, uFrameS;
-uniform float uP, uDpr, uT;
-uniform vec4 uStorm[3];
+attribute vec4 aP;            // disc x, y; size px + seed (fraction); alpha
+uniform vec2 uRes, uFrameC, uFrameS, uM;
+uniform float uP, uDpr, uLight;
 varying float vA;
 varying float vSeed;
 varying vec3 vCol;
-${NOISE}
-${CLOUDS}
+varying float vL;
+varying vec2 vToL;
 void main() {
   vec2 puv = vec2(1.0122, 0.65) + aP.xy * 883.0 / vec2(2000.0, 1126.0);
   vec2 oP = vec2(0.85, 0.58);
@@ -940,26 +938,27 @@ void main() {
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
   float r2 = dot(aP.xy, aP.xy);
   float z = sqrt(max(0.0, 1.0 - r2));
-  float bonus, eye;
-  vec2 tw = stormTwist(aS, bonus, eye);
-  float dens = cloudDetail(cloudBase(aS), cloudCoords(tw));
-  float age = aP.z;
-  gl_PointSize = (5.0 + 9.0 * aP.w) * (1.0 + 0.9 * age) * uDpr * (uFrameS.x / 1800.0) * (0.4 + 0.6 * z);
-  vA = dens * smoothstep(0.0, 0.08, age) * pow(1.0 - age, 1.4) * step(r2, 0.985) * smoothstep(0.0, 0.2, z);
-  vSeed = aP.w;
+  gl_PointSize = floor(aP.z) * uDpr * (uFrameS.x / 2200.0) * (0.35 + 0.65 * z);
+  vA = aP.w * step(r2, 0.985) * smoothstep(0.0, 0.25, z);
+  vSeed = fract(aP.z) * 100.0;
   vec3 nrm = vec3(aP.xy, z);
   float light = clamp(dot(nrm, normalize(vec3(-0.85, -0.35, 0.4))), 0.0, 1.0);
   float night = smoothstep(-0.3, 0.3, (aP.x + 0.62) * 0.9 + (aP.y + 0.05));
   vCol = vec3(0.94, 0.96, 0.99) * (0.3 + 0.62 * light) * (1.0 - 0.72 * night);
+  vec2 dl = uM - sp;
+  vL = uLight * exp(-dot(dl, dl) / (180.0 * 180.0));
+  vToL = normalize(vec2(dl.x, -dl.y) + 1e-4);
 }
 `;
 
-const WISP_FRAG = `
+const PUFF_FRAG = `
 precision mediump float;
 uniform float uBright;
 varying float vA;
 varying float vSeed;
 varying vec3 vCol;
+varying float vL;
+varying vec2 vToL;
 float h1(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float n1(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -970,10 +969,11 @@ void main() {
   vec2 c = gl_PointCoord * 2.0 - 1.0;
   float d = length(c);
   if (d > 1.0) discard;
-  float n = n1(c * 2.5 + vSeed * 31.0) * 0.6 + n1(c * 5.0 + vSeed * 17.0) * 0.4;
-  float puff = smoothstep(1.0, 0.2, d) * smoothstep(0.25, 0.75, n + 0.25 * (1.0 - d));
-  float a = clamp(puff * vA * 0.55 * uBright, 0.0, 1.0);
-  gl_FragColor = vec4(vCol * a, a);
+  float n = n1(c * 2.4 + vSeed) * 0.6 + n1(c * 5.0 + vSeed * 1.7) * 0.4;
+  float puff = pow(1.0 - d, 1.6) * (0.55 + 0.6 * n);
+  float lit = 1.0 + vL * (0.4 + 0.8 * clamp(dot(vec2(c.x, -c.y), vToL), 0.0, 1.0));
+  float a = clamp(puff * vA * uBright, 0.0, 1.0);
+  gl_FragColor = vec4(vCol * lit * a, a);
 }
 `;
 
@@ -1149,56 +1149,52 @@ export function HeroScene({
         if (fieldNear) uploadData(7, "uStateNear", 64, 64, fieldNear.state, true);
       };
 
-      // Cloud wisps (planet only): a small second program drawing point sprites.
-      const wisps = layer === "planet" ? new CloudWisps() : null;
+      // Upper cloud layer (planet only): a small second program drawing point sprites.
+      const wisps = layer === "planet" ? new CloudPuffs() : null;
+      const stormPuffs = layer === "planet" ? new StormPuffs() : null;
       let wProg: WebGLProgram | null = null;
       let wBufA: WebGLBuffer | null = null;
-      let wBufS: WebGLBuffer | null = null;
       let wLocA = -1;
-      let wLocS = -1;
       const WU: Record<string, WebGLUniformLocation | null> = {};
       if (wisps) {
         try {
           wProg = gl.createProgram()!;
-          gl.attachShader(wProg, compile(gl, gl.VERTEX_SHADER, WISP_VERT));
-          gl.attachShader(wProg, compile(gl, gl.FRAGMENT_SHADER, WISP_FRAG));
+          gl.attachShader(wProg, compile(gl, gl.VERTEX_SHADER, PUFF_VERT));
+          gl.attachShader(wProg, compile(gl, gl.FRAGMENT_SHADER, PUFF_FRAG));
           gl.linkProgram(wProg);
           if (!gl.getProgramParameter(wProg, gl.LINK_STATUS)) throw new Error("link");
           wLocA = gl.getAttribLocation(wProg, "aP");
-          wLocS = gl.getAttribLocation(wProg, "aS");
-          for (const n of ["uRes", "uFrameC", "uFrameS", "uP", "uDpr", "uT", "uStorm[0]", "uBright"]) WU[n] = gl.getUniformLocation(wProg, n);
+          for (const n of ["uRes", "uFrameC", "uFrameS", "uP", "uDpr", "uM", "uLight", "uBright"]) WU[n] = gl.getUniformLocation(wProg, n);
           wBufA = gl.createBuffer();
-          wBufS = gl.createBuffer();
         } catch {
           wProg = null; // the clouds still work, just without wisps
         }
         gl.useProgram(prog);
       }
       const drawWisps = (g: { cx: number; cy: number; fw: number; fh: number }, p: number, tSec: number) => {
-        if (!wisps || !wProg || !wBufA || !wBufS || wisps.count === 0) return;
+        if (!wisps || !wProg || !wBufA || wisps.count === 0) return;
         gl.useProgram(wProg);
         gl.uniform2f(WU.uRes!, canvas.width, canvas.height);
         gl.uniform2f(WU.uFrameC!, g.cx, g.cy);
         gl.uniform2f(WU.uFrameS!, g.fw, g.fh);
         gl.uniform1f(WU.uP!, p);
         gl.uniform1f(WU.uDpr!, dpr);
-        gl.uniform1f(WU.uT!, tSec);
-        gl.uniform4fv(WU["uStorm[0]"]!, stormData);
+        // The cursor's light on the puffs, while it is over the revealed planet.
+        gl.uniform2f(WU.uM!, pointer.tx, pointer.ty);
+        gl.uniform1f(WU.uLight!, heroSignal.overPlanet && !reduced ? 1 : 0);
         gl.uniform1f(WU.uBright!, smooth(2.0, 5.2, tSec) * (0.07 + 0.93 * smooth(0, 1, p)));
         gl.bindBuffer(gl.ARRAY_BUFFER, wBufA);
-        gl.bufferData(gl.ARRAY_BUFFER, wisps.a.subarray(0, wisps.count * 4), gl.DYNAMIC_DRAW);
         gl.enableVertexAttribArray(wLocA);
-        gl.vertexAttribPointer(wLocA, 4, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, wBufS);
-        gl.bufferData(gl.ARRAY_BUFFER, wisps.s.subarray(0, wisps.count * 2), gl.DYNAMIC_DRAW);
-        gl.enableVertexAttribArray(wLocS);
-        gl.vertexAttribPointer(wLocS, 2, gl.FLOAT, false, 0, 0);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-        gl.drawArrays(gl.POINTS, 0, wisps.count);
+        for (const set of [wisps, stormPuffs]) {
+          if (!set || set.count === 0) continue;
+          gl.bufferData(gl.ARRAY_BUFFER, set.attrs.subarray(0, set.count * 4), gl.DYNAMIC_DRAW);
+          gl.vertexAttribPointer(wLocA, 4, gl.FLOAT, false, 0, 0);
+          gl.drawArrays(gl.POINTS, 0, set.count);
+        }
         gl.disable(gl.BLEND);
         if (wLocA !== loc) gl.disableVertexAttribArray(wLocA);
-        if (wLocS !== loc) gl.disableVertexAttribArray(wLocS);
         gl.useProgram(prog);
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
         gl.enableVertexAttribArray(loc);
@@ -1381,8 +1377,8 @@ export function HeroScene({
           // The pointer's wake gently moves the air, and the air carries the cloud.
           flow.step(mx, my, dmx, dmy, dt);
           if (wisps) {
-            if (stir) wisps.spawn(mx, my, dmx, dmy, dt);
             wisps.step(flow, dt);
+            stormPuffs?.step(flow, dt);
           }
           prevSim.disc = [mx, my];
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
@@ -1501,6 +1497,7 @@ export function HeroScene({
         st.seed = Math.random();
         heroSignal.surgeAt = st.t;
         flow.vortex(mx, my);
+        stormPuffs?.spawn(mx, my);
         onStorm?.(e.clientX - rect.left, e.clientY - rect.top);
       };
       window.addEventListener("pointermove", onMove, { passive: true });
