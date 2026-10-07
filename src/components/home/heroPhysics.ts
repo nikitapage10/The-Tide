@@ -281,8 +281,8 @@ export class FlowSim {
     }
     // Planted storms: the air spins around each for a few seconds, fading.
     for (const st of this.storms) {
-      const R = 3.2;
-      const spin = 0.0015 * st.life * dt;
+      const R = 1.4;
+      const spin = 0.0012 * st.life * dt;
       for (let j = Math.max(0, Math.floor(st.y - 3 * R)); j <= Math.min(n - 1, Math.ceil(st.y + 3 * R)); j++)
         for (let i = Math.max(0, Math.floor(st.x - 3 * R)); i <= Math.min(n - 1, Math.ceil(st.x + 3 * R)); i++) {
           const ex = i - st.x;
@@ -543,16 +543,17 @@ export class StormPuffs {
   private base: number[] = [];
 
   spawn(x: number, y: number) {
-    const n = 300;
+    const n = 170;
     const arms = 3;
     const phase = Math.random() * Math.PI * 2;
     for (let q = 0; q < n; q++) {
       if (this.cx.length >= this.max) this.drop(0);
       // Eyewall (a dense ring) plus feathered bands spiralling in.
       const wall = q < n * 0.3;
-      const r = wall ? 0.018 + Math.random() * 0.012 : 0.03 + Math.pow(Math.random(), 0.8) * 0.11;
+      // Small and local: about a twentieth of the disc across.
+      const r = wall ? 0.008 + Math.random() * 0.005 : 0.013 + Math.pow(Math.random(), 0.8) * 0.035;
       const arm = Math.floor(Math.random() * arms);
-      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.03) * 1.7 + (Math.random() - 0.5) * 0.6;
+      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.013) * 1.7 + (Math.random() - 0.5) * 0.6;
       this.cx.push(x);
       this.cy.push(y);
       this.ang.push(a);
@@ -579,9 +580,9 @@ export class StormPuffs {
         continue;
       }
       const spin = (1 - Math.min(1, Math.max(0, age) / 8)) * 0.9;
-      this.ang[i] = this.ang[i]! + (spin * 0.03 / Math.max(0.02, this.rad[i]!)) * s;
+      this.ang[i] = this.ang[i]! + (spin * 0.012 / Math.max(0.008, this.rad[i]!)) * s;
       // Slowly drawn inward as it spins.
-      this.rad[i] = Math.max(0.016, this.rad[i]! - 0.002 * s);
+      this.rad[i] = Math.max(0.007, this.rad[i]! - 0.0008 * s);
       const x = this.cx[i]! + Math.cos(this.ang[i]!) * this.rad[i]! + this.ox[i]!;
       const y = this.cy[i]! + Math.sin(this.ang[i]!) * this.rad[i]! + this.oy[i]!;
       const [ax, ay] = flow.velocityAt(x, y);
@@ -596,7 +597,7 @@ export class StormPuffs {
       const fade = Math.min(1, Math.max(0, age) / 0.9) * (1 - Math.min(1, Math.max(0, age - 5) / 3));
       this.attrs[i * 4] = this.cx[i]! + Math.cos(this.ang[i]!) * this.rad[i]! + this.ox[i]!;
       this.attrs[i * 4 + 1] = this.cy[i]! + Math.sin(this.ang[i]!) * this.rad[i]! + this.oy[i]!;
-      this.attrs[i * 4 + 2] = 22 + (i % 30) + ((i * 0.618) % 1) * 0.98;
+      this.attrs[i * 4 + 2] = 12 + (i % 14) + ((i * 0.618) % 1) * 0.98;
       this.attrs[i * 4 + 3] = this.base[i]! * fade;
     }
   }
