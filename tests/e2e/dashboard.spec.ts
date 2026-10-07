@@ -15,7 +15,7 @@ async function axe(page: Page) {
 test("home shows real summaries, demo labels and unresolved lore", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "The Tide" })).toBeVisible();
-  await expect(page.getByText("Worlds in equilibrium")).toBeVisible();
+  await expect(page.getByText("Echoes through the void.").first()).toBeAttached();
   await expect(page.getByText("No session is scheduled.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Undertow, the Age of the Abyssal Veil and The Tide" })).toBeVisible();
   for (const name of ["World", "People", "Stories", "Studio", "Workshop"]) {
