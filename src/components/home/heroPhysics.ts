@@ -452,7 +452,7 @@ export class CloudPuffs {
   private vy: Float32Array;
   private coupling: Float32Array;
 
-  constructor(n = 2400) {
+  constructor(n = 4200) {
     const lon: number[] = [];
     const lat: number[] = [];
     const dens: number[] = [];
@@ -462,7 +462,7 @@ export class CloudPuffs {
       const la = Math.asin(Math.random() * 2 - 1);
       const lo = (Math.random() * 2 - 1) * (Math.PI / 2);
       const d = Math.min(1, Math.max(0, (fbm2(lo * 2.4 + 7.3, la * 2.4 + 3.1) - 0.5) / 0.22));
-      if (Math.random() > d * d) continue;
+      if (Math.random() > d) continue;
       lon.push(lo);
       lat.push(la);
       dens.push(d);
