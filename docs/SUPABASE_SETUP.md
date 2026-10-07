@@ -60,7 +60,7 @@ TIDE_PROJECT_ID=333ea628-f6a1-4f3a-8b83-ce98d12f2565
 # TIDE_PUBLISHER_TOKEN_SHA256=<sha256 hex of your random token>
 ```
 
-If any required value is missing the app shows **Setup required**. It never falls back to demo data.
+If `TIDE_DATA_MODE` is unset but `NEXT_PUBLIC_SUPABASE_URL` and a publishable/anon key are present (as the Vercel ↔ Supabase integration provides), the app uses Supabase automatically, and `TIDE_PROJECT_ID` defaults to the `seed.sql` project ID. If any required value is missing the app shows **Setup required**. It never falls back to demo data.
 
 ## 6. Publish the seed lore
 

@@ -17,6 +17,8 @@ export interface SectionDef {
   key: SectionKey;
   href: string;
   label: string;
+  /** Short label for the top navigation. */
+  navLabel: string;
   tagline: string;
   subsections: Subsection[];
 }
@@ -60,13 +62,14 @@ const toSubs = (groups: Record<string, { label: string; description: string }>):
   Object.entries(groups).map(([slug, g]) => ({ slug, label: g.label, description: g.description }));
 
 export const SECTIONS: SectionDef[] = [
-  { key: "world", href: "/world", label: "The World", tagline: "Environments, places, history, technology and how the world works.", subsections: toSubs(WORLD_KIND_GROUPS) },
-  { key: "people", href: "/people", label: "People & Powers", tagline: "Peoples, characters, creatures, factions, institutions and their relationships.", subsections: toSubs(PEOPLE_KIND_GROUPS) },
-  { key: "stories", href: "/stories", label: "Stories", tagline: "Campaigns, one-shots, novels and short fiction.", subsections: toSubs(STORY_FORMAT_GROUPS) },
-  { key: "studio", href: "/studio", label: "The Studio", tagline: "Music, artwork, aesthetics, branding and design.", subsections: toSubs(STUDIO_TYPE_GROUPS) },
+  { key: "world", href: "/world", navLabel: "World", label: "The World", tagline: "Environments, places, history, technology and how the world works.", subsections: toSubs(WORLD_KIND_GROUPS) },
+  { key: "people", href: "/people", navLabel: "People", label: "People & Powers", tagline: "Peoples, characters, creatures, factions, institutions and their relationships.", subsections: toSubs(PEOPLE_KIND_GROUPS) },
+  { key: "stories", href: "/stories", navLabel: "Stories", label: "Stories", tagline: "Campaigns, one-shots, novels and short fiction.", subsections: toSubs(STORY_FORMAT_GROUPS) },
+  { key: "studio", href: "/studio", navLabel: "Studio", label: "The Studio", tagline: "Music, artwork, aesthetics, branding and design.", subsections: toSubs(STUDIO_TYPE_GROUPS) },
   {
     key: "workshop",
     href: "/workshop",
+    navLabel: "Workshop",
     label: "The Workshop",
     tagline: "Physical builds, the print queue, code, logic and the dashboard itself.",
     subsections: [

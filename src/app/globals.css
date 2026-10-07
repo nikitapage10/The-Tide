@@ -8,32 +8,34 @@
  * Contrast: text/muted/faint all meet WCAG AA (≥ 4.5:1) on bg and surface.
  */
 :root {
-  --bg: #0b0f14;
-  --surface: #11171f;
-  --surface-2: #17202b;
-  --surface-3: #1e2935;
-  --border: #283543;
-  --border-strong: #3a4a5c;
-  --text: #e7edf3;
-  --muted: #a9b8c6;
-  --faint: #8597a8;
-  --accent: #5cc0bb;
-  --accent-strong: #8fdcd7;
-  --accent-ink: #04201f;
-  --accent-2: #8eb2dc;
-  --ok: #74c99a;
-  --warn: #e3b968;
-  --danger: #ee8a80;
-  --demo: #cfaef5;
-  --focus: #a6ece8;
-  --contour: rgba(92, 192, 187, 0.09);
+  /* Monochrome observatory: near-black space, white light, one cool silver for links. */
+  --bg: #050506;
+  --surface: #0b0b0d;
+  --surface-2: #111114;
+  --surface-3: #19191d;
+  --border: #23232a;
+  --border-strong: #3b3b44;
+  --text: #ececee;
+  --muted: #a9a9b1;
+  --faint: #8a8a93;
+  --accent: #dfe5ec;
+  --accent-strong: #ffffff;
+  --accent-ink: #050506;
+  --accent-2: #b8c6d4;
+  --ok: #94cba8;
+  --warn: #dcc07f;
+  --danger: #e89d95;
+  --demo: #cdbbe9;
+  --focus: #ffffff;
+  --contour: rgba(255, 255, 255, 0.05);
+  --header-h: 64px;
 
-  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-display: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --radius: 10px;
-  --radius-sm: 6px;
+  --radius: 3px;
+  --radius-sm: 2px;
   color-scheme: dark;
 }
 
@@ -61,6 +63,7 @@
   --radius-card: var(--radius);
 }
 
+@layer base {
 html {
   background: var(--bg);
   color: var(--text);
@@ -72,24 +75,28 @@ html {
 body {
   min-height: 100vh;
   line-height: 1.6;
-  background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(92, 192, 187, 0.06), transparent 60%),
-    var(--bg);
+  background: var(--bg);
 }
 
 h1, h2, h3 {
   font-family: var(--font-display);
-  letter-spacing: 0.005em;
-  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
   color: var(--text);
+  text-wrap: balance;
 }
+h1 { font-weight: 400; }
 
 a {
-  color: var(--accent-strong);
+  color: var(--accent);
+  text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
 /* Visible, consistent focus for keyboard users. */
+}
+
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -97,13 +104,21 @@ a {
 }
 
 ::selection {
-  background: rgba(92, 192, 187, 0.35);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Wide-tracked uppercase label used across the shell (from the home mockup). */
+.tracked {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
 }
 
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--faint);
 }
@@ -124,8 +139,43 @@ a {
 /* Restrained cartographic texture for headers. Static, decorative only. */
 .contour-bg {
   background-image:
-    repeating-radial-gradient(circle at 12% 120%, transparent 0 22px, var(--contour) 22px 23px),
+    repeating-radial-gradient(circle at 88% 140%, transparent 0 28px, var(--contour) 28px 29px),
     linear-gradient(var(--surface), var(--surface));
+}
+
+/* ---------------------------------------------------------------- home hero */
+body { overflow-x: clip; }
+/* Full-bleed hero that slides under the translucent header. */
+main:has(> .hero-track) { padding-top: 0; }
+.hero-track { position: relative; height: 280vh; width: 100vw; margin-left: calc(50% - 50vw); }
+.hero-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #000; --p: 0; }
+/* A box with the artwork's aspect ratio that always covers the stage, so callouts stay pinned to the art. */
+.hero-frame { position: absolute; left: 50%; top: 50%; width: max(100vw, 177.7svh); aspect-ratio: 1672 / 941; translate: -50% -50%; }
+.hero-layer { position: absolute; inset: 0; will-change: transform, opacity; pointer-events: none; }
+/* Planet scale S(p) = 2.1 - 0.5p; shift T(p) = -6% + 6%p. Callouts reuse the same maths so they stay pinned. */
+.hero-planet { transform: scale(calc(2.1 - 0.5 * var(--p))) translateX(calc(-6% + 6% * var(--p))); transform-origin: 82% 52%; }
+.hero-pin { position: absolute; left: calc(82% + (var(--x) - 82% - 6% + 6% * var(--p)) * (2.1 - 0.5 * var(--p))); top: calc(52% + (var(--y) - 52%) * (2.1 - 0.5 * var(--p))); }
+/* No header bar over the landing scene. */
+body:has(.hero-track) header { position: fixed; inset-inline: 0; }
+body:has(.hero-track):not([data-past-hero="true"]) header { background: transparent; border-color: transparent; backdrop-filter: none; }
+.hero-far { transform: scale(calc(1 + 0.9 * var(--p))); opacity: calc(1 - 0.55 * var(--p)); filter: drop-shadow(0 0 1px rgba(255,255,255,.55)) drop-shadow(0 0 10px rgba(255,255,255,.08)); }
+.hero-near { transform: scale(calc(1.05 + 1.6 * var(--p))); opacity: calc(1 - 1.7 * var(--p)); filter: drop-shadow(0 0 2px rgba(255,255,255,.35)); }
+.hero-ui { opacity: clamp(0, calc((var(--p) - 0.4) * 3), 1); translate: 0 calc(16px - 16px * clamp(0, calc((var(--p) - 0.4) * 3), 1)); }
+.hero-ui[data-hidden="true"] { pointer-events: none; }
+.hero-cue { opacity: clamp(0, calc(1 - 4 * var(--p)), 1); }
+.hero-vignette { background: radial-gradient(120% 90% at 30% 50%, transparent 40%, rgba(0,0,0,.65) 100%), linear-gradient(90deg, rgba(0,0,0,.55) 0%, transparent 45%); }
+@media (max-aspect-ratio: 1/1) {
+  /* Portrait: keep the planet in view by anchoring the frame towards its right side. */
+  .hero-frame { left: 15%; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-land { animation: hero-land 1.8s cubic-bezier(.2,.7,.1,1) both; }
+  .hero-land-late { animation: hero-land 2.4s cubic-bezier(.2,.7,.1,1) both; }
+}
+@keyframes hero-land { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-track { height: auto; }
+  .hero-stage { position: relative; --p: 1 !important; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

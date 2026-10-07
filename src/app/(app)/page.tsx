@@ -1,12 +1,12 @@
 import Link from "next/link";
+import { HomeHero, type HeroCallout } from "@/components/home/HomeHero";
 import { PrintCard } from "@/components/live/PrintCard";
 import { Badge, DemoBadge } from "@/components/ui/Badge";
 import { Card, SectionHeading } from "@/components/ui/Card";
 import { Markdown } from "@/components/ui/Markdown";
-import { ProceduralMark } from "@/components/ui/ProceduralMark";
 import { EmptyState } from "@/components/ui/States";
 import { RefLink } from "@/components/records/RefLink";
-import { listRecords, resolveRef } from "@/lib/domain/queries";
+import { hrefFor, listRecords, resolveRef } from "@/lib/domain/queries";
 import { SECTIONS } from "@/lib/domain/sections";
 import { requirePageContext } from "@/lib/server/page-context";
 
@@ -14,9 +14,8 @@ const fmt = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "
 
 export default async function HomePage() {
   const ctx = await requirePageContext();
-  const [state, project, releases, sessionStates, checklist, prints, activity] = await Promise.all([
+  const [state, releases, sessionStates, checklist, prints, activity] = await Promise.all([
     ctx.publicationStore.getActiveState(),
-    ctx.publicationStore.getProject(),
     ctx.publicationStore.listReleases(),
     ctx.operationalStore.listSessionStates(),
     ctx.operationalStore.listChecklistItems(),
@@ -32,33 +31,46 @@ export default async function HomePage() {
   const inProgress = prints.filter((p) => ["ready", "printing", "post_processing"].includes(p.status));
   const latest = releases[0];
   const questions = listRecords(state, "open_question").filter((q) => q.record.status === "open");
+  const entity = (title: string) => listRecords(state, "entity").find((e) => e.record.title === title);
+  const href = (title: string) => {
+    const e = entity(title);
+    return e ? hrefFor(e.state) : null;
+  };
+  const code = (title: string) => {
+    const e = entity(title);
+    return e ? `ID ${e.record.id.slice(0, 8)}` : undefined;
+  };
+  // Callouts point at real published entries; nothing here asserts new canon.
+  const callouts: HeroCallout[] = [
+    { x: 80, y: 40, side: "right", title: "Entry unknown", lines: ["Designation withheld"], href: href("Future Earth"), code: code("Future Earth") },
+    { x: 60, y: 50.5, side: "right", title: "The Tide", lines: ["Origin unresolved"], href: href("The Tide (in-lore usage)"), code: code("The Tide (in-lore usage)") },
+    { x: 44.6, y: 70, side: "right", title: "Seven cycles", lines: ["Record incomplete"], href: href("The seven cycles"), code: code("The seven cycles") },
+  ];
 
   return (
-    <div className="space-y-10">
-      <section aria-labelledby="intro" className="contour-bg rounded-[var(--radius)] border border-border p-6 sm:p-8">
-        <p className="eyebrow">Archive · {project.name}</p>
-        <h1 id="intro" className="mt-2 text-4xl sm:text-5xl">
-          The Tide
-        </h1>
-        <p className="mt-3 max-w-3xl text-lg text-muted">
-          A homebrew science-fiction Daggerheart setting on a transformed future Earth. The world is shown here as it has been documented so far, fragment by fragment, from published Space Pages.
+    <>
+      <HomeHero callouts={callouts} code={latest ? `Archive · release v${latest.version}` : "Archive · no release yet"} />
+      <div className="space-y-12 pt-14">
+      <section aria-labelledby="observatory">
+        <p className="tracked flex items-center gap-3 text-faint">
+          <span>02 / Observatory</span>
+          <span aria-hidden="true" className="h-px w-20 bg-white/20" />
         </p>
-        <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <Badge tone="warn">Planet name undecided</Badge>
-          <span className="text-faint">“Primus” is the former working name found in historical sources.</span>
-        </p>
+        <h2 id="observatory" className="mt-4 text-4xl font-light">
+          The archive at a glance
+        </h2>
       </section>
 
       <nav aria-labelledby="sections-heading">
-        <h2 id="sections-heading" className="mb-3 text-2xl">
+        <h2 id="sections-heading" className="sr-only">
           Sections
         </h2>
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <ul className="grid border-l border-t border-white/10 sm:grid-cols-2 xl:grid-cols-5">
           {SECTIONS.map((s) => (
-            <li key={s.key}>
-              <Link href={s.href} className="flex h-full flex-col gap-3 rounded-[var(--radius)] border border-border bg-surface p-4 no-underline hover:border-accent/60">
-                <ProceduralMark seed={s.key} size={40} />
-                <span className="font-[family-name:var(--font-display)] text-xl text-text">{s.label}</span>
+            <li key={s.key} className="border-b border-r border-white/10">
+              <Link href={s.href} className="group flex h-full flex-col gap-3 p-5 no-underline transition-tide hover:bg-white/[0.03]">
+                <span className="tracked text-[0.68rem] text-faint group-hover:text-white">Enter</span>
+                <span className="font-[family-name:var(--font-display)] text-2xl text-white">{s.label}</span>
                 <span className="text-sm text-muted">{s.tagline}</span>
               </Link>
             </li>
@@ -197,6 +209,7 @@ export default async function HomePage() {
           <EmptyState title="No open lore questions are recorded." />
         )}
       </section>
-    </div>
+      </div>
+    </>
   );
 }

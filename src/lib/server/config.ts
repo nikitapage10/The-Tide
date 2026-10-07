@@ -16,7 +16,11 @@ export type ModeInfo =
   | { mode: "setup-required"; reason: string; missing: string[] };
 
 export function resolveMode(env: NodeJS.ProcessEnv = process.env): ModeInfo {
-  const requested = env.TIDE_DATA_MODE?.trim();
+  // When TIDE_DATA_MODE is unset but Supabase is configured (e.g. by the Vercel ↔ Supabase
+  // integration), use Supabase. Sign-in and GM membership are still required; there is
+  // never a fallback to demo data.
+  const hasSupabase = Boolean(env.NEXT_PUBLIC_SUPABASE_URL && (env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
+  const requested = env.TIDE_DATA_MODE?.trim() || (hasSupabase ? "supabase" : undefined);
   if (requested === "demo") {
     if (env.VERCEL || env.VERCEL_ENV) {
       return { mode: "setup-required", reason: "Demo mode is local-only and is disabled on Vercel deployments. Configure Supabase.", missing: [] };
@@ -33,7 +37,8 @@ export function resolveMode(env: NodeJS.ProcessEnv = process.env): ModeInfo {
   if (requested === "supabase") {
     const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
     const supabaseKey = (env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
-    const projectId = env.TIDE_PROJECT_ID?.trim() ?? "";
+    // Defaults to the project row created by supabase/seed.sql.
+    const projectId = env.TIDE_PROJECT_ID?.trim() || DEMO_PROJECT_ID_CONST;
     const missing: string[] = [];
     if (!/^https:\/\/|^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(supabaseUrl)) missing.push("NEXT_PUBLIC_SUPABASE_URL");
     if (!supabaseKey) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
@@ -48,7 +53,7 @@ export function resolveMode(env: NodeJS.ProcessEnv = process.env): ModeInfo {
   };
 }
 
-// Kept in sync with fixtures/ids.json (asserted by tests/unit/config.test.ts).
+// Kept in sync with fixtures/ids.json and supabase/seed.sql (asserted by tests).
 export const DEMO_PROJECT_ID_CONST = "333ea628-f6a1-4f3a-8b83-ce98d12f2565";
 function demoProjectId(): string {
   return DEMO_PROJECT_ID_CONST;

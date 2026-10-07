@@ -15,10 +15,10 @@ async function axe(page: Page) {
 test("home shows real summaries, demo labels and unresolved lore", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "The Tide" })).toBeVisible();
-  await expect(page.getByText("Planet name undecided")).toBeVisible();
+  await expect(page.getByText("Worlds in equilibrium")).toBeVisible();
   await expect(page.getByText("No session is scheduled.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Undertow, the Age of the Abyssal Veil and The Tide" })).toBeVisible();
-  for (const name of ["The World", "People & Powers", "Stories", "The Studio", "The Workshop"]) {
+  for (const name of ["World", "People", "Stories", "Studio", "Workshop"]) {
     await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name, exact: true })).toBeVisible();
   }
   await expect(page.getByText("Demo", { exact: true }).first()).toBeVisible();
@@ -32,7 +32,8 @@ test("keyboard: skip link first, visible focus, search by Unicode-insensitive na
   await expect(skip).toBeFocused();
   const outline = await skip.evaluate((el) => getComputedStyle(el).outlineStyle);
   expect(outline).not.toBe("none");
-  await page.getByRole("searchbox", { name: "Search The Tide" }).first().fill("teruanga");
+  await page.getByRole("link", { name: "Search the archive" }).click();
+  await page.getByRole("searchbox", { name: "Search", exact: true }).fill("teruanga");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: /1 result/ })).toBeVisible();
   await page.getByRole("link", { name: "Teruānga" }).click();
@@ -158,7 +159,7 @@ test("small screens: no horizontal scroll and a working menu", async ({ page }) 
   }
   await page.goto("/");
   await page.getByText("Menu & search").click();
-  await page.getByRole("navigation", { name: "Primary (mobile)" }).getByRole("link", { name: "The Studio" }).click();
+  await page.getByRole("navigation", { name: "Primary (mobile)" }).getByRole("link", { name: "Studio", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "The Studio" })).toBeVisible();
   await axe(page);
 });

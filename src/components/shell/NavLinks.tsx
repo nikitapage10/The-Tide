@@ -13,6 +13,65 @@ function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** Primary sections as a horizontal, tracked-uppercase bar (desktop). */
+export function TopNav({ items }: { items: NavItem[] }) {
+  const pathname = usePathname() ?? "/";
+  return (
+    <ul className="flex items-center gap-1 lg:gap-3">
+      {items.map((item) => {
+        const active = isActive(pathname, item.href);
+        return (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              aria-current={pathname === item.href ? "page" : active ? "true" : undefined}
+              className={cx(
+                "tracked transition-tide relative block px-2 py-2 text-[0.7rem] no-underline lg:px-3",
+                active ? "text-white" : "text-muted hover:text-white",
+              )}
+            >
+              {item.label}
+              <span aria-hidden="true" className={cx("absolute inset-x-2 -bottom-px h-px lg:inset-x-3", active ? "bg-white" : "bg-transparent")} />
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Sub-sections of the active section, as a tab row under the header. */
+export function SubNav({ items }: { items: NavItem[] }) {
+  const pathname = usePathname() ?? "/";
+  const section = items.find((i) => i.href !== "/" && isActive(pathname, i.href));
+  if (!section?.children?.length) return null;
+  return (
+    <nav aria-label={`${section.label} sections`} className="border-b border-border bg-bg/80">
+      <ul className="mx-auto flex max-w-[96rem] gap-1 overflow-x-auto px-4 sm:px-10">
+        <li>
+          <Link href={section.href} aria-current={pathname === section.href ? "page" : undefined} className={tab(pathname === section.href)}>
+            Overview
+          </Link>
+        </li>
+        {section.children.map((c) => (
+          <li key={c.href}>
+            <Link href={c.href} aria-current={isActive(pathname, c.href) ? "page" : undefined} className={tab(isActive(pathname, c.href))}>
+              {c.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+const tab = (active: boolean) =>
+  cx(
+    "tracked transition-tide block whitespace-nowrap border-b px-3 py-3 text-[0.68rem] no-underline",
+    active ? "border-white text-white" : "border-transparent text-faint hover:text-white",
+  );
+
+/** Stacked list for the mobile menu. */
 export function NavLinks({ items }: { items: NavItem[] }) {
   const pathname = usePathname() ?? "/";
   return (
@@ -24,25 +83,15 @@ export function NavLinks({ items }: { items: NavItem[] }) {
             <Link
               href={item.href}
               aria-current={pathname === item.href ? "page" : undefined}
-              className={cx(
-                "transition-tide block rounded-md px-3 py-2 text-[0.95rem] no-underline",
-                active ? "bg-surface-3 font-semibold text-text" : "text-muted hover:bg-surface-2 hover:text-text",
-              )}
+              className={cx("tracked block px-1 py-2.5 no-underline", active ? "text-white" : "text-muted hover:text-white")}
             >
               {item.label}
             </Link>
             {active && item.children?.length ? (
-              <ul className="mb-2 ml-3 mt-0.5 space-y-0.5 border-l border-border pl-2">
+              <ul className="mb-2 ml-1 space-y-0.5 border-l border-border pl-3">
                 {item.children.map((c) => (
                   <li key={c.href}>
-                    <Link
-                      href={c.href}
-                      aria-current={isActive(pathname, c.href) ? "page" : undefined}
-                      className={cx(
-                        "transition-tide block rounded px-2 py-1.5 text-sm no-underline",
-                        isActive(pathname, c.href) ? "text-accent-strong" : "text-faint hover:text-text",
-                      )}
-                    >
+                    <Link href={c.href} className={cx("block py-1.5 text-sm no-underline", isActive(pathname, c.href) ? "text-white" : "text-faint hover:text-white")}>
                       {c.label}
                     </Link>
                   </li>

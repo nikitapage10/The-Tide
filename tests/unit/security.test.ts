@@ -28,7 +28,13 @@ describe("mode resolution fails closed", () => {
   it("does not fall back to demo when Supabase is half-configured, and names only what is missing", () => {
     const r = resolveMode(env({ TIDE_DATA_MODE: "supabase", NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co" }));
     expect(r.mode).toBe("setup-required");
-    if (r.mode === "setup-required") expect(r.missing).toEqual(["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "TIDE_PROJECT_ID"]);
+    if (r.mode === "setup-required") expect(r.missing).toEqual(["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"]);
+  });
+  it("selects Supabase automatically when an integration provides its URL and key, never demo", () => {
+    const r = resolveMode(env({ NODE_ENV: "production", VERCEL: "1", NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon" }));
+    expect(r.mode).toBe("supabase");
+    expect(r.mode === "supabase" && r.projectId).toBe(ids.projectId);
+    expect(resolveMode(env({ TIDE_DATA_MODE: "supabase", NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "a", TIDE_PROJECT_ID: "bad" })).mode).toBe("setup-required");
   });
   it("keeps the demo project ID in sync with fixtures", () => {
     const r = resolveMode(env({ TIDE_DATA_MODE: "demo" }));

@@ -2,6 +2,8 @@
 
 ## Implemented
 
+- **Visual direction (v2, from the GM's mockup):** monochrome observatory look; full-screen home hero where you land among meteors, scrolling pulls the camera back (meteors fly outward, the planet is revealed, callouts and glyphs fade in behind the meteors); a minimal gravity-lens flare that appears only while the pointer moves; transparent header with World / People / Stories / Studio / Workshop; hero artwork in `public/brand/` (supplied by the GM), reference mockup in `docs/design/`.
+
 - **Five sections plus Home** with shared navigation, nested subpages, global search and contextual cross-links:
   - *The World*: environments, places, history & events, technology, relics, phenomena, how the world works, concepts & names. Filterable by text, category, tag, canon status and archived state.
   - *People & Powers*: peoples (the eight established peoples), characters, creatures, factions, institutions; two-way relationship lists; "appears in" backlinks to stories and sessions.
