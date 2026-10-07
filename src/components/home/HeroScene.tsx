@@ -936,6 +936,8 @@ varying float vSeed;
 varying vec3 vCol;
 varying float vL;
 varying vec2 vToL;
+varying vec2 vRad;
+varying float vZ;
 void main() {
   vec2 puv = vec2(1.0122, 0.65) + aP.xy * 883.0 / vec2(2000.0, 1126.0);
   vec2 oP = vec2(0.85, 0.58);
@@ -945,9 +947,12 @@ void main() {
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
   float r2 = dot(aP.xy, aP.xy);
   float z = sqrt(max(0.0, 1.0 - r2));
-  gl_PointSize = floor(aP.z) * uDpr * (uFrameS.x / 2200.0) * (0.35 + 0.65 * z);
+  gl_PointSize = floor(aP.z) * uDpr * (uFrameS.x / 2200.0) * (0.6 + 0.4 * z);
   vA = aP.w * step(r2, 0.985) * smoothstep(0.0, 0.25, z);
   vSeed = fract(aP.z) * 100.0;
+  // Seen at an angle: squashed toward the horizon (radially, by z).
+  vRad = length(aP.xy) > 1e-4 ? normalize(aP.xy) : vec2(1.0, 0.0);
+  vZ = max(z, 0.12);
   vec3 nrm = vec3(aP.xy, z);
   float light = clamp(dot(nrm, normalize(vec3(-0.85, -0.35, 0.4))), 0.0, 1.0);
   float night = smoothstep(-0.3, 0.3, (aP.x + 0.62) * 0.9 + (aP.y + 0.05));
@@ -966,6 +971,8 @@ varying float vSeed;
 varying vec3 vCol;
 varying float vL;
 varying vec2 vToL;
+varying vec2 vRad;
+varying float vZ;
 float h1(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float n1(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -973,7 +980,9 @@ float n1(vec2 p) {
   return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), u.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), u.x), u.y);
 }
 void main() {
-  vec2 c = gl_PointCoord * 2.0 - 1.0;
+  vec2 c0 = gl_PointCoord * 2.0 - 1.0;
+  // Foreshorten: compress the radial axis by the surface's tilt.
+  vec2 c = vec2(dot(c0, vRad) / vZ, dot(c0, vec2(-vRad.y, vRad.x)));
   float d = length(c);
   if (d > 1.0) discard;
   float n = n1(c * 2.4 + vSeed) * 0.6 + n1(c * 5.0 + vSeed * 1.7) * 0.4;
@@ -1114,7 +1123,7 @@ export function HeroScene({
       // Strands drawn off the planet toward the cursor (planet layer).
       const head = { x: -9999, y: -9999 };
       const strand = { on: 0 };
-      const flowState = [0, 1, 2, 3].map(() => ({ tx: -9999, ty: -9999, cx: -9999, cy: -9999 }));
+      const flowState = [0, 1, 2, 3].map(() => ({ tx: -9999, ty: -9999, cx: -9999, cy: -9999, rx: -9999, ry: -9999, anchor: -99 }));
       let strandDt = 1;
       let strandLast = 0;
       const strandA = new Float32Array(24);
@@ -1281,21 +1290,40 @@ export function HeroScene({
             // Roots: the marked spots on the planet (the callouts and notes) nearest
             // the cursor, as if the strands were drawn out of those places;
             // fallback roots along the limb if too few are in view.
-            const roots: [number, number][] = [];
-            for (const a of anchors?.current ?? []) {
+            // Fixed roots: when the strands appear, each picks one of the marked
+            // spots nearest the cursor and stays rooted there (only the tips follow
+            // the cursor); new spots are picked only after the strands fade away.
+            const cands: { id: number; x: number; y: number; d: number }[] = [];
+            (anchors?.current ?? []).forEach((a, id) => {
               const ax2 = (a.x / 100) * 2000, ay2 = (a.y / 100) * 1126;
-              if (Math.hypot(ax2 - 2024.4, ay2 - 731.9) > 883 - 30) continue;
-              roots.push(toScreen(ax2, ay2));
-            }
-            roots.sort((p1, p2) => Math.hypot(p1[0] - head.x, p1[1] - head.y) - Math.hypot(p2[0] - head.x, p2[1] - head.y));
+              if (Math.hypot(ax2 - 2024.4, ay2 - 731.9) > 883 - 30) return;
+              const [sx2, sy2] = toScreen(ax2, ay2);
+              cands.push({ id, x: sx2, y: sy2, d: Math.hypot(sx2 - head.x, sy2 - head.y) });
+            });
+            cands.sort((c1, c2) => c1.d - c2.d);
+            const near = cands.slice(0, 6);
             const baseAng = Math.atan2(ay - pcy, ax - pcx) + 0.1;
-            for (let k = roots.length; k < 4; k++) {
+            const taken = new Set<number>();
+            for (const st of flowState) if (st.anchor >= 0) taken.add(st.anchor);
+            flowState.forEach((st, k) => {
+              if (st.anchor === -99) {
+                const free = near.find((c) => !taken.has(c.id));
+                st.anchor = free ? free.id : -1 - k;
+                if (free) taken.add(free.id);
+              }
+              const c = cands.find((cc) => cc.id === st.anchor);
               const ra = baseAng + (k - 1.5) * 0.09;
-              roots.push([pcx + Math.cos(ra) * (pr - 14), pcy + Math.sin(ra) * (pr - 14)]);
-            }
-            const use = roots.slice(0, 4);
-            // Order around the cursor, so the outer strands are the fan's edges.
-            use.sort((p1, p2) => (p1[0] - head.x) * py + (p1[1] - head.y) * -px - ((p2[0] - head.x) * py + (p2[1] - head.y) * -px));
+              const gx = c ? c.x : pcx + Math.cos(ra) * (pr - 14);
+              const gy = c ? c.y : pcy + Math.sin(ra) * (pr - 14);
+              if (st.rx < -9000) {
+                st.rx = gx;
+                st.ry = gy;
+              }
+              const re = 1 - Math.pow(0.96, strandDt);
+              st.rx += (gx - st.rx) * re;
+              st.ry += (gy - st.ry) * re;
+            });
+            const use = flowState.map((st) => [st.rx, st.ry] as [number, number]);
             const mrx = use.reduce((a2, r) => a2 + r[0], 0) / use.length;
             const mry = use.reduce((a2, r) => a2 + r[1], 0) / use.length;
             for (let k = 0; k < 4; k++) {
@@ -1351,7 +1379,10 @@ export function HeroScene({
             const pad = 90 + reach * 0.25;
             gl.uniform4f(U.strandBox, x0 - pad, y0 - pad, x1 + pad, y1 + pad);
           } else {
-            for (const st of flowState) st.tx = st.cx = -9999;
+            for (const st of flowState) {
+              st.tx = st.cx = st.rx = -9999;
+              st.anchor = -99;
+            }
             gl.uniform4f(U.strandBox, 0, 0, -1, -1);
           }
           if (tip?.current) {

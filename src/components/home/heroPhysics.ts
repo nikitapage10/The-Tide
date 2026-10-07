@@ -451,36 +451,49 @@ export class CloudPuffs {
   private vx: Float32Array;
   private vy: Float32Array;
   private coupling: Float32Array;
+  // Life cycle: puffs form, live a while, evaporate and re-form elsewhere, so
+  // the layer keeps renewing itself (and gaps you push open fill back in).
+  private age: Float32Array;
+  private span: Float32Array;
+  private alpha: Float32Array;
 
   constructor(n = 4200) {
-    const lon: number[] = [];
-    const lat: number[] = [];
-    const dens: number[] = [];
-    let tries = 0;
-    while (lon.length < n && tries < 200000) {
-      tries++;
+    this.count = n;
+    this.lon = new Float32Array(n);
+    this.lat = new Float32Array(n);
+    this.alpha = new Float32Array(n);
+    this.attrs = new Float32Array(n * 4);
+    this.ox = new Float32Array(n);
+    this.oy = new Float32Array(n);
+    this.vx = new Float32Array(n);
+    this.vy = new Float32Array(n);
+    this.age = new Float32Array(n);
+    this.span = new Float32Array(n);
+    this.coupling = Float32Array.from({ length: n }, () => 2 + 6 * Math.random());
+    for (let i = 0; i < n; i++) {
+      this.respawn(i);
+      // Start at random points in their lives, so they do not all renew together.
+      this.age[i] = Math.random() * this.span[i]!;
+    }
+    this.place();
+  }
+
+  /** Re-form puff i somewhere in the cloud system (in its own pattern). */
+  private respawn(i: number) {
+    for (let tries = 0; tries < 60; tries++) {
       const la = Math.asin(Math.random() * 2 - 1);
       const lo = (Math.random() * 2 - 1) * (Math.PI / 2);
       const d = Math.min(1, Math.max(0, (fbm2(lo * 2.4 + 7.3, la * 2.4 + 3.1) - 0.5) / 0.22));
-      if (Math.random() > d) continue;
-      lon.push(lo);
-      lat.push(la);
-      dens.push(d);
+      if (Math.random() > d && tries < 59) continue;
+      this.lon[i] = lo;
+      this.lat[i] = la;
+      this.alpha[i] = 0.06 + 0.14 * d;
+      break;
     }
-    this.count = lon.length;
-    this.lon = Float32Array.from(lon);
-    this.lat = Float32Array.from(lat);
-    this.attrs = new Float32Array(this.count * 4);
-    for (let i = 0; i < this.count; i++) {
-      this.attrs[i * 4 + 2] = 50 + Math.floor(Math.random() * 64) + Math.random() * 0.98;
-      this.attrs[i * 4 + 3] = 0.06 + 0.14 * dens[i]!;
-    }
-    this.ox = new Float32Array(this.count);
-    this.oy = new Float32Array(this.count);
-    this.vx = new Float32Array(this.count);
-    this.vy = new Float32Array(this.count);
-    this.coupling = Float32Array.from({ length: this.count }, () => 2 + 6 * Math.random());
-    this.place();
+    this.attrs[i * 4 + 2] = 50 + Math.floor(Math.random() * 64) + Math.random() * 0.98;
+    this.ox[i] = this.oy[i] = this.vx[i] = this.vy[i] = 0;
+    this.age[i] = 0;
+    this.span[i] = 20 + Math.random() * 20;
   }
 
   private place() {
@@ -488,6 +501,9 @@ export class CloudPuffs {
       const cl = Math.cos(this.lat[i]!);
       this.attrs[i * 4] = cl * Math.sin(this.lon[i]!) + this.ox[i]!;
       this.attrs[i * 4 + 1] = Math.sin(this.lat[i]!) + this.oy[i]!;
+      const a = this.age[i]!, sp = this.span[i]!;
+      const fade = Math.min(1, a / 3) * Math.min(1, Math.max(0, sp - a) / 4);
+      this.attrs[i * 4 + 3] = this.alpha[i]! * fade;
     }
   }
 
@@ -518,14 +534,18 @@ export class CloudPuffs {
       }
       let vx = this.vx[i]! + (tx - this.vx[i]!) * Math.min(1, s * k);
       let vy = this.vy[i]! + (ty - this.vy[i]!) * Math.min(1, s * k);
-      vx -= this.ox[i]! * 0.5 * s;
-      vy -= this.oy[i]! * 0.5 * s;
-      vx *= Math.exp(-s * 1.2);
-      vy *= Math.exp(-s * 1.2);
+      // Recovery: a steady pull back to its place in the (still drifting) cloud
+      // system; pushed puffs glide home over a few seconds.
+      vx -= this.ox[i]! * 1.6 * s;
+      vy -= this.oy[i]! * 1.6 * s;
+      vx *= Math.exp(-s * 2.4);
+      vy *= Math.exp(-s * 2.4);
       this.vx[i] = vx;
       this.vy[i] = vy;
       this.ox[i] = clamp(this.ox[i]! + vx * s, -0.25, 0.25);
       this.oy[i] = clamp(this.oy[i]! + vy * s, -0.25, 0.25);
+      this.age[i] = this.age[i]! + s;
+      if (this.age[i]! >= this.span[i]!) this.respawn(i);
     }
     this.place();
   }
@@ -569,9 +589,10 @@ export class StormPuffs {
       const wall = q < n * 0.28;
       // Angular radius on the sphere (radians): eyewall ~0.03, bands out to ~0.17,
       // with ragged, uneven outer reach (not a neat circle).
-      const r = wall ? 0.022 + Math.random() * 0.014 : 0.04 + Math.pow(Math.random(), 0.7) * (0.08 + 0.08 * Math.random());
+      // A small eye: the eyewall hugs it closely.
+      const r = wall ? 0.008 + Math.random() * 0.012 : 0.022 + Math.pow(Math.random(), 0.7) * (0.08 + 0.08 * Math.random());
       const arm = Math.floor(Math.random() * arms);
-      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.04) * 1.9 + (Math.random() - 0.5) * 0.9;
+      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.022) * 1.9 + (Math.random() - 0.5) * 0.9;
       this.sid.push(this.centres.indexOf(id));
       this.ang.push(a);
       this.rad.push(r);
@@ -581,7 +602,7 @@ export class StormPuffs {
       this.vy.push(0);
       this.age.push(-Math.random() * 1.2);
       this.base.push((wall ? 0.15 : 0.08) + Math.random() * 0.08);
-      this.size.push(Math.floor(wall ? 22 + Math.random() * 20 : 30 + Math.random() * 40) + Math.random() * 0.98);
+      this.size.push(Math.floor(wall ? 16 + Math.random() * 14 : 30 + Math.random() * 40) + Math.random() * 0.98);
     }
     this.cx.push(x);
     this.cy.push(y);
@@ -623,8 +644,8 @@ export class StormPuffs {
         continue;
       }
       const spin = (1 - Math.min(1, Math.max(0, age) / 10)) * 0.9;
-      this.ang[i] = this.ang[i]! + (spin * 0.02 / Math.max(0.02, this.rad[i]!)) * s;
-      this.rad[i] = Math.max(0.018, this.rad[i]! - 0.0015 * s);
+      this.ang[i] = this.ang[i]! + (spin * 0.02 / Math.max(0.012, this.rad[i]!)) * s;
+      this.rad[i] = Math.max(0.006, this.rad[i]! - 0.0012 * s);
       const k = this.sid[i]!;
       const [x, y] = this.onSphere(this.cx[k]!, this.cy[k]!, this.rad[i]!, this.ang[i]!);
       const [ax, ay] = flow.velocityAt(x + this.ox[i]!, y + this.oy[i]!);
