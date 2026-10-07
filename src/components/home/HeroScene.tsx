@@ -70,30 +70,40 @@ vec2 cloudCoords(vec2 sph) {
   vec2 ll = vec2(atan(ps.x, max(zz, 0.0001)), asin(clamp(ps.y, -1.0, 1.0)));
   return ll * 3.0 + vec2(uT * 0.012, uT * 0.003);
 }
-float stormAmount(vec2 sph) {
-  float st = 0.0;
+// Storms you plant: the weather around the point is wound into a cyclone by
+// differential rotation (the inside turns faster and keeps turning, slowing as
+// the storm dies), which draws the real cloud texture into soft spiral bands;
+// cloud thickens around a clear eye. Lasts about seven seconds.
+vec2 stormTwist(vec2 sph, out float bonus, out float eye) {
+  bonus = 0.0;
+  eye = 0.0;
+  vec2 q = sph;
   for (int k = 0; k < 3; k++) {
     float sa = uStorm[k].z;
-    if (sa < 0.0 || sa > 6.5) continue;
-    float grow = smoothstep(0.0, 0.6, sa) * (1.0 - smoothstep(3.5, 6.5, sa));
-    vec2 d = sph - uStorm[k].xy;
-    float r = length(d) / 0.13;
-    if (r > 1.6) continue;
-    float th = atan(d.y, d.x);
-    // Thin spiral bands (a cyclone seen from orbit), not a solid mass.
-    // Keeps spinning, slowing as it dies down.
-    float spinA = 3.2 * sa - 0.22 * sa * sa;
-    float arms = pow(0.5 + 0.5 * sin(3.0 * th + 7.0 * log(r + 0.06) - spinA + uStorm[k].w * 6.0), 4.0);
-    float body = smoothstep(1.35, 0.35, r) * smoothstep(0.06, 0.2, r);
-    st = max(st, body * arms * 0.8 * grow);
+    if (sa < 0.0 || sa > 7.5) continue;
+    float grow = smoothstep(0.0, 1.0, sa) * (1.0 - smoothstep(4.5, 7.5, sa));
+    vec2 c = uStorm[k].xy;
+    vec2 d = q - c;
+    float r = length(d) / 0.12;
+    if (r > 2.6) continue;
+    float spinA = (2.4 * sa - 0.15 * sa * sa + 1.5) * grow;
+    float a = spinA * exp(-r * r * 0.7);
+    float cs = cos(a), sn = sin(a);
+    q = c + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
+    float th = atan(d.y, d.x) + a;
+    float bands = 0.55 + 0.45 * sin(2.0 * th + 3.0 * log(r + 0.1) + uStorm[k].w * 6.0);
+    bonus = max(bonus, grow * smoothstep(1.9, 0.6, r) * bands);
+    eye = max(eye, grow * exp(-r * r * 9.0));
   }
-  return st;
+  return q;
 }
 float cloudBase(vec2 sph) {
-  vec2 p = cloudCoords(sph);
+  float bonus, eye;
+  vec2 tw = stormTwist(sph, bonus, eye);
+  vec2 p = cloudCoords(tw);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
   float base = fbm5(p * 1.7 + 0.45 * w);
-  return max(base, 0.38 + 0.36 * stormAmount(sph));
+  return base + bonus * (0.12 + 0.3 * base) - eye * 0.45;
 }
 // Cloud displacement field (simulated on the GPU, 256² over the disc): how far
 // the cloud at each point has been carried from where the weather put it, in
@@ -367,16 +377,20 @@ vec3 planetWithLimb(vec2 uv) {
     vec2 pw = cloudCoords(sph);
     vec2 sunStepS = normalize(sunDir.xy) * 0.012;
     // Where the cloud now here came from (carried by the air you stirred).
-    vec2 srcH = sph - cloudOffAt(uClouds, sph * 0.5 + 0.5);
+    // (Less displacement toward the limb, where foreshortening would make any
+    // shift look like the horizon itself bending.)
+    vec2 srcH = sph - cloudOffAt(uClouds, sph * 0.5 + 0.5) * smoothstep(0.05, 0.45, z);
+    srcH *= min(1.0, 0.985 / max(length(srcH), 1e-4));
     vec2 srcS = srcH + sunStepS;
     float coverH = 1.0, coverS = 1.0;
     float baseHere = cloudBase(srcH);
     float baseSun = cloudBase(srcS);
-    pw = cloudCoords(srcH);
+    float sbH, seH;
+    pw = cloudCoords(stormTwist(srcH, sbH, seH));
     // The cloud amount drifts with the particles; the fine texture stays put
     // (moving it made the clouds shimmer while they settled).
     float dens = clamp(cloudDetail(baseHere, pw) * coverH, 0.0, 1.0);
-    float densSun = clamp(cloudDetail(baseSun, cloudCoords(srcS)) * coverS, 0.0, 1.0);
+    float densSun = clamp(cloudDetail(baseSun, cloudCoords(stormTwist(srcS, sbH, seH))) * coverS, 0.0, 1.0);
     cleared = max(cleared, clamp(1.0 - coverH, 0.0, 1.0));
     vec2 eyes[3];
     eyes[0] = vec2(-0.4127, -0.0255);
@@ -822,6 +836,12 @@ void main() {
       ghosts += smoothstep(gr, gr * 0.35, length(sp - gpos)) * (0.07 - 0.012 * fi);
     }
     col += vec3(0.85, 0.92, 1.0) * ghosts * e * pointerInSpace;
+    // A small soft flare at the cursor in space: a glow and a faint horizontal
+    // streak (cropped by the planet, like everything of the lens).
+    vec2 dmF = sp - uM;
+    float coreF = exp(-dot(dmF, dmF) / (R * R * 0.012));
+    float streakF = exp(-dmF.y * dmF.y / (R * R * 0.0005)) * exp(-abs(dmF.x) / (R * 0.8));
+    col += vec3(0.75, 0.84, 0.98) * (coreF * 0.1 + streakF * 0.07) * e * pointerInSpace;
     // Strands of energy drawn off the planet toward the cursor: a few curved
     // filaments leave the limb nearest the pointer, bending and swaying as if
     // stretched and pulled, with light flowing outward along them. Mild, cool
@@ -868,12 +888,13 @@ void main() {
         prevC = P;
       }
       // Half-width of the fan at this point: wide at the planet, pinching to the tip.
-      float halfW = length(A3 - A0) * 0.5 * (1.0 - tC) * (1.0 - tC) + 3.0;
+      float spreadC = length(uStrandA[3].zw - uStrandA[0].zw);
+      float halfW = spreadC * 0.75 * 4.0 * tC * (1.0 - tC) + 4.0;
       float across = bestC / halfW;
       // Made of many faint filaments (not a flat fill), so the strands dissolve into it.
       float fil = vnoise(vec2(across * 12.0 + 0.6 * sin(tC * 6.0 + uT * 0.4), tC * 4.0 - uT * 1.1));
       fil = 0.3 * fil + 0.7 * pow(vnoise(vec2(across * 26.0, tC * 7.0 - uT * 1.6)), 2.0) + 0.25 * fil * fil;
-      float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.06, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
+      float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.12, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
       float sheetStr = max(uStrandT[1].w, uStrandT[2].w);
       // Fade out well inside the region it is drawn in (no visible mask edges).
       vec2 e2 = min(sp - uStrandBox.xy, uStrandBox.zw - sp);
@@ -963,6 +984,7 @@ export function HeroScene({
   clock,
   onReady,
   onFail,
+  onStorm,
   className,
 }: {
   layer: "planet" | "meteors";
@@ -970,6 +992,8 @@ export function HeroScene({
   /** Shared intro clock (ms timestamp) so both canvases animate in sync. */
   clock: { current: number };
   onReady?: () => void;
+  /** A storm was planted at this point (CSS px, relative to the canvas). */
+  onStorm?: (x: number, y: number) => void;
   onFail?: () => void;
   className?: string;
 }) {
@@ -1182,47 +1206,50 @@ export function HeroScene({
           const pr = (883 / 2000) * g.fw * sP;
           const dx = head.x - pcx;
           const dy = head.y - pcy;
-          const dist = Math.hypot(dx, dy);
-          const out = dist - pr;
+          const out = Math.hypot(dx, dy) - pr;
+          // All strands stem from one place: where the main streams meet the
+          // planet (the limb point facing the streams' crossing). From there they
+          // leave along the streams and bend up or down toward the cursor.
+          const toScreen = (sx: number, sy: number): [number, number] => [
+            g.cx - g.fw / 2 + (0.85 + (sx / 2000 - 0.85) * sP) * g.fw,
+            g.cy - g.fh / 2 + (0.58 + (sy / 1126 - 0.58) * sP) * g.fh,
+          ];
+          const [ax, ay] = toScreen(2024.4 - 0.9906 * (883 - 14), 731.9 - 0.1353 * (883 - 14));
+          const [lx, ly] = toScreen(2024.4 - 0.9906 * 883, 731.9 - 0.1353 * 883);
+          const ox = lx - ax || -1, oy = ly - ay;
+          const on = Math.hypot(ox, oy);
+          const tx0 = ox / on, ty0 = oy / on;                 // outward, along the streams
+          const reach = Math.hypot(head.x - ax, head.y - ay);
           // Present while the cursor is out in space, not too far off; eases in/out.
           // Only as the rocks clear: faint while the last ones leave, full once gone.
           const clear = smooth(0.72, 0.97, progress.current);
-          const want = head.x > -9000 && out > 8 && out < pr * 0.9 && clear > 0 && !reduced ? clear : 0;
+          const want = head.x > -9000 && out > 8 && reach < pr * 1.3 && clear > 0 && !reduced ? clear : 0;
           strand.on += (want - strand.on) * (want > strand.on ? 0.04 : 0.06);
           strandA.fill(0);
           strandT.fill(0);
           if (strand.on > 0.002) {
-            const ang = Math.atan2(dy, dx);
-            const tSecS = (now - clock.current) / 1000;
-            const reach = Math.max(1, out);
-            let x0 = Math.min(head.x, pcx + Math.cos(ang) * pr), y0 = Math.min(head.y, pcy + Math.sin(ang) * pr);
-            let x1 = Math.max(head.x, pcx + Math.cos(ang) * pr), y1 = Math.max(head.y, pcy + Math.sin(ang) * pr);
+            // Perpendicular to the line from the root to the cursor.
+            const ux = (head.x - ax) / Math.max(reach, 1), uy = (head.y - ay) / Math.max(reach, 1);
+            const px = -uy, py = ux;
+            let x0 = Math.min(head.x, ax), y0 = Math.min(head.y, ay);
+            let x1 = Math.max(head.x, ax), y1 = Math.max(head.y, ay);
             for (let k = 0; k < 4; k++) {
-              const off = (k - 1.5) * Math.min(0.16, (reach / pr) * 0.35) + Math.sin(tSecS * 0.5 + k * 1.7) * 0.015;
-              // Anchored just inside the limb, so the planet always hides the ends.
-              const ax = pcx + Math.cos(ang + off) * (pr - 10);
-              const ay = pcy + Math.sin(ang + off) * (pr - 10);
-              // Bend inward: every strand curves toward the shared axis (planet
-              // centre → cursor) and they pinch together toward the tip, like the
-              // main streams; a slow sway keeps them alive.
-              const nx = Math.cos(ang + off), ny = Math.sin(ang + off);
-              const axx = Math.cos(ang), axy = Math.sin(ang);
-              // Neighbouring strands sway in opposite phase, so they twine
-              // around one another.
-              const sway = Math.sin(tSecS * 0.55 + k * Math.PI * 0.75) * reach * 0.13;
-              const cxp = pcx + axx * (pr + reach * 0.42) - axy * sway;
-              const cyp = pcy + axy * (pr + reach * 0.42) + axx * sway;
-              const tx = head.x + Math.sin(tSecS * 0.9 + k * 3.3) * 6 - nx * k * 3;
-              const ty = head.y + Math.cos(tSecS * 0.8 + k * 2.4) * 6 - ny * k * 3;
+              const s = k - 1.5;
+              // Bend: leave along the streams, curving toward the cursor; the
+              // strands fan slightly apart in the middle and meet again at the tip.
+              const cxp = ax + tx0 * reach * 0.5 + px * s * reach * 0.07;
+              const cyp = ay + ty0 * reach * 0.5 + py * s * reach * 0.07;
+              const tx = head.x + px * s * 3;
+              const ty = head.y + py * s * 3;
               strandA.set([ax, ay, cxp, cyp], k * 4);
-              strandT.set([tx, ty, 1.6 + 0.6 * (k % 2), strand.on * (k === 1 || k === 2 ? 1 : 0.7) * (1 - 0.6 * (reach / (pr * 0.9)))], k * 4);
+              strandT.set([tx, ty, 1.6 + 0.6 * (k % 2), strand.on * (k === 1 || k === 2 ? 1 : 0.7) * (1 - 0.5 * Math.min(1, reach / (pr * 1.3)))], k * 4);
               x0 = Math.min(x0, cxp);
               y0 = Math.min(y0, cyp);
               x1 = Math.max(x1, cxp);
               y1 = Math.max(y1, cyp);
             }
             // Generous padding: the sheet's soft falloff must end well inside it.
-            const pad = 90 + Math.min(pr * 0.6, reach * 0.6);
+            const pad = 90 + reach * 0.25;
             gl.uniform4f(U.strandBox, x0 - pad, y0 - pad, x1 + pad, y1 + pad);
           } else {
             gl.uniform4f(U.strandBox, 0, 0, -1, -1);
@@ -1392,6 +1419,7 @@ export function HeroScene({
         st.seed = Math.random();
         heroSignal.surgeAt = st.t;
         flow.vortex(mx, my);
+        onStorm?.(e.clientX - rect.left, e.clientY - rect.top);
       };
       window.addEventListener("pointermove", onMove, { passive: true });
       window.addEventListener("pointerdown", onDown, { passive: true });
@@ -1415,7 +1443,7 @@ export function HeroScene({
       disposed = true;
       teardown?.();
     };
-  }, [layer, progress, clock, onReady, onFail]);
+  }, [layer, progress, clock, onReady, onFail, onStorm]);
 
   return <canvas ref={ref} aria-hidden="true" className={className} />;
 }

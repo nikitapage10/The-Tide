@@ -62,6 +62,22 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
   const onSceneReady = useCallback(() => stage.current?.setAttribute("data-gl", "on"), []);
   // Without WebGL, fall back to the plain image layers.
   const onSceneFail = useCallback(() => stage.current?.setAttribute("data-gl", "off"), []);
+  // A storm planted by clicking the planet gets its own short-lived callout.
+  const [stormNote, setStormNote] = useState<{ id: number; x: number; y: number; left: boolean; title: string; line: string } | null>(null);
+  const onStorm = useCallback((x: number, y: number) => {
+    const kinds = ["Plasma cell", "Ion squall", "Static bloom", "Gravitic shear", "Resonance front", "Charge vortex"];
+    const classes = ["II", "III", "IV", "V"];
+    const id = Date.now();
+    setStormNote({
+      id,
+      x,
+      y,
+      left: x > window.innerWidth * 0.62,
+      title: kinds[Math.floor(Math.random() * kinds.length)]!,
+      line: `Class ${classes[Math.floor(Math.random() * classes.length)]} · forming`,
+    });
+    window.setTimeout(() => setStormNote((n) => (n && n.id === id ? null : n)), 6000);
+  }, []);
 
   useEffect(() => {
     const t = track.current;
@@ -123,7 +139,7 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
         </div>
 
         {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
-        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} className="hero-layer z-[1] h-full w-full" />
+        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} className="hero-layer z-[1] h-full w-full" />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
         <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
@@ -204,6 +220,22 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
             </h1>
           </div>
         </div>
+
+        {stormNote ? (
+          <div key={stormNote.id} aria-hidden="true" className="obs obs-on pointer-events-none absolute z-[6]" style={{ left: stormNote.x, top: stormNote.y }}>
+            <span className="obs-ping absolute -left-2 -top-2 h-4 w-4 rounded-full border border-white/70" />
+            <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />
+            <span className={`obs-line absolute top-0 h-px bg-white/50 ${stormNote.left ? "right-2 origin-right" : "left-2 origin-left"}`} />
+            <div className={`absolute -top-2.5 w-max ${stormNote.left ? "right-[4.5rem] text-right" : "left-[4.5rem]"}`}>
+              <span className="tracked block text-white">
+                <Typed text={stormNote.title} active delay={150} />
+              </span>
+              <span className="tracked block text-[0.68rem] leading-5 text-muted">
+                <Typed text={stormNote.line} active delay={150 + stormNote.title.length * 28 + 120} speed={18} />
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         {/* The haiku from the GM's intro, set low along the streams of light. */}
         <div className="page-x pointer-events-none absolute inset-x-0 bottom-[16%] z-[6] hidden sm:block">

@@ -268,8 +268,13 @@ export class FlowSim {
           const d2 = (i - ax - ex * t) ** 2 + (j - ay - ey * t) ** 2;
           const w = Math.exp(-d2 / (r * r));
           const k = j * n + i;
-          u[k] = u[k]! + fx * w * 0.04;
-          v[k] = v[k]! + fy * w * 0.04;
+          // Carried along a little, and parted to either side of the path, so the
+          // cloud breaks apart around the pointer rather than smearing.
+          const side = (i - ax - ex * t) * -ey + (j - ay - ey * t) * ex >= 0 ? 1 : -1;
+          const sl = Math.sqrt(ll);
+          const pw = Math.exp(-d2 / (r * r * 2.2)) * Math.min(1, Math.sqrt(d2) / r);
+          u[k] = u[k]! + fx * w * 0.035 + (-ey / sl) * side * pw * Math.hypot(fx, fy) * 0.03;
+          v[k] = v[k]! + fy * w * 0.035 + (ex / sl) * side * pw * Math.hypot(fx, fy) * 0.03;
           clr[k] = Math.min(0.3, clr[k]! + w * Math.min(0.01, speed * 0.3));
         }
       this.awake = true;
@@ -277,7 +282,7 @@ export class FlowSim {
     // Planted storms: the air spins around each for a few seconds, fading.
     for (const st of this.storms) {
       const R = 3.2;
-      const spin = 0.005 * st.life * dt;
+      const spin = 0.0015 * st.life * dt;
       for (let j = Math.max(0, Math.floor(st.y - 3 * R)); j <= Math.min(n - 1, Math.ceil(st.y + 3 * R)); j++)
         for (let i = Math.max(0, Math.floor(st.x - 3 * R)); i <= Math.min(n - 1, Math.ceil(st.x + 3 * R)); i++) {
           const ex = i - st.x;
