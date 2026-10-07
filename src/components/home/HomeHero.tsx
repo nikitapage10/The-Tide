@@ -83,7 +83,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
         <div className="hero-frame z-0">
           <div className="hero-layer hero-planet">
             <div className="hero-land absolute inset-0">
-              <Image src="/brand/planet.webp" alt="" fill priority sizes="100vw" className="object-cover" />
+              <Image src="/brand/planet-v2.webp" alt="" fill priority sizes="100vw" className="object-cover" />
             </div>
           </div>
         </div>
@@ -95,20 +95,20 @@ export function HomeHero({ callouts, code }: HeroProps) {
           <div className="hero-frame">
             <div className="hero-layer hero-planet">
               <svg aria-hidden="true" className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <ellipse cx="82" cy="53" rx="40" ry="55" fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="1" strokeDasharray="1 6" vectorEffect="non-scaling-stroke" />
+                <ellipse cx="88" cy="62" rx="40" ry="60" fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="1" strokeDasharray="1 6" vectorEffect="non-scaling-stroke" />
               </svg>
             </div>
             {/* Tiny bodies on the orbit: decorative markers only. */}
             {[
-              [42.5, 58],
-              [47, 80],
+              [48.5, 55],
+              [54, 88],
             ].map(([x, y]) => (
               <span key={`${x}`} aria-hidden="true" className="hero-pin -ml-[3px] -mt-[3px] h-1.5 w-1.5 rounded-full bg-white/60" style={pin(x!, y!)} />
             ))}
             {/* Crosshairs */}
             {[
-              [52, 62],
-              [68.25, 73.25],
+              [30, 66],
+              [60, 18],
             ].map(([x, y]) => (
               <span key={`c${x}`} aria-hidden="true" className="hero-pin -ml-2 -mt-2 font-[family-name:var(--font-mono)] text-base leading-4 text-white/35" style={pin(x!, y!)}>
                 +
