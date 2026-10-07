@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — the whole look is driven from here.
+ * Proposed starting direction (not a final art direction): a deep neutral
+ * archive palette with restrained oceanic accents. Swap these values to
+ * re-theme the app; components only use the semantic names below.
+ * Contrast: text/muted/faint all meet WCAG AA (≥ 4.5:1) on bg and surface.
+ */
+:root {
+  --bg: #0b0f14;
+  --surface: #11171f;
+  --surface-2: #17202b;
+  --surface-3: #1e2935;
+  --border: #283543;
+  --border-strong: #3a4a5c;
+  --text: #e7edf3;
+  --muted: #a9b8c6;
+  --faint: #8597a8;
+  --accent: #5cc0bb;
+  --accent-strong: #8fdcd7;
+  --accent-ink: #04201f;
+  --accent-2: #8eb2dc;
+  --ok: #74c99a;
+  --warn: #e3b968;
+  --danger: #ee8a80;
+  --demo: #cfaef5;
+  --focus: #a6ece8;
+  --contour: rgba(92, 192, 187, 0.09);
+
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-2: var(--accent-2);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-demo: var(--demo);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+  --radius-card: var(--radius);
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  line-height: 1.6;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(92, 192, 187, 0.06), transparent 60%),
+    var(--bg);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.005em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+a {
+  color: var(--accent-strong);
+  text-underline-offset: 3px;
+}
+
+/* Visible, consistent focus for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: rgba(92, 192, 187, 0.35);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Rendered Markdown (already sanitized). */
+.prose-tide { color: var(--text); max-width: 72ch; }
+.prose-tide p, .prose-tide ul, .prose-tide ol, .prose-tide blockquote, .prose-tide pre, .prose-tide table { margin: 0.75em 0; }
+.prose-tide ul { list-style: disc; padding-left: 1.4em; }
+.prose-tide ol { list-style: decimal; padding-left: 1.4em; }
+.prose-tide h1, .prose-tide h2, .prose-tide h3, .prose-tide h4 { margin: 1.2em 0 0.4em; font-size: 1.15rem; }
+.prose-tide blockquote { border-left: 3px solid var(--border-strong); padding-left: 1em; color: var(--muted); }
+.prose-tide code { font-family: var(--font-mono); font-size: 0.9em; background: var(--surface-3); padding: 0.1em 0.35em; border-radius: 4px; }
+.prose-tide pre { background: var(--surface-3); padding: 0.8em; border-radius: var(--radius-sm); overflow-x: auto; }
+.prose-tide table { border-collapse: collapse; display: block; overflow-x: auto; }
+.prose-tide th, .prose-tide td { border: 1px solid var(--border); padding: 0.35em 0.6em; text-align: left; }
+.prose-tide strong { color: var(--text); }
+
+/* Restrained cartographic texture for headers. Static, decorative only. */
+.contour-bg {
+  background-image:
+    repeating-radial-gradient(circle at 12% 120%, transparent 0 22px, var(--contour) 22px 23px),
+    linear-gradient(var(--surface), var(--surface));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .transition-tide { transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+@media (forced-colors: active) {
+  :focus-visible { outline: 2px solid CanvasText; }
+}

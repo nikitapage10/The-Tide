@@ -330,7 +330,7 @@ function checkRecordContent(rec: PublishedRecord, projectId: string, path: strin
       issues.push(issue(c.severity, c.severity === "error" ? "UNSAFE_CONTENT" : "RAW_HTML", `${field}: ${c.message}`, `${path}.${field}`, rec.id));
     }
   }
-  if (rec.demo && rec.canonStatus !== "non_canon" && rec.type !== "source") {
+  if (rec.demo && rec.type !== "source" && rec.canonStatus !== "non_canon") {
     issues.push(issue("error", "INVALID_OPERATION", "Demo records must have canonStatus \"non_canon\".", `${path}.canonStatus`, rec.id));
   }
   if ("conflicts" in rec && rec.conflicts?.some((c) => c.status === "open")) {

@@ -73,6 +73,7 @@ export const SECTIONS: SectionDef[] = [
       { slug: "prints", label: "Print queue", description: "3D print jobs and attempts." },
       { slug: "builds", label: "Builds", description: "Physical creations, code and logic." },
       { slug: "publishing", label: "Publishing", description: "Import, preview, publish and roll back lore releases." },
+      { slug: "sources", label: "Sources", description: "Source references and their access metadata." },
       { slug: "settings", label: "Connection & settings", description: "Data mode and configuration status." },
     ],
   },

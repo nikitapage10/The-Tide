@@ -3,19 +3,12 @@
  * find "Nyth’rok". Runs server-side, only after authorization, over the active
  * release plus live print jobs and builds. GM notes are not indexed.
  */
+import { normalizeForSearch } from "./normalize";
 import { recordTitle } from "./publication";
 import { hrefFor } from "./queries";
 import type { BuildRecord, PrintJob, PublishedState } from "./types";
 
-export function normalizeForSearch(text: string): string {
-  return text
-    .normalize("NFKD")
-    .replace(/\p{M}+/gu, "")
-    .toLowerCase()
-    .replace(/[’'‘`ʼ´]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-}
+export { normalizeForSearch };
 
 export interface SearchHit {
   id: string;
