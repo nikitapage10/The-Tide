@@ -11,7 +11,21 @@ export function ChecklistPanel({ subjectId, items, headingId }: { subjectId: str
   const [label, setLabel] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
-  const done = items.filter((i) => i.done).length;
+  // Optimistic completion state, valid only while the item's revision is unchanged.
+  const [optimistic, setOptimistic] = useState<Record<string, { done: boolean; rev: number }>>({});
+  const isDone = (i: ChecklistItem) => (optimistic[i.id]?.rev === i.revision ? optimistic[i.id]!.done : i.done);
+  const done = items.filter(isDone).length;
+
+  async function toggle(item: ChecklistItem, next: boolean) {
+    setOptimistic((o) => ({ ...o, [item.id]: { done: next, rev: item.revision } }));
+    const ok = await m.run(`/api/v1/checklist-items/${item.id}`, "PATCH", { expectedRevision: item.revision, done: next });
+    if (!ok)
+      setOptimistic((o) => {
+        const next = { ...o };
+        delete next[item.id];
+        return next;
+      });
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -56,12 +70,12 @@ export function ChecklistPanel({ subjectId, items, headingId }: { subjectId: str
                   <input
                     id={`ck-${item.id}`}
                     type="checkbox"
-                    checked={item.done}
+                    checked={isDone(item)}
                     disabled={m.busy}
-                    onChange={(e) => m.run(`/api/v1/checklist-items/${item.id}`, "PATCH", { expectedRevision: item.revision, done: e.target.checked })}
+                    onChange={(e) => void toggle(item, e.target.checked)}
                     className="h-5 w-5 accent-[var(--accent)]"
                   />
-                  <label htmlFor={`ck-${item.id}`} className={item.done ? "flex-1 text-muted line-through" : "flex-1"}>
+                  <label htmlFor={`ck-${item.id}`} className={isDone(item) ? "flex-1 text-muted line-through" : "flex-1"}>
                     {item.label}
                   </label>
                   {item.demo ? <DemoBadge /> : null}

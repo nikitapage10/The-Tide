@@ -7,13 +7,14 @@ import "server-only";
  * dev-server restarts. Reset with the "Reset demo data" button, `npm run demo:reset`,
  * or by deleting the file.
  */
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { MemoryStore, type StoreDoc } from "./memory-store";
 import { buildSeededDoc } from "./demo-seed";
 
 export function demoStatePath(): string {
-  return path.resolve(process.env.TIDE_DEMO_STATE_FILE || path.join(process.cwd(), ".tide-demo", "state.json"));
+  return path.resolve(process.env.TIDE_DEMO_STATE_FILE || path.join(/* turbopackIgnore: true */ process.cwd(), ".tide-demo", "state.json"));
 }
 
 async function readDoc(file: string): Promise<StoreDoc | null> {
@@ -27,7 +28,7 @@ async function readDoc(file: string): Promise<StoreDoc | null> {
 
 async function writeDoc(file: string, doc: StoreDoc) {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  const tmp = `${file}.${randomUUID()}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(doc), "utf8");
   await fs.rename(tmp, file); // atomic replace on the same filesystem
 }
@@ -37,11 +38,7 @@ let storePromise: Promise<MemoryStore> | null = null;
 export function getDemoFileStore(): Promise<MemoryStore> {
   storePromise ??= (async () => {
     const file = demoStatePath();
-    let doc = await readDoc(file);
-    if (!doc) {
-      doc = await buildSeededDoc();
-      await writeDoc(file, doc);
-    }
+    const doc = (await readDoc(file)) ?? (await reseed(file));
     return new MemoryStore(doc, {
       load: async () => (await readDoc(file)) ?? (await reseed(file)),
       persist: (d) => writeDoc(file, d),
@@ -50,10 +47,20 @@ export function getDemoFileStore(): Promise<MemoryStore> {
   return storePromise;
 }
 
-async function reseed(file: string): Promise<StoreDoc> {
-  const doc = await buildSeededDoc();
-  await writeDoc(file, doc);
-  return doc;
+let reseeding: Promise<StoreDoc> | null = null;
+
+/** Single-flight: concurrent readers that find no file share one reseed. */
+function reseed(file: string): Promise<StoreDoc> {
+  reseeding ??= (async () => {
+    try {
+      const doc = await buildSeededDoc();
+      await writeDoc(file, doc);
+      return doc;
+    } finally {
+      reseeding = null;
+    }
+  })();
+  return reseeding;
 }
 
 export async function resetDemoStore(): Promise<void> {
