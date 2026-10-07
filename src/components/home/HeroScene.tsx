@@ -38,6 +38,7 @@ uniform vec2 uV;
 uniform float uE;
 uniform float uDpr;
 uniform float uS;         // smoothed scroll speed (progress per second, >= 0)
+uniform float uMenuH;     // header height (CSS px); rocks are kept off the menu at rest
 
 const vec2 SRC = vec2(2000.0, 1126.0);
 const vec2 LIMB_C = vec2(1.0122, 0.6500); // planet centre in artwork uv (fitted to the horizon)
@@ -71,10 +72,22 @@ vec3 sharpPlanet(vec2 uv) {
   return c;
 }
 
-// Black-hole-like horizon, kept very light: space just outside the planet's edge
-// is slightly lensed (the streams stretch along the horizon and shimmer slowly),
-// a thin photon ring hugs the limb (brighter on one side, slowly drifting), with
-// a fainter second ring and a soft halo beyond it.
+// Smooth value noise and a small fbm, for slow flowing motion.
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) { return 0.6 * vnoise(p) + 0.3 * vnoise(p * 2.03 + 7.1) + 0.1 * vnoise(p * 4.1 + 3.7); }
+
+const vec2 PINCH = vec2(0.20, 0.453); // where the streams cross, in artwork uv
+
+// Black-hole-like horizon plus a flowing tide, always in motion and kept light:
+// - the streams carry slow pulses of light toward the planet and gently undulate
+// - space just outside the horizon is lensed by a turbulent flow that circles the
+//   planet; a thin photon ring with travelling bright knots hugs the limb, with a
+//   fainter second ring and a soft halo.
 vec3 planetWithLimb(vec2 uv) {
   vec2 q = (uv - LIMB_C) * SRC;
   float rq = length(q);
@@ -83,17 +96,39 @@ vec3 planetWithLimb(vec2 uv) {
   vec2 nrm = q / max(rq, 1.0);
   vec2 tng = vec2(-nrm.y, nrm.x);
   float outside = smoothstep(-2.0, 8.0, dl);
-  float near = exp(-max(dl, 0.0) / 110.0) * outside;
-  float lens = 16.0 * near + sin(dl * 0.07 - uT * 0.5 + ang * 3.0) * 2.2 * near;
-  vec2 swirl = tng * sin(ang * 9.0 + uT * 0.22) * 1.6 * near;
-  vec3 col = sharpPlanet(uv + (nrm * lens + swirl) / SRC);
+  float near = exp(-max(dl, 0.0) / 120.0) * outside;
 
-  float beam = 0.55 + 0.45 * cos(ang + 2.1 + 0.25 * sin(uT * 0.15));
+  // Orbiting flow just above the horizon (angle advances with time).
+  float orbit = ang * 7.0 - uT * 0.55;
+  float turb = fbm(vec2(orbit, dl * 0.03 - uT * 0.25)) - 0.5;
+  vec2 disp = (nrm * (10.0 + 7.0 * turb) + tng * 9.0 * turb) * near;
+
+  // Streams: polar coordinates around the crossing point; strands fan out from it.
+  vec2 w = (uv - PINCH) * SRC;
+  float along = length(w);
+  float across = atan(w.y, abs(w.x));
+  // Outside the planet, and faded out right at the crossing point (polar singularity).
+  float space = (1.0 - smoothstep(0.0, 40.0, -dl)) * smoothstep(20.0, 90.0, along);
+  float wave = sin(along * 0.012 - uT * 0.9 + across * 18.0);
+  vec2 perp = normalize(vec2(-w.y, w.x) + 1e-4);
+  disp += perp * wave * 1.3 * space * outside;
+
+  vec3 col = sharpPlanet(uv + disp / SRC);
+
+  // Light travelling along the strands, toward the planet (masked to bright strands).
+  float lum = dot(col, vec3(0.3333));
+  float strand = smoothstep(0.08, 0.5, lum) * outside * smoothstep(20.0, 90.0, along);
+  float pulse = fbm(vec2(along * 0.005 - uT * 0.32, across * 26.0));
+  col *= 1.0 + strand * (0.55 * smoothstep(0.5, 0.85, pulse) - 0.12);
+
+  // Photon ring with knots of light circling the planet, a second ring, a halo.
+  float knots = 0.45 + 1.1 * smoothstep(0.45, 0.9, fbm(vec2(ang * 22.0 - uT * 1.1, uT * 0.1)));
+  float beam = 0.55 + 0.45 * cos(ang + 2.1 + 0.4 * sin(uT * 0.2));
   float ring1 = exp(-pow((dl - 3.0) / 2.6, 2.0));
-  float ring2 = exp(-pow((dl - 13.0 - 1.5 * sin(uT * 0.3 + ang * 2.0)) / 1.6, 2.0));
-  float halo = exp(-max(dl, 0.0) / 60.0) * outside;
+  float ring2 = exp(-pow((dl - 13.0 - 3.0 * turb) / 1.6, 2.0));
+  float halo = exp(-max(dl, 0.0) / 60.0) * outside * (0.8 + 0.4 * turb);
   vec3 tint = vec3(0.86, 0.91, 1.0);
-  col += tint * (ring1 * 0.2 * beam + ring2 * 0.06 * beam + halo * 0.035);
+  col += tint * (ring1 * 0.2 * beam * knots + ring2 * 0.07 * beam * knots + halo * 0.04);
   return col;
 }
 
@@ -213,7 +248,10 @@ void main() {
     col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 9.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
     gl_FragColor = vec4(col, 1.0);
   } else {
-    gl_FragColor = vec4(col, cg.a);
+    // Keep the menu strip clear at rest; once scrolling, rocks pass over it faintly.
+    float band = 1.0 - smoothstep(uMenuH - 6.0, uMenuH + 36.0, sp.y);
+    float keep = 1.0 - band * (1.0 - 0.4 * min(1.0, uP * 14.0));
+    gl_FragColor = vec4(col, cg.a) * keep;
   }
 }
 `;
@@ -307,7 +345,7 @@ export function HeroScene({
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const u = (n: string) => gl.getUniformLocation(prog, n);
-    const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS") };
+    const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH") };
     gl.uniform1i(u("uLayer"), transparent ? 1 : 0);
     gl.clearColor(0, 0, 0, 0);
 
@@ -315,6 +353,7 @@ export function HeroScene({
     // builds up / settles slowly over a couple of seconds.
     const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
     let dpr = 1;
+    const menuH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 84;
     // Scroll speed, smoothed, so streaks swell while you scroll and settle after.
     const scroll = { p: progress.current, t: 0, v: 0 };
 
@@ -354,6 +393,7 @@ export function HeroScene({
       scroll.p = progress.current;
       scroll.t = now;
       gl.uniform1f(U.s, reduced ? 0 : scroll.v);
+      gl.uniform1f(U.menu, menuH);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };

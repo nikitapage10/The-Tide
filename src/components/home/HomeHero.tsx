@@ -37,7 +37,6 @@ export function HomeHero({ callouts, code }: HeroProps) {
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
-  const overlay = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
   // One intro clock shared by both scene layers so they fade in in sequence.
   const clock = useRef(0);
@@ -51,7 +50,6 @@ export function HomeHero({ callouts, code }: HeroProps) {
     if (!t || !s) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       s.style.setProperty("--p", "1");
-      overlay.current?.style.setProperty("--p", "1");
       progress.current = 1;
       ui.current?.setAttribute("data-hidden", "false");
       return;
@@ -66,7 +64,6 @@ export function HomeHero({ callouts, code }: HeroProps) {
       const span = Math.max(1, rect.height - window.innerHeight - hold);
       const p = Math.min(1, Math.max(0, -rect.top / span));
       s.style.setProperty("--p", p.toFixed(4));
-      overlay.current?.style.setProperty("--p", p.toFixed(4));
       progress.current = p;
       // Sparse glyphs before you scroll, more present as you scroll in.
       glyphPresence.current = 0.15 + 0.85 * p;
@@ -200,7 +197,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
       {/* WebGL meteors over everything, the header and title included. A separate
           sticky layer (the stage's own stacking context sits under the header): as you
           scroll in, the near rocks rise past the text and leave the frame by the end. */}
-      <div ref={overlay} className="hero-overlay" aria-hidden="true">
+      <div className="hero-overlay" aria-hidden="true">
         <HeroScene layer="meteors" progress={progress} clock={clock} onFail={onSceneFail} className="h-full w-full" />
       </div>
     </section>

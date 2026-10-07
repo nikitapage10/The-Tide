@@ -149,16 +149,9 @@ body { overflow-x: clip; }
 main:has(> .hero-track) { padding-top: 0; }
 .hero-track { position: relative; height: 330vh; width: 100vw; margin-left: calc(50% - 50vw); }
 .hero-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #000; --p: 0; }
-/* Meteors above the header (z-40): sticks with the stage, never takes input. */
-.hero-overlay {
-  --p: 0;
-  /* At rest the menu strip stays clear; once you scroll the rocks pass over it,
-     but only faintly (at most 40%) so the menu always stays readable. */
-  --menu-clear: calc(1 - 0.4 * min(1, var(--p) * 14));
-  position: sticky; top: 0; height: 100svh; margin-top: -100svh; z-index: 50; pointer-events: none; overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, rgb(0 0 0 / calc(1 - var(--menu-clear))) calc(var(--header-h) - 6px), #000 calc(var(--header-h) + 36px));
-  mask-image: linear-gradient(to bottom, rgb(0 0 0 / calc(1 - var(--menu-clear))) calc(var(--header-h) - 6px), #000 calc(var(--header-h) + 36px));
-}
+/* Meteors above the header (z-40): sticks with the stage, never takes input.
+   The shader itself keeps the menu strip clear (no CSS mask: it flickered). */
+.hero-overlay { position: sticky; top: 0; height: 100svh; margin-top: -100svh; z-index: 50; pointer-events: none; overflow: hidden; }
 .hero-stage[data-gl="off"] ~ .hero-overlay { display: none; }
 /* A box with the artwork's aspect ratio that always covers the stage, so callouts stay pinned to the art. */
 /* Must match frameGeometry() in HeroScene.tsx. Shifted right; wide enough to still cover the left edge. */
