@@ -317,3 +317,7 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .decode-letter.decode-on { opacity: 1; }
 .decode-glyph { position: absolute; left: 50%; top: 50%; translate: -50% -50%; opacity: 0.9; transition: opacity 0.22s ease, filter 0.22s ease; }
 .decode-glyph.decode-off { opacity: 0; filter: blur(1px); }
+/* Glyph pairs fit their letter's slot: narrow in plain text and headings,
+   wider in tracked (letter-spaced) labels. */
+.decode-cell { --glyph-w: 0.7em; --glyph-h: 1.05em; }
+.tracked .decode-cell, .eyebrow .decode-cell { --glyph-w: 1.15em; --glyph-h: 1.3em; }
