@@ -66,6 +66,6 @@ export function configSummary(env: NodeJS.ProcessEnv = process.env) {
     projectIdSet: Boolean(env.TIDE_PROJECT_ID),
     serviceKeySet: Boolean(env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY),
     machinePublisherConfigured: Boolean(env.TIDE_PUBLISHER_TOKEN_SHA256),
-    storageBucket: env.TIDE_ASSET_BUCKET || "tide-private",
+    storageBucket: "tide-private",
   };
 }

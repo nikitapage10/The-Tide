@@ -130,6 +130,7 @@ test("publishing: preview without change, explicit publish, rollback keeps live 
   await page.getByRole("button", { name: "Publish release" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Confirm publish" }).click();
   await expect(page.getByText("Release published")).toBeVisible();
+  await axe(page);
   await expect(page.getByLabel("Release history").getByText("Version 2", { exact: true })).toBeVisible();
 
   await page.goto(`/people/entry/${ID.d_faction}`);

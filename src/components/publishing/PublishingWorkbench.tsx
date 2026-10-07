@@ -165,6 +165,8 @@ export function PublishingWorkbench({ exampleBundle }: { exampleBundle: string |
             accept="application/json,.json"
             className="sr-only"
             id="bundle-file"
+            aria-label="Choose a bundle .json file"
+            tabIndex={-1}
             onChange={async (e) => {
               const f = e.target.files?.[0];
               if (f) setText(await f.text());
