@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SECTIONS } from "@/lib/domain/sections";
+import { EditAccessProvider } from "./EditAccess";
 import { NavLinks, SubNav, TopNav, type NavItem } from "./NavLinks";
 
 const NAV: NavItem[] = [
@@ -42,9 +43,9 @@ function SearchForm({ id }: { id: string }) {
   );
 }
 
-export function AppShell({ mode, actorLabel, children }: { mode: "demo" | "supabase"; actorLabel: string; children: React.ReactNode }) {
+export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo" | "supabase"; actorLabel: string; canEdit: boolean; children: React.ReactNode }) {
   return (
-    <>
+    <EditAccessProvider canEdit={canEdit}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:bg-white focus:px-3 focus:py-2 focus:text-black">
         Skip to content
       </a>
@@ -59,7 +60,12 @@ export function AppShell({ mode, actorLabel, children }: { mode: "demo" | "supab
             <TopNav items={NAV.slice(1)} />
           </nav>
           <Link href="/search" aria-label="Search the archive" title="Search" className="ml-auto hidden h-4 w-4 rounded-full border border-white/70 hover:border-white lg:block" />
-          {mode === "supabase" ? (
+          {mode === "supabase" && !canEdit ? (
+            <Link href="/login" className="tracked hidden px-2 py-1 text-[0.65rem] text-muted no-underline hover:text-white lg:block">
+              Sign in
+            </Link>
+          ) : null}
+          {mode === "supabase" && canEdit ? (
             <form action="/auth/signout" method="post" className="hidden lg:block">
               <button type="submit" className="tracked px-2 py-1 text-[0.65rem] text-muted hover:text-white" title={`Signed in as ${actorLabel}`}>
                 Sign out
@@ -74,7 +80,8 @@ export function AppShell({ mode, actorLabel, children }: { mode: "demo" | "supab
               <nav aria-label="Primary (mobile)">
                 <NavLinks items={NAV} />
               </nav>
-              {mode === "supabase" ? (
+              {mode === "supabase" && !canEdit ? <Link href="/login" className="tracked text-[0.68rem]">Sign in</Link> : null}
+              {mode === "supabase" && canEdit ? (
                 <form action="/auth/signout" method="post">
                   <button type="submit" className="tracked text-[0.68rem] text-muted underline">
                     Sign out
@@ -92,9 +99,9 @@ export function AppShell({ mode, actorLabel, children }: { mode: "demo" | "supab
         </main>
         <footer className="tracked mx-4 flex flex-wrap justify-between gap-2 border-t border-white/10 py-6 text-[0.62rem] text-faint sm:mx-10">
           <span>Authored lore lives in Space Pages. This dashboard shows published releases only.</span>
-          <span>{mode === "demo" ? "Local demo · not production data" : `Signed in · ${actorLabel}`}</span>
+          <span>{mode === "demo" ? "Local demo · not production data" : canEdit ? `Signed in · ${actorLabel}` : "Public view · read-only"}</span>
         </footer>
       </div>
-    </>
+    </EditAccessProvider>
   );
 }

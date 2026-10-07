@@ -11,7 +11,7 @@ export const GET = route(async (_req, { params }: { params: Promise<{ mediaId: s
   const state = await ctx.publicationStore.getActiveState();
   const rs = state.records[(await params).mediaId];
   if (!rs || rs.record?.type !== "media" || !rs.record.asset) throw new DomainError("NOT_FOUND", "No private asset for this item.");
-  if (!ctx.signAsset) throw new DomainError("SETUP_REQUIRED", "Private storage is not available in demo mode.");
+  if (!ctx.signAsset) throw new DomainError(ctx.mode === "demo" ? "SETUP_REQUIRED" : "UNAUTHENTICATED", ctx.mode === "demo" ? "Private storage is not available in demo mode." : "Sign in as the GM to open private assets.");
   const url = await ctx.signAsset(rs.record.asset.bucket, rs.record.asset.path);
   if (!url) throw new DomainError("NOT_FOUND", "Asset is unavailable or you are not authorized.");
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });

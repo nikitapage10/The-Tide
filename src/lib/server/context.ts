@@ -23,6 +23,8 @@ export interface AppContext {
   operations: OperationsService;
   /** Issues a short-lived signed URL for a private asset after authorization; null when storage is unavailable. */
   signAsset: ((bucket: string, path: string) => Promise<string | null>) | null;
+  /** False for public (read-only) visitors of a project with public viewing enabled. */
+  canEdit: boolean;
 }
 
 export type ContextResult =
@@ -37,8 +39,10 @@ export function wireContext(
   actor: Actor,
   store: PublicationStore & OperationalStore,
   signAsset: AppContext["signAsset"] = null,
+  canEdit = true,
 ): AppContext {
   return {
+    canEdit,
     signAsset,
     mode,
     projectId,
@@ -61,17 +65,27 @@ export const getAppContext = cache(async (): Promise<ContextResult> => {
 
   const { createUserClient } = await import("./supabase");
   const { SupabaseStore } = await import("@/lib/data/supabase-store");
+  const { readOnlyStore } = await import("@/lib/data/read-only-store");
   const db = await createUserClient(info.supabaseUrl, info.supabaseKey);
   // getUser() verifies the JWT with Supabase Auth (getSession() alone is not trusted).
   const { data, error } = await db.auth.getUser();
-  if (error || !data.user) return { status: "unauthenticated" };
+  // Public viewing: when the project allows it, visitors without GM access get a read-only view.
+  const publicView = async (label: string): Promise<ContextResult | null> => {
+    const { data: project } = await db.from("projects").select("id").eq("id", info.projectId).maybeSingle();
+    if (!project) return null;
+    const viewer: Actor = { kind: "user", id: "public", label };
+    return { status: "ok", ctx: wireContext("supabase", info.projectId, viewer, readOnlyStore(new SupabaseStore(db, info.projectId)), null, false) };
+  };
+  if (error || !data.user) return (await publicView("Visitor (read-only)")) ?? { status: "unauthenticated" };
   const { data: member } = await db
     .from("project_members")
     .select("role")
     .eq("project_id", info.projectId)
     .eq("user_id", data.user.id)
     .maybeSingle();
-  if (member?.role !== "gm") return { status: "forbidden", email: data.user.email ?? null };
+  if (member?.role !== "gm") {
+    return (await publicView(`${data.user.email ?? "Signed in"} (read-only)`)) ?? { status: "forbidden", email: data.user.email ?? null };
+  }
   const actor: Actor = { kind: "user", id: data.user.id, label: data.user.email ?? "GM" };
   const signAsset = async (bucket: string, path: string) => {
     // Storage RLS re-checks GM membership; URLs expire after 60 s and are never stored.

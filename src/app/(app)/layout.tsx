@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requirePageContext();
   return (
-    <AppShell mode={ctx.mode} actorLabel={ctx.actor.label}>
+    <AppShell mode={ctx.mode} actorLabel={ctx.actor.label} canEdit={ctx.canEdit}>
       {children}
     </AppShell>
   );

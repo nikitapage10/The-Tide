@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Notice } from "@/components/ui/States";
+import { useCanEdit } from "@/components/shell/EditAccess";
 
 const CHANGE_TONE = { added: "ok", changed: "info", unchanged: "neutral", archived: "warn", restored: "accent", tombstoned: "danger" } as const;
 
@@ -100,6 +101,10 @@ export function PreviewView({ preview }: { preview: Preview }) {
 }
 
 export function PublishingWorkbench({ exampleBundle }: { exampleBundle: string | null }) {
+  return useCanEdit() ? <Workbench exampleBundle={exampleBundle} /> : <Notice title="Read-only">Sign in as the GM to import and publish releases.</Notice>;
+}
+
+function Workbench({ exampleBundle }: { exampleBundle: string | null }) {
   const router = useRouter();
   const textId = useId();
   const fileRef = useRef<HTMLInputElement>(null);

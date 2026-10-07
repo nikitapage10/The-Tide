@@ -55,9 +55,9 @@ grant execute on function tests.release(uuid, uuid, text, text) to authenticated
 set role anon;
 select tests.claims('', 'anon');
 do $$ begin
-  perform 1 from public.projects;
-  raise notice 'not ok - anon can read projects';
-exception when insufficient_privilege then raise notice 'ok - anon cannot read projects';
+  if (select count(*) from public.projects) = 0 then raise notice 'ok - anon sees no private projects';
+  else raise notice 'not ok - anon can read private projects'; end if;
+exception when insufficient_privilege then raise notice 'ok - anon sees no private projects';
 end $$;
 do $$ begin
   perform public.tide_commit_release('aaaaaaaa-0000-4000-8000-000000000001', '{}'::jsonb, '[]'::jsonb);
@@ -308,3 +308,63 @@ do $$ begin
   raise notice 'not ok - identity deleted';
 exception when insufficient_privilege or foreign_key_violation then raise notice 'ok - stable identities cannot be deleted';
 end $$;
+
+-- ---------------------------------------------------------------- public read-only viewing
+update public.projects set public_read = true where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+set role anon;
+select tests.claims('', 'anon');
+do $$ begin
+  if (select count(*) from public.release_records) > 0 and (select count(*) from public.print_jobs) = 1
+     and (select count(*) from public.projects) = 1
+  then raise notice 'ok - anon can read a public project''s lore and live status';
+  else raise notice 'not ok - public read'; end if;
+end $$;
+do $$ begin
+  perform 1 from public.gm_notes;
+  raise notice 'not ok - anon can read gm notes';
+exception when insufficient_privilege then raise notice 'ok - GM notes stay private on a public project';
+end $$;
+do $$ begin
+  perform 1 from public.publication_events;
+  raise notice 'not ok - anon can read the publication audit';
+exception when insufficient_privilege then raise notice 'ok - publication audit stays private on a public project';
+end $$;
+do $$ begin
+  insert into public.checklist_items (id, project_id, subject_id, label) values (gen_random_uuid(), 'aaaaaaaa-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000002', 'vandal');
+  raise notice 'not ok - anon wrote to a public project';
+exception when insufficient_privilege then raise notice 'ok - public projects are read-only for anon';
+end $$;
+do $$ begin
+  if (select count(*) from public.release_records where project_id = 'bbbbbbbb-0000-4000-8000-000000000001') = 0
+  then raise notice 'ok - private projects stay hidden from anon';
+  else raise notice 'not ok - private project visible'; end if;
+end $$;
+reset role;
+set role authenticated;
+select tests.claims('00000000-0000-4000-8000-0000000000c1', 'authenticated', 'outsider@example.test');
+do $$
+declare n int;
+begin
+  update public.print_jobs set notes = 'x', revision = revision + 1;
+  get diagnostics n = row_count;
+  if n = 0 and (select count(*) from public.print_jobs) = 1 then raise notice 'ok - signed-in non-members can read a public project but not change it';
+  else raise notice 'not ok - non-member changed % rows', n; end if;
+end $$;
+reset role;
+
+-- ---------------------------------------------------------------- GM invites
+insert into public.project_invites (project_id, email) values ('aaaaaaaa-0000-4000-8000-000000000001', 'new-gm@example.test');
+insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000d1', 'New-GM@example.test');
+do $$ begin
+  if exists (select 1 from public.project_members where user_id = '00000000-0000-4000-8000-0000000000d1' and role = 'gm')
+  then raise notice 'ok - an invited email becomes GM on first sign-in';
+  else raise notice 'not ok - invite not applied'; end if;
+end $$;
+set role authenticated;
+select tests.claims('00000000-0000-4000-8000-0000000000c1', 'authenticated', 'outsider@example.test');
+do $$ begin
+  insert into public.project_invites (project_id, email) values ('aaaaaaaa-0000-4000-8000-000000000001', 'outsider@example.test');
+  raise notice 'not ok - user invited themselves';
+exception when insufficient_privilege then raise notice 'ok - users cannot invite themselves';
+end $$;
+reset role;

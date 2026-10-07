@@ -7,11 +7,16 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Field, Input, Select, Textarea, describedBy } from "@/components/ui/Field";
 import { ErrorLine } from "./ErrorLine";
 import { LinkPicker, type LinkOption } from "./LinkPicker";
+import { useCanEdit } from "@/components/shell/EditAccess";
 import { useMutation } from "./useMutation";
 
 const numOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
 
-export function PrintJobDialog({ job, linkOptions, triggerLabel }: { job?: PrintJob; linkOptions: LinkOption[]; triggerLabel: string }) {
+export function PrintJobDialog(props: { job?: PrintJob; linkOptions: LinkOption[]; triggerLabel: string }) {
+  return useCanEdit() ? <PrintJobDialogInner {...props} /> : null;
+}
+
+function PrintJobDialogInner({ job, linkOptions, triggerLabel }: { job?: PrintJob; linkOptions: LinkOption[]; triggerLabel: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const m = useMutation();
@@ -170,6 +175,10 @@ export function PrintJobDialog({ job, linkOptions, triggerLabel }: { job?: Print
 }
 
 export function PrintAttemptForm({ job }: { job: PrintJob }) {
+  return useCanEdit() ? <PrintAttemptFormInner job={job} /> : <p className="text-sm text-faint">Sign in as the GM to record pieces.</p>;
+}
+
+function PrintAttemptFormInner({ job }: { job: PrintJob }) {
   const m = useMutation();
   const [outcome, setOutcome] = useState<"succeeded" | "failed">("succeeded");
   const [quantity, setQuantity] = useState("1");

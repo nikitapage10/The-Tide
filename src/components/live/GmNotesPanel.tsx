@@ -4,11 +4,14 @@ import type { GmNote } from "@/lib/domain/types";
 import { DemoBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ErrorLine } from "./ErrorLine";
+import { useCanEdit } from "@/components/shell/EditAccess";
 import { useMutation } from "./useMutation";
 
 export function GmNotesPanel({ subjectId, notes }: { subjectId: string; notes: GmNote[] }) {
   const m = useMutation();
+  const canEdit = useCanEdit();
   const [body, setBody] = useState("");
+  if (!canEdit) return <p className="text-sm text-faint">GM notes are private.</p>;
   return (
     <div className="space-y-3">
       <p className="text-xs text-faint">Private working notes. Append-only in this version. They never become published canon.</p>

@@ -7,9 +7,14 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Field, Input, Select, Textarea, describedBy } from "@/components/ui/Field";
 import { ErrorLine } from "./ErrorLine";
 import { LinkPicker, type LinkOption } from "./LinkPicker";
+import { useCanEdit } from "@/components/shell/EditAccess";
 import { useMutation } from "./useMutation";
 
-export function BuildDialog({ build, linkOptions, triggerLabel }: { build?: BuildRecord; linkOptions: LinkOption[]; triggerLabel: string }) {
+export function BuildDialog(props: { build?: BuildRecord; linkOptions: LinkOption[]; triggerLabel: string }) {
+  return useCanEdit() ? <BuildDialogInner {...props} /> : null;
+}
+
+function BuildDialogInner({ build, linkOptions, triggerLabel }: { build?: BuildRecord; linkOptions: LinkOption[]; triggerLabel: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const m = useMutation();
@@ -98,6 +103,10 @@ export function BuildDialog({ build, linkOptions, triggerLabel }: { build?: Buil
 }
 
 export function BuildVersionForm({ build }: { build: BuildRecord }) {
+  return useCanEdit() ? <BuildVersionFormInner build={build} /> : null;
+}
+
+function BuildVersionFormInner({ build }: { build: BuildRecord }) {
   const m = useMutation();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");

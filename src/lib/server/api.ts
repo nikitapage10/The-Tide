@@ -10,6 +10,7 @@ export async function gmMutation(req: Request, maxBytes = MAX_LIVE_BODY): Promis
   if (hasBearer(req)) throw new DomainError("FORBIDDEN", "Bearer credentials are only accepted by the publication endpoints.");
   assertSameOrigin(req);
   const ctx = await requireApiContext();
+  if (!ctx.canEdit) throw new DomainError("UNAUTHENTICATED", "Sign in as the GM to make changes.");
   const { value } = await readJson(req, maxBytes);
   return { ctx, body: value };
 }
@@ -19,6 +20,7 @@ export async function publisherRequest(req: Request): Promise<{ ctx: AppContext;
   const ctx = hasBearer(req)
     ? await requireMachinePublisherContext(req)
     : (assertSameOrigin(req), await requireApiContext());
+  if (!ctx.canEdit) throw new DomainError("UNAUTHENTICATED", "Sign in as the GM to validate or publish.");
   const { text } = await readJson(req, LIMITS.maxBundleBytes);
   return { ctx, text };
 }

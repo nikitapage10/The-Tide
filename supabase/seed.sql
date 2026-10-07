@@ -2,8 +2,9 @@
 -- (Supabase SQL editor, or `supabase db reset` locally, which runs seed.sql).
 -- The UUID matches fixtures/ids.json so the seed publication bundle can be
 -- imported unchanged. Set TIDE_PROJECT_ID to this value.
-insert into public.projects (id, name)
-values ('333ea628-f6a1-4f3a-8b83-ce98d12f2565', 'The Tide')
+-- public_read: anyone may view (read-only). Set to false to make the project private again.
+insert into public.projects (id, name, public_read)
+values ('333ea628-f6a1-4f3a-8b83-ce98d12f2565', 'The Tide', true)
 on conflict (id) do nothing;
 
 -- Then grant yourself GM access AFTER signing in once (so auth.users has your row):

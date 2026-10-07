@@ -5,8 +5,13 @@ import { api, messageFor, type ApiError } from "@/lib/client/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Notice } from "@/components/ui/States";
+import { useCanEdit } from "@/components/shell/EditAccess";
 
-export function RollbackButton({ targetReleaseId, targetVersion, activeReleaseId }: { targetReleaseId: string; targetVersion: number; activeReleaseId: string | null }) {
+export function RollbackButton(props: { targetReleaseId: string; targetVersion: number; activeReleaseId: string | null }) {
+  return useCanEdit() ? <RollbackInner {...props} /> : null;
+}
+
+function RollbackInner({ targetReleaseId, targetVersion, activeReleaseId }: { targetReleaseId: string; targetVersion: number; activeReleaseId: string | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   // One release ID per dialog opening, so a retried click is idempotent.

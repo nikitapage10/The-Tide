@@ -4,14 +4,29 @@ import { SESSION_STATUSES, type SessionState } from "@/lib/domain/types";
 import { Button } from "@/components/ui/Button";
 import { Field, Select, Input } from "@/components/ui/Field";
 import { ErrorLine } from "./ErrorLine";
+import { useCanEdit } from "@/components/shell/EditAccess";
 import { useMutation } from "./useMutation";
 
 export function SessionStatePanel({ sessionId, state }: { sessionId: string; state: SessionState | null }) {
   const m = useMutation();
+  const canEdit = useCanEdit();
   const [status, setStatus] = useState(state?.status ?? "planned");
   const [scheduledFor, setScheduledFor] = useState(state?.scheduledFor ?? "");
   const [actualRunDate, setActualRunDate] = useState(state?.actualRunDate ?? "");
   const [saved, setSaved] = useState(false);
+
+  if (!canEdit) {
+    return (
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt className="text-muted">Status</dt>
+        <dd>{(state?.status ?? "planned").replace("_", " ")}</dd>
+        <dt className="text-muted">Scheduled for</dt>
+        <dd>{state?.scheduledFor ?? "Not scheduled"}</dd>
+        <dt className="text-muted">Actual run date</dt>
+        <dd>{state?.actualRunDate ?? "Not recorded"}</dd>
+      </dl>
+    );
+  }
 
   return (
     <form

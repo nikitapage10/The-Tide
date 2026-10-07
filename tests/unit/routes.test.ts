@@ -128,10 +128,28 @@ describe("demo mode API", () => {
 });
 
 describe("supabase mode authentication and authorization (stubbed Supabase client)", () => {
-  function stubClient(user: { id: string; email: string } | null, role: string | null) {
+  function stubClient(user: { id: string; email: string } | null, role: string | null, publicRead = false) {
+    const rows: Record<string, unknown> = {
+      project_members: role ? { role } : null,
+      projects: publicRead ? { id: "11111111-2222-4333-8444-555555555555", name: "P", active_release_id: null, release_count: 0 } : null,
+    };
+    const query = (table: string) => {
+      const q: Record<string, unknown> = {};
+      const chain = () => q;
+      Object.assign(q, {
+        select: chain,
+        eq: chain,
+        order: chain,
+        limit: chain,
+        range: chain,
+        maybeSingle: async () => ({ data: rows[table] ?? null, error: null }),
+        then: (resolve: (v: unknown) => void) => resolve({ data: [], error: null }),
+      });
+      return q;
+    };
     return {
       auth: { getUser: async () => ({ data: { user }, error: user ? null : { message: "no session" } }) },
-      from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: role ? { role } : null, error: null }) }) }) }) }),
+      from: query,
     };
   }
   beforeEach(() => {
@@ -155,6 +173,19 @@ describe("supabase mode authentication and authorization (stubbed Supabase clien
     expect(releases.status).toBe(403);
     const body = await releases.json();
     expect(JSON.stringify(body)).not.toContain("releases\":[");
+  });
+
+  it("public project: visitors can read but every change and publish is refused", async () => {
+    vi.doMock("@/lib/server/supabase", () => ({ createUserClient: async () => stubClient(null, null, true), createServiceClient: () => null }));
+    const releases = await (await import("@/app/api/v1/publications/releases/route")).GET(req("/api/v1/publications/releases", "GET"));
+    expect(releases.status).toBe(200);
+    expect((await releases.json()).events).toEqual([]);
+    const publish = await (await import("@/app/api/v1/publications/publish/route")).POST(req("/api/v1/publications/publish", "POST", "{}"));
+    expect(publish.status).toBe(401);
+    const note = await (await import("@/app/api/v1/gm-notes/route")).POST(req("/api/v1/gm-notes", "POST", { subjectId: ID.ss_1, body: "x" }));
+    expect(note.status).toBe(401);
+    const asset = await (await import("@/app/api/v1/assets/[mediaId]/route")).GET(req(`/api/v1/assets/${ID.m_private}`, "GET"), params({ mediaId: ID.m_private }));
+    expect([401, 404]).toContain(asset.status);
   });
 
   it("machine publishing needs the server secret key even with a valid token", async () => {

@@ -1,5 +1,7 @@
 # Security model
 
+> **Current setting: public, read-only viewing is ON** for The Tide (requested by the GM). Anyone can view published lore and live status without signing in; GM notes, the publication audit and private assets stay private; every change, publish and rollback still requires the GM account. Turn it off with `update public.projects set public_read = false where id = '333ea628-f6a1-4f3a-8b83-ce98d12f2565';` (migration `20261007000003_tide_public_read.sql`). GM access is granted through `project_invites` (migration `…000004`): an invited email becomes GM on its first sign-in.
+
 The MVP is private and GM-first. Hiding a button is never treated as access control.
 
 ## Access control

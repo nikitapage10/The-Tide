@@ -4,10 +4,12 @@ import type { ChecklistItem } from "@/lib/domain/types";
 import { DemoBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ErrorLine } from "./ErrorLine";
+import { useCanEdit } from "@/components/shell/EditAccess";
 import { useMutation } from "./useMutation";
 
 export function ChecklistPanel({ subjectId, items, headingId }: { subjectId: string; items: ChecklistItem[]; headingId: string }) {
   const m = useMutation();
+  const canEdit = useCanEdit();
   const [label, setLabel] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -71,7 +73,7 @@ export function ChecklistPanel({ subjectId, items, headingId }: { subjectId: str
                     id={`ck-${item.id}`}
                     type="checkbox"
                     checked={isDone(item)}
-                    disabled={m.busy}
+                    disabled={m.busy || !canEdit}
                     onChange={(e) => void toggle(item, e.target.checked)}
                     className="h-5 w-5 accent-[var(--accent)]"
                   />
@@ -79,6 +81,8 @@ export function ChecklistPanel({ subjectId, items, headingId }: { subjectId: str
                     {item.label}
                   </label>
                   {item.demo ? <DemoBadge /> : null}
+                  {canEdit ? (
+                  <>
                   <Button
                     variant="ghost"
                     className="min-h-8 px-2 py-1"
@@ -100,12 +104,15 @@ export function ChecklistPanel({ subjectId, items, headingId }: { subjectId: str
                   >
                     Remove
                   </Button>
+                  </>
+                  ) : null}
                 </>
               )}
             </li>
           ))}
         </ul>
       ) : null}
+      {canEdit ? (
       <form onSubmit={add} className="flex flex-wrap gap-2">
         <label htmlFor={`new-${subjectId}`} className="sr-only">
           New prep item
@@ -122,6 +129,7 @@ export function ChecklistPanel({ subjectId, items, headingId }: { subjectId: str
           Add
         </Button>
       </form>
+      ) : null}
       <ErrorLine message={m.errorMessage} conflict={m.error?.code === "REVISION_CONFLICT"} onReload={m.reload} />
     </div>
   );

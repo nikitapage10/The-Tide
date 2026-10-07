@@ -7,9 +7,9 @@
 #   SUPABASE_DB_URL  Supabase dashboard → Connect → "Session pooler" connection
 #                    string, with your database password filled in. (GitHub runners
 #                    have no IPv6, so use the pooler string, not "Direct connection".)
-# Optional secret:
-#   TIDE_GM_EMAIL    Your sign-in email. After you have signed in once, the job adds
-#                    you as GM of the project (safe to keep; it does nothing if done).
+# Optional: the GM email, via the "gm_email" input when run by hand, or the
+#   TIDE_GM_EMAIL secret. It is stored as an invite; that person becomes GM on
+#   first sign-in (or immediately if they already have an account).
 name: Supabase migrations
 
 on:
@@ -18,6 +18,11 @@ on:
       - "supabase/**"
       - ".github/workflows/supabase-migrations.yml"
   workflow_dispatch:
+    inputs:
+      gm_email:
+        description: "Email to make GM (applied now if that user exists, otherwise on their first sign-in)"
+        required: false
+        type: string
 
 concurrency:
   group: supabase-migrations
@@ -34,7 +39,7 @@ jobs:
     timeout-minutes: 15
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      TIDE_GM_EMAIL: ${{ secrets.TIDE_GM_EMAIL }}
+      TIDE_GM_EMAIL: ${{ inputs.gm_email || secrets.TIDE_GM_EMAIL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -64,20 +69,20 @@ jobs:
         if: steps.config.outputs.ready == 'true'
         run: supabase db push --db-url "$SUPABASE_DB_URL" --include-seed --yes
 
-      - name: Grant GM access (optional)
+      - name: Invite GM (optional)
         if: steps.config.outputs.ready == 'true' && env.TIDE_GM_EMAIL != ''
         run: |
           sudo apt-get install -y -qq postgresql-client >/dev/null
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v email="$TIDE_GM_EMAIL" -q <<'SQL'
-          with granted as (
-            insert into public.project_members (project_id, user_id, role)
-            select '333ea628-f6a1-4f3a-8b83-ce98d12f2565', u.id, 'gm'
-            from auth.users u where lower(u.email) = lower(:'email')
-            on conflict (project_id, user_id) do nothing
-            returning 1
-          )
+          insert into public.project_invites (project_id, email)
+          values ('333ea628-f6a1-4f3a-8b83-ce98d12f2565', lower(trim(:'email')))
+          on conflict do nothing;
+          insert into public.project_members (project_id, user_id, role)
+          select '333ea628-f6a1-4f3a-8b83-ce98d12f2565', u.id, 'gm'
+          from auth.users u where lower(u.email) = lower(trim(:'email'))
+          on conflict (project_id, user_id) do nothing;
           select case
-            when exists (select 1 from auth.users where lower(email) = lower(:'email')) then 'GM access is in place.'
-            else 'No user with that email yet: sign in to the site once, then re-run this workflow.'
+            when exists (select 1 from auth.users where lower(email) = lower(trim(:'email'))) then 'GM access is in place.'
+            else 'Invite stored: this email becomes GM on its first sign-in.'
           end as result;
           SQL
