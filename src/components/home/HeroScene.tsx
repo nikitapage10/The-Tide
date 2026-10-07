@@ -82,6 +82,9 @@ float vnoise(vec2 p) {
 }
 float fbm(vec2 p) { return 0.6 * vnoise(p) + 0.3 * vnoise(p * 2.03 + 7.1) + 0.1 * vnoise(p * 4.1 + 3.7); }
 
+// Screen position of the pixel being shaded (set in scene(); used by the clouds).
+vec2 gSp;
+
 const vec2 PINCH = vec2(0.20, 0.453); // where the streams cross, in artwork uv
 
 // Black-hole-like horizon plus a flowing tide, always in motion and kept light.
@@ -155,16 +158,28 @@ vec3 planetWithLimb(vec2 uv) {
   vec3 tint = vec3(0.86, 0.91, 1.0);
   col += tint * (ring1 * 0.2 * beam * knots + ring2 * 0.07 * beam * knots + halo * 0.04);
 
-  // Atmosphere: a faint veil of cloud drifting over the planet, projected onto the
-  // sphere (foreshortened toward the limb) and thickening toward the edge.
+  // Atmosphere: a faint veil of haze plus white swirling cloud bands, projected
+  // onto the sphere (foreshortened toward the limb). The pointer parts the
+  // clouds a little (pushes them aside and thins them); as the lens energy
+  // settles they drift back together.
   float inside = 1.0 - smoothstep(-6.0, 0.0, dl);
   vec2 sph = q / LIMB_R;
   float z = sqrt(max(0.0, 1.0 - dot(sph, sph)));
   vec2 cuv = sph / (0.35 + z) * 3.2;
-  float cloud = fbm(cuv + vec2(uT * 0.012, uT * 0.004));
-  cloud = smoothstep(0.42, 0.8, cloud * 0.75 + fbm(cuv * 2.3 - vec2(uT * 0.02, 0.0)) * 0.35);
+  vec2 toM = gSp - uM;
+  float part = uE * exp(-dot(toM, toM) / (120.0 * 120.0));
+  cuv += normalize(toM + 1e-4) * part * 0.35;
+  float haze = fbm(cuv + vec2(uT * 0.012, uT * 0.004));
+  haze = smoothstep(0.42, 0.8, haze * 0.75 + fbm(cuv * 2.3 - vec2(uT * 0.02, 0.0)) * 0.35);
+  // Domain-warped noise: slowly turning, marbled swirls.
+  vec2 p0 = cuv * 1.1;
+  vec2 wq = vec2(fbm(p0 + vec2(0.0, uT * 0.015)), fbm(p0 + vec2(5.2, 1.3 - uT * 0.012)));
+  vec2 wr = vec2(fbm(p0 + 3.5 * wq + vec2(1.7, 9.2) + uT * 0.02), fbm(p0 + 3.5 * wq + vec2(8.3, 2.8) - uT * 0.017));
+  float swirl = smoothstep(0.52, 0.86, fbm(p0 + 3.0 * wr));
+  float thin = 1.0 - 0.75 * clamp(part, 0.0, 1.0);
   float rimMist = pow(1.0 - z, 3.0);
-  col += vec3(0.82, 0.88, 0.95) * inside * (cloud * (0.07 + 0.08 * rimMist) + rimMist * 0.06);
+  col += vec3(0.82, 0.88, 0.95) * inside * (haze * (0.07 + 0.08 * rimMist) * thin + rimMist * 0.06);
+  col += vec3(0.95, 0.97, 1.0) * inside * swirl * (0.13 + 0.06 * rimMist) * thin * smoothstep(0.0, 0.25, z);
   return col;
 }
 
@@ -225,6 +240,7 @@ vec4 flyby(sampler2D s, vec2 uv, vec2 origin, float streak, float bright, float 
 }
 
 vec4 scene(vec2 sp) {
+  gSp = sp;
   vec2 f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;
   vec2 px = 1.0 / uFrameS;
   if (uLayer == 0) {
