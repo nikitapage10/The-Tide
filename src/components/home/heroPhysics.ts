@@ -3,7 +3,6 @@
  *
  * - RockBodies: every rock is its own body in space (momentum, spin, a slow
  *   drift home); the pointer is a soft repulsor.
- * - CloudParticles: the cloud deck as particles you can fly through.
  * - FlowSim: a 64×64 "stable fluids" grid over the planet's disc. The pointer
  *   stirs the air (and planted storms set it turning); the GPU cloud
  *   simulation is carried by this air, and a "cleared" channel thins the haze
@@ -195,90 +194,6 @@ export class RockBodies {
   }
 }
 
-/**
- * Clouds as particles: a grid of small pieces of the cloud deck. Undisturbed,
- * they tile the deck exactly; the pointer moves through them like a breeze,
- * nudging pieces a little along its path (each slightly differently) so the
- * cloud softens and shifts, then settles back.
- */
-export class CloudParticles {
-  readonly g = 96;
-  readonly count: number;
-  /** Per particle: home x, y and current offset x, y (disc units). */
-  readonly attrs: Float32Array;
-  private vx: Float32Array;
-  private vy: Float32Array;
-  private rnd: Float32Array;
-  awake = false;
-
-  constructor() {
-    const homes: number[] = [];
-    for (let j = 0; j < this.g; j++)
-      for (let i = 0; i < this.g; i++) {
-        const x = ((i + 0.5) / this.g) * 2 - 1;
-        const y = ((j + 0.5) / this.g) * 2 - 1;
-        if (x * x + y * y < 1.08) homes.push(x, y);
-      }
-    this.count = homes.length / 2;
-    this.attrs = new Float32Array(this.count * 4);
-    for (let k = 0; k < this.count; k++) {
-      this.attrs[k * 4] = homes[k * 2]!;
-      this.attrs[k * 4 + 1] = homes[k * 2 + 1]!;
-    }
-    this.vx = new Float32Array(this.count);
-    this.vy = new Float32Array(this.count);
-    this.rnd = Float32Array.from({ length: this.count }, () => Math.random());
-  }
-
-  /** Pointer and its motion this frame, in disc units. */
-  step(mx: number, my: number, mvx: number, mvy: number, enabled: boolean, dt: number) {
-    mvx = clamp(mvx, -0.02, 0.02);
-    mvy = clamp(mvy, -0.02, 0.02);
-    const speed = Math.hypot(mvx, mvy);
-    const stirring = enabled && speed > 0.0003;
-    if (!this.awake && !stirring) return;
-    const R = 0.075;
-    let live = 0;
-    for (let k = 0; k < this.count; k++) {
-      const o = k * 4;
-      const px = this.attrs[o]! + this.attrs[o + 2]!;
-      const py = this.attrs[o + 1]! + this.attrs[o + 3]!;
-      let vx = this.vx[k]!;
-      let vy = this.vy[k]!;
-      if (stirring) {
-        const rx = px - mx;
-        const ry = py - my;
-        const d2 = rx * rx + ry * ry;
-        if (d2 < R * R) {
-          const d = Math.sqrt(d2) || 1e-4;
-          const w = (1 - d / R) ** 2;
-          const r = this.rnd[k]!;
-          // A breeze: nudged a little along the pointer's path, slightly unevenly.
-          vx += (mvx * (0.04 + 0.05 * r) + (rx / d) * speed * 0.015) * w;
-          vy += (mvy * (0.04 + 0.05 * r) + (ry / d) * speed * 0.015) * w;
-        }
-      }
-      // Drift on, slowing gently, and slowly gather back home.
-      vx = (vx - this.attrs[o + 2]! * 0.0025 * dt) * Math.pow(0.94, dt);
-      vy = (vy - this.attrs[o + 3]! * 0.0025 * dt) * Math.pow(0.94, dt);
-      this.vx[k] = vx;
-      this.vy[k] = vy;
-      // Small drifts only (a few dozen pixels at most).
-      this.attrs[o + 2] = clamp(this.attrs[o + 2]! + vx * dt, -0.035, 0.035);
-      this.attrs[o + 3] = clamp(this.attrs[o + 3]! + vy * dt, -0.035, 0.035);
-      live = Math.max(live, Math.abs(this.attrs[o + 2]!), Math.abs(this.attrs[o + 3]!));
-    }
-    this.awake = live > 0.0002 || stirring;
-    if (!this.awake)
-      for (let k = 0; k < this.count; k++) {
-        this.attrs[k * 4 + 2] = 0;
-        this.attrs[k * 4 + 3] = 0;
-        this.vx[k] = 0;
-        this.vy[k] = 0;
-      }
-  }
-}
-
 export class FlowSim {
   readonly n = 64;
   private u = new Float32Array(64 * 64);
@@ -350,8 +265,9 @@ export class FlowSim {
         for (let i = Math.max(0, (gx - 3 * r) | 0); i < Math.min(n, gx + 3 * r); i++) {
           const w = Math.exp(-((i - gx) ** 2 + (j - gy) ** 2) / (r * r));
           const k = j * n + i;
-          u[k] = u[k]! + fx * w * 0.6;
-          v[k] = v[k]! + fy * w * 0.6;
+          // A gentle wake: the air picks up a little of the pointer's motion.
+          u[k] = u[k]! + fx * w * 0.22;
+          v[k] = v[k]! + fy * w * 0.22;
           clr[k] = Math.min(0.85, clr[k]! + w * Math.min(0.05, speed * 1.2));
         }
       this.awake = true;
