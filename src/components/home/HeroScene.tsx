@@ -863,13 +863,29 @@ void main() {
           if (d < best) { best = d; bestT = (float(j) - 1.0 + h) / 14.0; }
           prev = P;
         }
+        // Refine on the true curve (a few Newton steps), so the strand is one
+        // smooth arc rather than a chain of short straight pieces.
+        vec2 B1 = 2.0 * (C - A), B2 = 2.0 * (A - 2.0 * C + T);
+        for (int it = 0; it < 3; it++) {
+          vec2 P = mix(mix(A, C, bestT), mix(C, T, bestT), bestT);
+          vec2 dP = B1 + B2 * bestT;
+          vec2 e = P - sp;
+          float g = dot(e, dP);
+          float gp = dot(dP, dP) + dot(e, B2);
+          bestT = clamp(bestT - g / max(gp, 1e-3), 0.0, 1.0);
+        }
+        best = length(mix(mix(A, C, bestT), mix(C, T, bestT), bestT) - sp);
         // Near its root a strand loosens into faint wisps and fades into the
         // marked spot (no hard line end): wider, broken and dimmer there.
         float rootW = 1.0 - smoothstep(0.0, 0.12, bestT);
         // Width swells and pinches along the strand (slowly flowing outward), so
         // it reads as a wisp rather than a drawn line.
         float swell = vnoise(vec2(bestT * 4.5 - uT * 0.35, float(k) * 5.3)) * 0.7 + vnoise(vec2(bestT * 11.0 - uT * 0.6, float(k) * 2.1 + 4.0)) * 0.3;
-        float w = wid * (1.0 - 0.6 * bestT) * (1.0 + 1.5 * rootW) * (0.35 + 1.5 * swell * swell);
+        float w0 = wid * (1.0 - 0.6 * bestT) * (1.0 + 1.5 * rootW) * (0.35 + 1.5 * swell * swell);
+        // Never thinner than about a pixel (lines finer than that stair-step,
+        // worst when rendering at reduced resolution); keep the same light.
+        float w = max(w0, 1.1 / uDpr);
+        float thin = sqrt(w0 / w);
         float flow = 0.55 + 0.45 * vnoise(vec2(bestT * 9.0 - uT * 1.6, float(k) * 7.0));
         float wisp = mix(1.0, smoothstep(0.35, 0.8, vnoise(vec2(best * 0.25 + float(k) * 3.0, bestT * 22.0 - uT * 0.8))), rootW);
         float fadeTip = (1.0 - smoothstep(0.7, 1.0, bestT)) * mix(0.55, 1.0, smoothstep(0.0, 0.1, bestT)) * mix(1.0, wisp, 0.6);
@@ -878,7 +894,7 @@ void main() {
         sc3 = max(sc3, vec3(exp(-dot(dA, dA) / 30.0) * 0.9 * str + exp(-dot(dA, dA) / 260.0) * 0.25 * str));
         // Soft cores that melt into a wide glow (they read as part of the sheet).
         float line = 0.55 * exp(-best * best / (w * w)) + 0.4 * exp(-best * best / (14.0 * w * w));
-        sc3 = max(sc3, vec3(line * flow * fadeTip * str * (0.6 + 0.6 * swell)));
+        sc3 = max(sc3, vec3(line * flow * fadeTip * str * (0.6 + 0.6 * swell) * thin));
       }
       // The sheet between them: a soft gradient filling the fan, brightest along
       // its middle, with faint striations flowing outward.
@@ -914,7 +930,7 @@ void main() {
     }
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
-    col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 9.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
+    col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 4.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
     // Overall grade: a slight cool tint.
     col *= vec3(0.975, 0.993, 1.02);
     gl_FragColor = vec4(col, 1.0);

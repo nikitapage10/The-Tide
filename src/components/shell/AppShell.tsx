@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SECTIONS } from "@/lib/domain/sections";
 import { EditAccessProvider } from "./EditAccess";
 import { NavLinks, SubNav, TopNav, type NavItem } from "./NavLinks";
+import Image from "next/image";
 
 const NAV: NavItem[] = [
   { href: "/", label: "Home" },
@@ -14,16 +15,6 @@ const NAV: NavItem[] = [
     })),
   })),
 ];
-
-/** The mark: a ring cut by a vertical meridian. */
-function Mark() {
-  return (
-    <svg aria-hidden="true" width="34" height="60" viewBox="0 0 34 60" className="shrink-0">
-      <circle cx="17" cy="30" r="13" fill="none" stroke="currentColor" strokeWidth="0.9" />
-      <line x1="17" y1="0" x2="17" y2="60" stroke="currentColor" strokeWidth="0.9" />
-    </svg>
-  );
-}
 
 function SearchForm({ id }: { id: string }) {
   return (
@@ -52,7 +43,8 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
       <header className="sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur-md [text-shadow:0_1px_8px_rgba(0,0,0,.9)]">
         <div className="page-x flex h-[var(--header-h)] items-center gap-4">
           <Link href="/" className="flex items-center gap-3 text-white no-underline">
-            <Mark />
+            {/* The mark, from the original artwork. */}
+            <Image src="/brand/tide-mark.png" alt="" width={35} height={58} priority className="h-[58px] w-auto shrink-0" />
             <span className="whitespace-nowrap font-[family-name:var(--font-display)] text-lg uppercase tracking-[0.3em] sm:text-xl sm:tracking-[0.4em]">The Tide</span>
           </Link>
           <span aria-hidden="true" className="mx-4 hidden h-9 w-px bg-white/20 lg:block" />
