@@ -6,10 +6,9 @@
  * - Intro: outer rocks fade in first, then the middle rocks, then the planet.
  *   Each layer is darker than the one in front; the planet starts very dark
  *   and gains its light as you scroll in (progress p: 0 → 1).
- * - Gravity lens: moving the pointer bends space around it. Everything near
- *   it is pulled and slightly twisted (frame-dragging), with chromatic
- *   fringing, an Einstein ring, an anamorphic streak and faint ghosts.
- *   It appears only while the pointer moves and decays within about a second.
+ * - Gravity lens: moving the pointer slowly bends space around it. Everything
+ *   near it is gently pulled and twisted, with a trace of chromatic fringing.
+ *   It eases in while the pointer moves and eases out when it stops.
  *
  * Geometry matches the CSS .hero-frame so DOM callouts stay pinned to the art.
  * If WebGL is unavailable the DOM image layers underneath remain visible.
@@ -41,6 +40,20 @@ vec4 tex(sampler2D s, vec2 uv) {
   return texture2D(s, uv);
 }
 
+// Planet with a luminance-masked unsharp mask: crisper streams and surface
+// detail without amplifying compression blocks in the dark areas.
+vec3 sharpPlanet(vec2 uv) {
+  vec2 tx = 1.0 / vec2(2000.0, 1126.0);
+  vec3 c0 = tex(uPlanet, uv).rgb;
+  vec3 blur = (tex(uPlanet, uv + vec2(tx.x, 0.0)).rgb + tex(uPlanet, uv - vec2(tx.x, 0.0)).rgb
+             + tex(uPlanet, uv + vec2(0.0, tx.y)).rgb + tex(uPlanet, uv - vec2(0.0, tx.y)).rgb) * 0.25;
+  float lum = dot(c0, vec3(0.3333));
+  float k = 1.1 * smoothstep(0.05, 0.3, lum);
+  return max(c0 + (c0 - blur) * k, 0.0);
+}
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+
 // Backlit meteor: dark body with a thin rim of light from the upper left.
 vec4 meteor(sampler2D s, vec2 uv, float bright, float rimAmt, vec2 px) {
   vec4 c = tex(s, uv);
@@ -53,19 +66,19 @@ vec3 scene(vec2 sp) {
   vec2 f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;   // frame uv (0..1)
   vec2 px = 1.0 / uFrameS;
 
-  float iNear = intro(0.0, 1.3);
-  float iFar = intro(0.55, 1.9);
-  float iPlanet = intro(1.1, 2.8);
+  float iNear = intro(0.6, 1.9);
+  float iFar = intro(1.3, 2.7);
+  float iPlanet = intro(2.0, 3.8);
 
   // Planet: zooms out around its centre as you scroll; dark until you scroll in.
   float sP = 1.25 - 0.25 * uP + 0.06 * (1.0 - iPlanet);
   vec2 oP = vec2(0.85, 0.58);
-  vec3 col = tex(uPlanet, oP + (f - oP) / sP).rgb;
-  col *= iPlanet * mix(0.16, 1.0, smoothstep(0.0, 1.0, uP));
+  vec3 col = sharpPlanet(oP + (f - oP) / sP);
+  col *= iPlanet * mix(0.07, 1.0, smoothstep(0.0, 1.0, uP));
 
   // Middle rocks: darker, spread outward and thin out.
   float sF = 1.0 + 0.9 * uP + 0.08 * (1.0 - iFar);
-  vec4 far = meteor(uFar, 0.5 + (f - 0.5) / sF, 0.45, 0.55, px / sF);
+  vec4 far = meteor(uFar, 0.5 + (f - 0.5) / sF, mix(0.22, 0.45, uP), mix(0.3, 0.55, uP), px / sF);
   col = mix(col, far.rgb, far.a * iFar * clamp(1.0 - 0.55 * uP, 0.0, 1.0));
 
   // Outer rocks: brightest, fly past the camera.
@@ -78,47 +91,46 @@ vec3 scene(vec2 sp) {
 void main() {
   vec2 sp = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uDpr;   // css px, top-left origin
   vec2 res = uRes / uDpr;
-  float R = 0.16 * min(res.x, res.y);                                // lens radius
+  float R = 0.2 * min(res.x, res.y);                                 // lens radius
 
   vec2 d = sp - uM;
   float r = length(d);
-  float fall = exp(-(r * r) / (R * R * 2.2));
-  float e = uE;
+  float fall = exp(-(r * r) / (R * R * 2.0));
+  // Barely there before you scroll; grows as you scroll in.
+  float e = uE * mix(0.12, 1.0, smoothstep(0.0, 1.0, uP));
 
-  // Gravitational lens: pull toward the pointer (strong near, fading out),
-  // plus a twist along the direction of motion (frame dragging).
-  float pull = e * 0.85 * R * R / (r * r + R * R * 0.16) * fall;
+  // Gentle gravitational lens: a soft pull toward the pointer and a slow twist
+  // that follows the (heavily smoothed) direction of motion.
+  float pull = e * 0.32 * R * R / (r * r + R * R * 0.35) * fall;
   vec2 dir = r > 0.001 ? d / r : vec2(0.0);
-  float twist = e * 0.9 * fall * clamp(length(uV) / 18.0, 0.2, 1.0) * sign(uV.x + uV.y + 0.0001);
+  float twist = e * 0.22 * fall * clamp(uV.x / 30.0, -1.0, 1.0);
   float cs = cos(twist), sn = sin(twist);
   vec2 dRot = vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
   vec2 warped = uM + dRot - dir * pull;
 
-  // Chromatic fringing grows inside the bend.
-  vec2 ca = dir * e * 5.0 * fall;
+  // A trace of chromatic fringing inside the bend.
+  vec2 ca = dir * e * 1.4 * fall;
   vec3 col;
   col.r = scene(warped + ca).r;
   col.g = scene(warped).g;
   col.b = scene(warped - ca).b;
 
-  // Lens flare (additive, only while moving).
-  vec2 vdir = length(uV) > 0.01 ? normalize(uV) : vec2(1.0, 0.0);
-  vec2 local = vec2(dot(d, vdir), dot(d, vec2(-vdir.y, vdir.x)));
-  float streak = exp(-abs(local.y) / 1.6) * exp(-abs(local.x) / (R * 3.2));
-  float ring = exp(-pow((r - R * 0.42) / (R * 0.045), 2.0));
-  float glow = exp(-(r * r) / (R * R * 0.08));
+  // Small lens-flare ghosts thrown off the pointer along the line through the
+  // screen centre (no halo or streak). Soft-edged and faint.
   vec2 c = res * 0.5;
   float ghosts = 0.0;
-  for (int i = 0; i < 3; i++) {
-    float k = -0.45 - 0.55 * float(i);
-    vec2 gpos = c + (uM - c) * k;
-    float gr = R * (0.08 + 0.05 * float(i));
-    ghosts += smoothstep(gr, gr * 0.6, length(sp - gpos)) * (0.05 - 0.012 * float(i));
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    vec2 gpos = c + (uM - c) * (-0.35 - 0.4 * fi);
+    float gr = R * (0.05 + 0.035 * fi);
+    ghosts += smoothstep(gr, gr * 0.35, length(sp - gpos)) * (0.07 - 0.012 * fi);
   }
-  vec3 flare = vec3(0.86, 0.92, 1.0) * (streak * 0.45 + ring * 0.3 + glow * 0.14 + ghosts * 1.4) * e;
-  flare += vec3(ring * 0.06, 0.0, ring * 0.09) * e;      // faint spectral edge on the ring
+  col += vec3(0.85, 0.92, 1.0) * ghosts * e;
 
-  gl_FragColor = vec4(col + flare, 1.0);
+  // A whisper of grain hides banding and compression blocks in deep blacks.
+  col += (hash(sp + fract(uT)) - 0.5) * (2.2 / 255.0);
+
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -152,14 +164,27 @@ export function frameGeometry(w: number, h: number) {
   return { cx, cy: h / 2, fw, fh };
 }
 
-export function HeroScene({ progress, onReady, className }: { progress: { current: number }; onReady: () => void; className?: string }) {
+export function HeroScene({
+  progress,
+  onReady,
+  onFail,
+  className,
+}: {
+  progress: { current: number };
+  onReady: () => void;
+  onFail: () => void;
+  className?: string;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
     const gl = canvas.getContext("webgl", { antialias: false, premultipliedAlpha: false, alpha: false });
-    if (!gl) return;
+    if (!gl) {
+      onFail();
+      return;
+    }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let disposed = false;
     let raf = 0;
@@ -171,8 +196,12 @@ export function HeroScene({ progress, onReady, className }: { progress: { curren
       gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
       gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
       gl.linkProgram(prog);
-      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        onFail();
+        return;
+      }
     } catch {
+      onFail();
       return;
     }
     gl.useProgram(prog);
@@ -187,7 +216,7 @@ export function HeroScene({ progress, onReady, className }: { progress: { curren
       res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"),
     };
 
-    const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, e: 0, lx: 0, ly: 0, lt: 0 };
+    const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
     let start = 0;
     let dpr = 1;
 
@@ -202,18 +231,22 @@ export function HeroScene({ progress, onReady, className }: { progress: { curren
     const draw = (now: number) => {
       const rect = canvas.getBoundingClientRect();
       const g = frameGeometry(rect.width, rect.height);
-      pointer.x += (pointer.tx - pointer.x) * 0.2;
-      pointer.y += (pointer.ty - pointer.y) * 0.2;
-      pointer.e *= 0.95;
-      pointer.vx *= 0.9;
-      pointer.vy *= 0.9;
+      // Slow, smooth easing: the lens trails the pointer and swells/settles gradually.
+      pointer.x += (pointer.tx - pointer.x) * 0.06;
+      pointer.y += (pointer.ty - pointer.y) * 0.06;
+      pointer.target *= 0.97;
+      pointer.e += (pointer.target - pointer.e) * 0.035;
+      pointer.svx += (pointer.vx - pointer.svx) * 0.04;
+      pointer.svy += (pointer.vy - pointer.svy) * 0.04;
+      pointer.vx *= 0.94;
+      pointer.vy *= 0.94;
       gl.uniform2f(U.res, canvas.width, canvas.height);
       gl.uniform2f(U.fc, g.cx, g.cy);
       gl.uniform2f(U.fs, g.fw, g.fh);
       gl.uniform1f(U.p, progress.current);
       gl.uniform1f(U.t, reduced ? 10 : (now - start) / 1000);
       gl.uniform2f(U.m, pointer.x, pointer.y);
-      gl.uniform2f(U.v, pointer.vx, pointer.vy);
+      gl.uniform2f(U.v, pointer.svx, pointer.svy);
       gl.uniform1f(U.e, reduced ? 0 : pointer.e);
       gl.uniform1f(U.dpr, dpr);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -239,13 +272,13 @@ export function HeroScene({ progress, onReady, className }: { progress: { curren
       pointer.lx = x;
       pointer.ly = y;
       pointer.lt = now;
-      if (pointer.e < 0.02) {
+      if (pointer.e < 0.01) {
         pointer.x = x;
         pointer.y = y;
       }
       pointer.tx = x;
       pointer.ty = y;
-      pointer.e = Math.min(1, pointer.e + Math.min(0.18, Math.hypot(vx, vy) / 90));
+      pointer.target = Math.min(1, pointer.target + Math.min(0.08, Math.hypot(vx, vy) / 260));
     };
 
     Promise.all(["/brand/planet-v2.webp", "/brand/meteors-far.webp", "/brand/meteors-near.webp"].map(loadImage))
@@ -269,7 +302,7 @@ export function HeroScene({ progress, onReady, className }: { progress: { curren
         onReady();
         raf = requestAnimationFrame(loop);
       })
-      .catch(() => undefined);
+      .catch(() => onFail());
 
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
@@ -285,7 +318,7 @@ export function HeroScene({ progress, onReady, className }: { progress: { curren
       io.disconnect();
       window.removeEventListener("pointermove", onMove);
     };
-  }, [progress, onReady]);
+  }, [progress, onReady, onFail]);
 
   return <canvas ref={ref} aria-hidden="true" className={className} />;
 }

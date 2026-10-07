@@ -9,6 +9,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
+import { GlyphTrail } from "./GlyphTrail";
 import { HeroScene } from "./HeroScene";
 
 export interface HeroCallout {
@@ -38,6 +39,8 @@ export function HomeHero({ callouts, code }: HeroProps) {
   const ui = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
   const onSceneReady = useCallback(() => stage.current?.setAttribute("data-gl", "on"), []);
+  // Without WebGL, fall back to the plain image layers.
+  const onSceneFail = useCallback(() => stage.current?.setAttribute("data-gl", "off"), []);
 
   useEffect(() => {
     const t = track.current;
@@ -89,7 +92,8 @@ export function HomeHero({ callouts, code }: HeroProps) {
         </div>
 
         {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
-        <HeroScene progress={progress} onReady={onSceneReady} className="hero-layer z-[1] h-full w-full" />
+        <HeroScene progress={progress} onReady={onSceneReady} onFail={onSceneFail} className="hero-layer z-[1] h-full w-full" />
+        <GlyphTrail progress={progress} className="hero-layer z-[2] h-full w-full" />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
         <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">

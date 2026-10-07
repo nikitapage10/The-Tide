@@ -42,7 +42,7 @@ export default async function HomePage() {
   };
   // Callouts point at real published entries; nothing here asserts new canon.
   const callouts: HeroCallout[] = [
-    { x: 76, y: 30, side: "left", title: "Entry unknown", lines: ["Designation withheld"], href: href("Future Earth"), code: code("Future Earth") },
+    { x: 72, y: 70, side: "right", title: "Entry unknown", lines: ["Designation withheld"], href: href("Future Earth"), code: code("Future Earth") },
     { x: 46, y: 47, side: "right", title: "The Tide", lines: ["Origin unresolved"], href: href("The Tide (in-lore usage)"), code: code("The Tide (in-lore usage)") },
     { x: 50, y: 78, side: "left", title: "Seven cycles", lines: ["Record incomplete"], href: href("The seven cycles"), code: code("The seven cycles") },
   ];
