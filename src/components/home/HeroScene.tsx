@@ -134,7 +134,17 @@ vec3 planetWithLimb(vec2 uv) {
   }
   float glowSrc = smoothstep(0.03, 0.45, (halo1 * 0.6 + halo2 * 0.4) / 8.0);
   float streamZone = (1.0 - smoothstep(-40.0, 0.0, -dl)) * smoothstep(30.0, 160.0, along);
-  col += vec3(0.84, 0.9, 1.0) * glowSrc * flare * streamZone * 0.32;
+  col += vec3(0.84, 0.9, 1.0) * glowSrc * flare * streamZone * 0.4;
+
+  // Thin, brighter glints that run along the line cores themselves: the ridges of
+  // the strands (pixel brighter than its blurred surroundings), lit by short,
+  // quicker flecks travelling in the same direction as their bundle.
+  float lum0 = dot(tex(uPlanet, uv).rgb, vec3(0.3333));
+  float core = smoothstep(0.015, 0.14, lum0 - halo1 / 8.0);
+  float gIn = vnoise(vec2(s * 0.011 - uT * 0.8, across * 16.0));
+  float gOut = vnoise(vec2(s * 0.011 + uT * 0.8, across * 16.0 + 5.0));
+  float glint = smoothstep(0.68, 0.95, mix(gOut, gIn, inward));
+  col += vec3(0.9, 0.95, 1.0) * core * glint * streamZone * 0.75;
 
   // Photon ring with knots of light circling the planet, a second ring, a halo.
   float knots = 0.45 + 1.1 * smoothstep(0.45, 0.9, fbm(vec2(ang * 22.0 - uT * 1.1, uT * 0.1)));
@@ -144,7 +154,43 @@ vec3 planetWithLimb(vec2 uv) {
   float halo = exp(-max(dl, 0.0) / 60.0) * outside * (0.8 + 0.4 * turb);
   vec3 tint = vec3(0.86, 0.91, 1.0);
   col += tint * (ring1 * 0.2 * beam * knots + ring2 * 0.07 * beam * knots + halo * 0.04);
+
+  // Atmosphere: a faint veil of cloud drifting over the planet, projected onto the
+  // sphere (foreshortened toward the limb) and thickening toward the edge.
+  float inside = 1.0 - smoothstep(-6.0, 0.0, dl);
+  vec2 sph = q / LIMB_R;
+  float z = sqrt(max(0.0, 1.0 - dot(sph, sph)));
+  vec2 cuv = sph / (0.35 + z) * 3.2;
+  float cloud = fbm(cuv + vec2(uT * 0.012, uT * 0.004));
+  cloud = smoothstep(0.42, 0.8, cloud * 0.75 + fbm(cuv * 2.3 - vec2(uT * 0.02, 0.0)) * 0.35);
+  float rimMist = pow(1.0 - z, 3.0);
+  col += vec3(0.82, 0.88, 0.95) * inside * (cloud * (0.07 + 0.08 * rimMist) + rimMist * 0.06);
   return col;
+}
+
+// Faint "fourth-dimension" stars in the empty space: sparse points that breathe
+// slowly; now and then one slips out of phase, jumping a few pixels, splitting
+// into a prism triplet with a thin scanline before settling back.
+vec3 stars(vec2 sp, float emptiness) {
+  const float CELL = 64.0;
+  vec2 cell = floor(sp / CELL);
+  float h = hash(cell);
+  if (h < 0.7 || emptiness < 0.01) return vec3(0.0);
+  vec2 pos = (cell + 0.2 + 0.6 * vec2(hash(cell + 3.1), hash(cell + 7.7))) * CELL;
+  float slot = floor(uT * 0.4 + h * 17.0);
+  float g = step(0.93, hash(cell + slot * 1.37));            // out of phase this slot
+  float gt = fract(uT * 0.4 + h * 17.0);
+  float active = g * step(gt, 0.18);                          // only briefly
+  vec2 jump = active * (vec2(hash(cell + slot), hash(cell - slot)) - 0.5) * 10.0;
+  vec2 d = sp - pos - jump;
+  float breathe = 0.55 + 0.45 * sin(uT * (0.4 + h) + h * 40.0);
+  float b = (0.16 + 0.3 * hash(cell + 1.9)) * breathe;
+  float split = 1.6 * active;
+  vec3 c = vec3(exp(-dot(d - vec2(split, 0.0), d - vec2(split, 0.0)) * 1.3),
+                exp(-dot(d, d) * 1.3),
+                exp(-dot(d + vec2(split, 0.0), d + vec2(split, 0.0)) * 1.3));
+  float scan = active * exp(-d.y * d.y * 3.0) * smoothstep(9.0, 0.0, abs(d.x)) * 0.35;
+  return (c + scan) * b * emptiness;
 }
 
 // Backlit meteor: dark body, thin rim of light from the upper left. Optional soft
@@ -185,7 +231,12 @@ vec4 scene(vec2 sp) {
     float iPlanet = intro(2.0, 3.8);
     float sP = 1.25 - 0.25 * uP + 0.06 * (1.0 - iPlanet);
     vec2 oP = vec2(0.85, 0.58);
-    vec3 col = planetWithLimb(oP + (f - oP) / sP);
+    vec2 puv = oP + (f - oP) / sP;
+    vec3 col = planetWithLimb(puv);
+    // Stars only where space is empty: dark, and off the planet.
+    float dlS = length((puv - LIMB_C) * SRC) - LIMB_R;
+    float empty = (1.0 - smoothstep(0.03, 0.14, dot(col, vec3(0.3333)))) * smoothstep(20.0, 80.0, dlS);
+    col += stars(sp, empty);
     col *= iPlanet * mix(0.07, 1.0, smoothstep(0.0, 1.0, uP));
     return vec4(col, 1.0);
   }
