@@ -1,16 +1,18 @@
 "use client";
 /**
- * Things passing through, now and then, once the planet is revealed: one at a
- * time, every so often. Orbiters (relays, probes, stations, beacons) travel the
- * dashed orbit drawn around the planet: up the left side in front, then behind
- * the planet (masked by its disc). Debris (rocks, shards, wrecks) drifts across
- * open space, slowly tumbling. Both dim on the planet's night side. Hovering one
- * types a small label beside it. Off under reduced motion.
+ * Things in orbit and passing through, once the planet is revealed. A few at a
+ * time (never a crowd): orbiters (relays, probes, stations, beacons) travel real
+ * tilted orbits around the planet, in front of it and then behind it (hidden by
+ * its disc), slightly larger on the near side; debris (rocks, shards, wrecks)
+ * drifts across open space along slow curves, tumbling. Each carries a small
+ * callout that follows it, its label translated from the Tide's script. All
+ * slow and small; dimmer on the night side. Off under reduced motion.
  *
- * Imperative (one small rAF loop moving one or two elements), so scrolling and
- * the WebGL scene are untouched.
+ * The list changes rarely (React); positions are set every frame on the
+ * elements directly (transform-only, sub-pixel), so motion stays smooth.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Decode } from "@/components/glyphs/Decode";
 import { DRIFTERS, type DrifterKind } from "./drifters";
 import { frameGeometry } from "./HeroScene";
 
@@ -18,46 +20,44 @@ const ORBITERS: DrifterKind[] = ["relay", "probe", "station", "beacon", "needle"
 
 /** Vague on purpose: the archive never quite knows what these are. */
 const LABELS: Record<DrifterKind, [string, string][]> = {
-  relay: [["Relay", "Silent · still in orbit"], ["Relay", "Last contact unknown"]],
-  probe: [["Probe", "Signal faint · repeating"], ["Probe", "Listening"]],
-  station: [["Station", "No answer on any band"], ["Station", "Orbit decaying, slowly"]],
-  beacon: [["Beacon", "Transmitting · source unknown"], ["Marker", "Placed before the record"]],
+  relay: [["Relay", "Silent, still in orbit"], ["Relay", "Last contact unknown"]],
+  probe: [["Probe", "Signal faint, repeating"], ["Probe", "Listening"]],
+  station: [["Station", "No answer on any band"], ["Station", "Orbit decaying"]],
+  beacon: [["Beacon", "Source unknown"], ["Marker", "Older than the record"]],
   needle: [["Spindle", "Origin unresolved"], ["Vessel", "Course unchanged"]],
   orb: [["Object", "Designation withheld"]],
   rock: [["Debris", "Drifting, slowly"], ["Fragment", "Not from here"]],
   debris: [["Debris field", "Arrivals from elsewhere"]],
-  crystal: [["Shard", "Unclassified"], ["Shard", "Resonating, faintly"]],
+  crystal: [["Shard", "Unclassified"], ["Shard", "Resonating faintly"]],
   wreck: [["Hull fragment", "Record incomplete"], ["Wreckage", "Origin unresolved"]],
 };
 
-interface Pass {
-  el: HTMLDivElement;
-  img: HTMLImageElement;
-  kind: DrifterKind;
+interface Item {
+  id: number;
+  name: string;
   aspect: number;
+  title: string;
+  line: string;
+  side: "left" | "right";
+}
+
+interface Motion {
   orbit: boolean;
-  ready: boolean;
   t0: number;
-  dur: number;
-  /** Orbit: angles on the dashed ellipse. Drift: start/end on the artwork (fractions). */
+  life: number;
+  // Orbit: radius (planet radii), inclination, node angle, start angle, angular speed (rad/ms).
+  R: number;
+  inc: number;
+  node: number;
   a0: number;
-  a1: number;
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-  /** Long side, as a fraction of the artwork's width. */
+  w: number;
+  // Drift: start, control and end points on the artwork (fractions), quadratic path.
+  p: [number, number, number, number, number, number];
+  /** Long side as a fraction of the artwork's width. */
   size: number;
   rot0: number;
   spin: number;
-  label: [string, string];
-  code: string;
-  /** Size the image was laid out at (px, long side); motion is transform-only after that. */
   base: number;
-  /** Last placement on screen (for hover). */
-  sx: number;
-  sy: number;
-  r: number;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -66,118 +66,98 @@ const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
+const MAX_ORBIT = 3;
+const MAX_DRIFT = 1;
 
 export function HeroDrifters({ progress, className }: { progress: { current: number }; className?: string }) {
   const layer = useRef<HTMLDivElement>(null);
-  const tag = useRef<HTMLDivElement>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [shown, setShown] = useState<Record<number, boolean>>({});
+  const els = useRef(new Map<number, HTMLDivElement>());
+  const motions = useRef(new Map<number, Motion>());
 
   useEffect(() => {
     const root = layer.current;
-    const label = tag.current;
-    if (!root || !label) return;
+    if (!root) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const titleEl = label.querySelector<HTMLElement>("[data-title]")!;
-    const lineEl = label.querySelector<HTMLElement>("[data-line]")!;
-
+    const motionMap = motions.current;
+    const elMap = els.current;
     let raf = 0;
     let visible = true;
-    let next = 0;
-    let lastName = "";
-    const passes: Pass[] = [];
-    const pointer = { x: -1e4, y: -1e4 };
-    let hovered: Pass | null = null;
-    let typing = 0;
-    let hideAt = 0;
+    let nextAt = 0;
+    let nextId = 1;
+    const recent: string[] = [];
+    const labelOn = new Set<number>();
+    // Fixed callouts and notes on screen (refreshed now and then): a moving
+    // object's label stays quiet while it passes near one, so they never overlap.
+    let busy: DOMRect[] = [];
+    let busyAt = 0;
 
-    const spawn = (now: number) => {
-      // Orbiters a little more often than debris; the orb is rare.
-      const orbit = Math.random() < 0.58;
-      const pool = DRIFTERS.filter((d) => ORBITERS.includes(d.kind) === orbit && d.name !== lastName && (d.kind !== "orb" || Math.random() < 0.35));
-      const d = pick(pool.length ? pool : DRIFTERS);
-      lastName = d.name;
-      const el = document.createElement("div");
-      el.style.cssText = "position:absolute;left:0;top:0;opacity:0;will-change:transform,opacity;display:flex;align-items:center;justify-content:center";
-      const img = document.createElement("img");
-      img.alt = "";
-      img.decoding = "async";
-      img.draggable = false;
-      img.style.cssText = "display:block;max-width:none;user-select:none";
-      el.appendChild(img);
-      root.appendChild(el);
+    const spawn = (now: number, orbit: boolean, first = false) => {
+      const pool = DRIFTERS.filter((d) => ORBITERS.includes(d.kind) === orbit && !recent.includes(d.name) && (d.kind !== "orb" || Math.random() < 0.3));
+      const d = pick(pool.length ? pool : DRIFTERS.filter((x) => ORBITERS.includes(x.kind) === orbit));
+      recent.push(d.name);
+      if (recent.length > 5) recent.shift();
+      const id = nextId++;
+      const [title, line] = pick(LABELS[d.kind]);
       const toLeft = Math.random() < 0.5;
-      const p: Pass = {
-        el,
-        img,
-        kind: d.kind,
-        aspect: d.w / d.h,
+      const m: Motion = {
         orbit,
-        ready: false,
         t0: now,
-        dur: orbit ? rand(70000, 95000) : rand(80000, 120000),
-        // Up from below, round the left side, then behind the planet's upper half.
-        a0: Math.PI * rand(0.55, 0.7),
-        a1: Math.PI * rand(1.75, 1.95),
-        x0: toLeft ? 0.97 : -0.07,
-        y0: rand(0.12, 0.88),
-        x1: toLeft ? -0.07 : rand(0.6, 0.97),
-        y1: rand(0.12, 0.88),
-        // Small and far: things glimpsed, not set pieces.
-        size: orbit ? rand(0.018, 0.03) : rand(0.014, 0.032),
-        rot0: rand(0, 360),
-        spin: (orbit ? rand(-0.8, 0.8) : rand(-2.5, 2.5)) / 1000,
-        label: pick(LABELS[d.kind]),
-        code: Math.floor(Math.random() * 0xffff)
-          .toString(16)
-          .padStart(4, "0"),
+        // Orbiters stay for about one slow orbit; debris for one crossing.
+        life: orbit ? rand(100000, 140000) : rand(70000, 95000),
+        // Ring-like orbits (seen nearly edge-on, gently tilted): they cross the
+        // visible half of the planet, swing round its left side through open
+        // space, and pass behind it (the planet's centre is off to the right).
+        R: rand(1.15, 1.55),
+        inc: rand(1.05, 1.4),
+        node: rand(-0.45, 0.45),
+        // The first are already on the visible side; later ones come round
+        // from the right, off screen.
+        a0: first ? Math.PI + rand(-0.9, 0.9) : rand(-0.3, 0.3),
+        w: ((Math.random() < 0.5 ? 1 : -1) * (Math.PI * 2)) / rand(110000, 150000),
+        p: toLeft
+          ? [rand(0.62, 0.8), rand(-0.06, 0.15), rand(0.35, 0.5), rand(0.3, 0.7), -0.06, rand(0.55, 1.05)]
+          : [-0.06, rand(0.1, 0.9), rand(0.2, 0.4), rand(0.2, 0.8), rand(0.55, 0.7), rand(-0.06, 1.06)],
+        size: orbit ? rand(0.009, 0.014) : rand(0.008, 0.015),
+        rot0: orbit ? rand(-20, 20) : rand(0, 360),
+        spin: (orbit ? rand(-0.5, 0.5) : rand(-2, 2)) / 1000,
         base: 0,
-        sx: -1e4,
-        sy: -1e4,
-        r: 0,
       };
-      // Orbiters keep their artwork upright-ish; debris starts at any angle.
-      if (orbit) p.rot0 = rand(-25, 25);
-      img.onload = () => {
-        p.ready = true;
-        p.t0 = performance.now();
-      };
-      img.onerror = () => {
-        p.dur = 0;
-        p.ready = true;
-      };
-      img.src = `/brand/drifters/${d.name}.webp`;
-      passes.push(p);
-    };
-
-    const typeLabel = (p: Pass) => {
-      window.clearInterval(typing);
-      const title = `${p.label[0]} · ${p.code.toUpperCase()}`;
-      const line = p.label[1];
-      let i = 0;
-      titleEl.textContent = "";
-      lineEl.textContent = "";
-      typing = window.setInterval(() => {
-        i += 1;
-        titleEl.textContent = title.slice(0, i);
-        lineEl.textContent = i > title.length ? line.slice(0, (i - title.length) * 1.6) : "";
-        if (i > title.length + line.length / 1.6) window.clearInterval(typing);
-      }, 28);
+      if (first && !orbit) m.t0 = now - m.life * rand(0.1, 0.3);
+      motionMap.set(id, m);
+      setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side: orbit || toLeft ? "left" : "right" }]);
     };
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       if (!visible || document.hidden) return;
-      const pr0 = progress.current;
-      const on = pr0 >= 0.72;
-      root.style.opacity = String(smooth(0.72, 0.92, pr0));
-      if (on && !next && passes.length === 0) next = now + rand(5000, 9000);
-      if (on && next && now >= next && passes.length === 0) {
-        next = 0;
-        spawn(now);
+      const p = progress.current;
+      root.style.opacity = String(smooth(0.72, 0.92, p));
+      const on = p >= 0.72;
+      const all = [...motionMap.values()];
+      const nOrbit = all.filter((m) => m.orbit).length;
+      const nDrift = all.length - nOrbit;
+      if (on && !nextAt && all.length === 0) {
+        // On reveal: two orbiters already in view and one piece of debris.
+        spawn(now, true, true);
+        spawn(now, true, true);
+        spawn(now, false, true);
+        nextAt = now + rand(6000, 12000);
+      } else if (on && nextAt && now >= nextAt) {
+        if (nOrbit < MAX_ORBIT) spawn(now, true);
+        else if (nDrift < MAX_DRIFT) spawn(now, false);
+        nextAt = now + rand(6000, 12000);
       }
 
       const rect = root.getBoundingClientRect();
+      if (now - busyAt > 400) {
+        busyAt = now;
+        const stage = root.parentElement;
+        busy = stage ? [...stage.querySelectorAll<HTMLElement>(".hero-ui .tracked, .obs-on .tracked, .hero-haiku")].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 || r.height > 0) : [];
+      }
       const g = frameGeometry(rect.width, rect.height);
-      const sP = 1.25 - 0.25 * pr0;
+      const sP = 1.25 - 0.25 * p;
       const toScreen = (fx: number, fy: number): [number, number] => [
         g.cx - g.fw / 2 + (0.85 + (fx - 0.85) * sP) * g.fw,
         g.cy - g.fh / 2 + (0.58 + (fy - 0.58) * sP) * g.fh,
@@ -185,113 +165,141 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       const [pcx, pcy] = toScreen(1.0122, 0.65);
       const pr = (883 / 2000) * g.fw * sP;
 
-      let hit: Pass | null = null;
-      for (let i = passes.length - 1; i >= 0; i--) {
-        const p = passes[i]!;
-        if (!p.ready) continue;
-        const u = (now - p.t0) / p.dur;
-        if (!(u < 1)) {
-          p.el.remove();
-          passes.splice(i, 1);
-          if (hovered === p) hovered = null;
-          next = now + rand(25000, 60000);
+      for (const [id, m] of motionMap) {
+        const el = elMap.get(id);
+        if (!el) continue;
+        const age = now - m.t0;
+        const u = age / m.life;
+        if (u >= 1) {
+          motionMap.delete(id);
+          elMap.delete(id);
+          setItems((xs) => xs.filter((x) => x.id !== id));
           continue;
         }
         let x: number, y: number;
         let depth = 1;
         let behind = false;
-        if (p.orbit) {
-          // The dashed orbit in the interface: centre (88%, 62%), radii (40%, 60%) of the artwork.
-          const th = p.a0 + (p.a1 - p.a0) * u;
-          [x, y] = toScreen(0.88 + 0.4 * Math.cos(th), 0.62 + 0.6 * Math.sin(th));
-          behind = Math.sin(th) < 0;
-          depth = 0.88 + 0.12 * Math.sin(th);
+        let z = 0;
+        if (m.orbit) {
+          // A tilted circular orbit seen from the front: the near half crosses
+          // in front of the planet, the far half passes behind it.
+          const t = m.a0 + m.w * age;
+          const ox = Math.cos(t);
+          const oy = Math.sin(t) * Math.cos(m.inc);
+          z = Math.sin(t) * Math.sin(m.inc);
+          const cn = Math.cos(m.node), sn = Math.sin(m.node);
+          x = pcx + pr * m.R * (ox * cn - oy * sn);
+          y = pcy + pr * m.R * (ox * sn + oy * cn);
+          behind = z < 0;
+          depth = 1 + 0.18 * z;
         } else {
-          [x, y] = toScreen(p.x0 + (p.x1 - p.x0) * u, p.y0 + (p.y1 - p.y0) * u);
+          const [x0, y0, cx, cy, x1, y1] = m.p;
+          const fx = (1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * cx + u * u * x1;
+          const fy = (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * cy + u * u * y1;
+          [x, y] = toScreen(fx, fy);
+          depth = 0.95 + 0.1 * Math.sin(u * Math.PI);
         }
-        // Laid out once at its base size; after that only transforms change
-        // (sub-pixel, composited), so the motion stays perfectly smooth.
-        if (!p.base) {
-          p.base = p.size * g.fw;
-          const w = p.aspect >= 1 ? p.base : p.base * p.aspect;
-          const h = p.aspect >= 1 ? p.base / p.aspect : p.base;
-          const box = Math.ceil(p.base * 1.5);
-          p.el.style.width = `${box}px`;
-          p.el.style.height = `${box}px`;
-          p.el.style.transformOrigin = "0 0";
-          p.img.style.width = `${w.toFixed(1)}px`;
-          p.img.style.height = `${h.toFixed(1)}px`;
+        const body = el.firstElementChild as HTMLElement | null;
+        if (!m.base) {
+          m.base = m.size * g.fw;
+          if (body) body.style.width = body.style.height = `${Math.ceil(m.base * 1.5)}px`;
         }
-        const k = ((p.size * g.fw) / p.base) * sP * depth;
-        const long = p.base * k;
-        const half = (Math.ceil(p.base * 1.5) / 2) * k;
+        const k = ((m.size * g.fw) / m.base) * sP * depth;
+        const half = (Math.ceil(m.base * 1.5) / 2) * k;
         const left = x - half;
         const top = y - half;
-        p.el.style.transform = `translate3d(${left.toFixed(2)}px, ${top.toFixed(2)}px, 0) scale(${k.toFixed(4)})`;
-        p.img.style.transform = `rotate(${(p.rot0 + p.spin * (now - p.t0)).toFixed(3)}deg)`;
-        // Behind the planet: hidden by its disc (soft at the atmosphere). The
-        // mask is in the element's own (unscaled) coordinates.
+        const dPlanet = Math.hypot(x - pcx, y - pcy);
+        // Hidden while behind the disc (soft through the atmosphere).
+        const hidden = behind ? smooth(pr + 18, pr + 4, dPlanet) : 0;
         const mask = behind
           ? `radial-gradient(circle at ${((pcx - left) / k).toFixed(1)}px ${((pcy - top) / k).toFixed(1)}px, transparent ${((pr + 4) / k).toFixed(1)}px, #000 ${((pr + 18) / k).toFixed(1)}px)`
           : "none";
-        p.el.style.maskImage = mask;
-        p.el.style.webkitMaskImage = mask;
-        // Sunlight comes from the left: dimmer over and beside the night side.
-        const nx = (x - pcx) / pr;
-        const near = 1 - smooth(1.0, 1.8, Math.hypot(x - pcx, y - pcy) / pr);
-        const night = smooth(-0.3, 0.5, nx) * near;
-        p.el.style.filter = `brightness(${(1 - 0.55 * night).toFixed(3)})`;
+        if (body) {
+          body.style.transform = `translate3d(${left.toFixed(2)}px, ${top.toFixed(2)}px, 0) scale(${k.toFixed(4)})`;
+          body.style.maskImage = mask;
+          body.style.webkitMaskImage = mask;
+          const img = body.firstElementChild as HTMLElement | null;
+          if (img) img.style.transform = `rotate(${(m.rot0 + m.spin * age).toFixed(3)}deg)`;
+          // Sunlight from the left: dimmer beside and over the night side.
+          const near = 1 - smooth(1.0, 1.8, dPlanet / pr);
+          const night = smooth(-0.3, 0.5, (x - pcx) / pr) * near;
+          body.style.filter = `brightness(${(1 - 0.5 * night + (m.orbit ? 0.08 * z : 0)).toFixed(3)})`;
+        }
         // Long, eased fades at both ends; never fully opaque (they are far off).
-        const fade = smooth(0, 0.08, u) * (1 - smooth(0.92, 1, u));
-        p.el.style.opacity = (fade * (behind ? 0.7 : 0.8)).toFixed(3);
-        p.sx = x;
-        p.sy = y;
-        p.r = Math.max(22, long * 0.6);
-        if (fade > 0.5 && Math.hypot(pointer.x - x, pointer.y - y) < p.r) hit = p;
-      }
-
-      // Hover label: types itself next to the object and follows it.
-      if (hit && hit !== hovered) {
-        hovered = hit;
-        typeLabel(hit);
-      }
-      if (hit) hideAt = now + 700;
-      if (hovered && now > hideAt) hovered = null;
-      if (hovered) {
-        label.style.opacity = "1";
-        // Above and to the left: clear of the cursor's own readout (below right).
-        label.style.transform = `translate3d(${(hovered.sx - hovered.r * 0.6).toFixed(1)}px, ${(hovered.sy - hovered.r - 34).toFixed(1)}px, 0) translateX(-100%)`;
-      } else {
-        label.style.opacity = "0";
+        const fade = smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
+        el.style.opacity = (fade * 0.85).toFixed(3);
+        // The callout follows the object; it hides while the object is behind.
+        const tag = el.lastElementChild as HTMLElement | null;
+        if (tag) {
+          const r = Math.max(5, m.base * k * 0.45);
+          tag.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
+          const vis = fade > 0.6 && hidden < 0.5 && x > 8 && x < rect.width - 8 && y > 8 && y < rect.height - 8;
+          tag.style.opacity = vis ? "1" : "0";
+          // The label's area (beside the object, on its side); hide its text if a
+          // fixed callout is there. The ring stays.
+          const lx0 = tag.dataset.side === "left" ? x - 230 : x - 10;
+          const lx1 = tag.dataset.side === "left" ? x + 10 : x + 230;
+          const crowded = busy.some((b) => b.right + rect.left > lx0 + rect.left - 12 && b.left - rect.left < lx1 + 12 && b.bottom - rect.top > y - 36 && b.top - rect.top < y + 36);
+          const text = tag.lastElementChild as HTMLElement | null;
+          if (text) text.style.opacity = crowded ? "0" : "1";
+          tag.style.setProperty("--r", `${r.toFixed(1)}px`);
+          // Each label decodes once, the first time its object is clearly in view.
+          if (vis && !labelOn.has(id)) {
+            labelOn.add(id);
+            setShown((s) => ({ ...s, [id]: true }));
+          }
+        }
       }
     };
 
-    const onMove = (e: PointerEvent) => {
-      const rect = root.getBoundingClientRect();
-      pointer.x = e.clientX - rect.left;
-      pointer.y = e.clientY - rect.top;
-    };
     const io = new IntersectionObserver(([entry]) => {
       visible = entry?.isIntersecting ?? true;
     });
     io.observe(root);
-    window.addEventListener("pointermove", onMove, { passive: true });
     raf = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(raf);
-      window.clearInterval(typing);
       io.disconnect();
-      window.removeEventListener("pointermove", onMove);
-      for (const p of passes) p.el.remove();
+      motionMap.clear();
     };
   }, [progress]);
 
   return (
     <div ref={layer} aria-hidden="true" className={className} style={{ opacity: 0 }}>
-      <div ref={tag} className="pointer-events-none absolute left-0 top-0 z-[1] text-right opacity-0 transition-opacity duration-500" style={{ willChange: "transform" }}>
-        <span data-title className="tracked block whitespace-nowrap text-[0.58rem] text-white/80" />
-        <span data-line className="tracked block whitespace-nowrap text-[0.55rem] leading-4 text-faint" />
-      </div>
+      {items.map((it) => (
+        <div
+          key={it.id}
+          ref={(el) => {
+            if (el) els.current.set(it.id, el);
+          }}
+          className="absolute inset-0"
+          style={{ opacity: 0 }}
+        >
+          <div className="absolute left-0 top-0 flex items-center justify-center" style={{ transformOrigin: "0 0", willChange: "transform" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- tiny decorative sprite, positioned every frame */}
+            <img
+              src={`/brand/drifters/${it.name}.webp`}
+              alt=""
+              draggable={false}
+              className="block max-w-none select-none"
+              style={{ width: it.aspect >= 1 ? "66.6%" : `${it.aspect * 66.6}%`, height: it.aspect >= 1 ? `${66.6 / it.aspect}%` : "66.6%" }}
+            />
+          </div>
+          {/* Callout: a ring on the object, a leader line, and the translated label. */}
+          <div data-side={it.side} className="absolute left-0 top-0 transition-opacity duration-700" style={{ opacity: 0, willChange: "transform" }}>
+            <span className="absolute rounded-full border border-white/45" style={{ width: "calc(var(--r) * 2 + 6px)", height: "calc(var(--r) * 2 + 6px)", left: "calc(var(--r) * -1 - 3px)", top: "calc(var(--r) * -1 - 3px)" }} />
+            <span className={`absolute top-0 h-px w-9 bg-white/35 ${it.side === "left" ? "right-[calc(var(--r)+5px)]" : "left-[calc(var(--r)+5px)]"}`} />
+            <div className={`absolute -top-2 w-max transition-opacity duration-500 ${it.side === "left" ? "right-[calc(var(--r)+3rem)] text-right" : "left-[calc(var(--r)+3rem)]"}`}>
+              <span className="tracked block text-[0.58rem] text-white/85">
+                <Decode text={it.title} active={!!shown[it.id]} calc />
+              </span>
+              <span className="tracked block text-[0.55rem] leading-4 text-faint">
+                <Decode text={it.line} active={!!shown[it.id]} delay={700} />
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

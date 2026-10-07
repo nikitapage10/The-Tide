@@ -1,57 +1,60 @@
 /**
- * The Tide's script: one glyph per letter / digit (a real cipher, so the same
- * letter always reads the same).
- *
- * STAND-IN: until the supplied alphabet artwork is traced, each glyph is drawn
- * procedurally in the mark's language (a meridian, beads, a ring, diamond or
- * crescent). Swapping in the real alphabet only changes this file: replace
- * `glyphParts` with the traced paths per character.
+ * The Tide's script: each letter or digit is written as a pair of glyphs read
+ * together: the geometric meridian glyph followed by the flowing crescent
+ * glyph (a real cipher, so the same letter always reads the same). Traced from
+ * art/alphabet.png by scripts/build-glyphs.py; drawn as masks so they take the
+ * text colour.
  */
+import { GLYPH_ASPECT } from "./alphabet";
 
 /** Characters the script has glyphs for; anything else is shown as itself. */
 export function hasGlyph(ch: string) {
   return /^[A-Za-z0-9]$/.test(ch);
 }
 
-const hash = (c: number, k: number) => (((c * 2654435761) ^ (k * 40503 + 0x9e3779b9)) >>> 0) % 1000 / 1000;
+const GAP = 0.08; // between the pair, as a fraction of the glyph height
 
-function glyphParts(ch: string) {
-  const c = ch.toUpperCase().charCodeAt(0);
-  const h = (k: number) => hash(c, k);
-  // viewBox 0 0 12 20; meridian at x = 6.
-  const top = 1.5 + h(1) * 2.5;
-  const bottom = 18.5 - h(2) * 2.5;
-  const cy = 7 + h(3) * 6;
-  const shape = Math.floor(h(4) * 5);
-  const r = 2.2 + h(5) * 1.4;
-  const beadMid = h(6) < 0.5;
-  const bar = h(7) < 0.45 ? 3.5 + h(8) * 3 : 0;
-  const crescent = h(9) < 0.4;
-  return { top, bottom, cy, shape, r, beadMid, bar, crescent, flip: h(10) < 0.5 };
+function Mask({ name, aspect }: { name: string; aspect: number }) {
+  const url = `url(/brand/glyphs/${name}.webp)`;
+  return (
+    <span
+      style={{
+        display: "block",
+        height: "100%",
+        aspectRatio: String(aspect),
+        backgroundColor: "currentColor",
+        maskImage: url,
+        WebkitMaskImage: url,
+        maskSize: "100% 100%",
+        WebkitMaskSize: "100% 100%",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+      }}
+    />
+  );
 }
 
+/**
+ * One character in the script (its two glyphs). It fits within `--glyph-w`
+ * (default about a letter's width) and is at most `--glyph-h` tall.
+ */
 export function TideGlyph({ ch, className }: { ch: string; className?: string }) {
-  const g = glyphParts(ch);
-  const s = { stroke: "currentColor", strokeWidth: 1, vectorEffect: "non-scaling-stroke" as const, fill: "none" };
-  const dy = g.cy;
+  const k = ch.toLowerCase();
+  const a = GLYPH_ASPECT[`${k}-a`] ?? 0.5;
+  const b = GLYPH_ASPECT[`${k}-b`] ?? 0.5;
+  const pair = a + b + GAP;
   return (
-    <svg aria-hidden="true" viewBox="0 0 12 20" className={className} overflow="visible">
-      <line x1={6} y1={g.top} x2={6} y2={g.bottom} {...s} />
-      <circle cx={6} cy={g.top} r={0.9} fill="currentColor" />
-      <circle cx={6} cy={g.bottom} r={0.9} fill="currentColor" />
-      {g.shape === 0 ? <circle cx={6} cy={dy} r={g.r} {...s} /> : null}
-      {g.shape === 1 ? <path d={`M6 ${dy - g.r - 0.6} L${6 + g.r} ${dy} L6 ${dy + g.r + 0.6} L${6 - g.r} ${dy}Z`} {...s} /> : null}
-      {g.shape === 2 ? <path d={`M6 ${dy - g.r} L${6 + g.r} ${dy + g.r * 0.8} L${6 - g.r} ${dy + g.r * 0.8}Z`} {...s} /> : null}
-      {g.shape === 3 ? (
-        <>
-          <circle cx={6} cy={dy - g.r * 0.7} r={g.r * 0.6} {...s} />
-          <circle cx={6} cy={dy + g.r * 0.7} r={g.r * 0.6} {...s} />
-        </>
-      ) : null}
-      {g.shape === 4 ? <circle cx={6} cy={dy} r={g.r * 0.45} fill="currentColor" /> : null}
-      {g.bar ? <line x1={6 - g.bar / 2} y1={dy + (g.flip ? -1 : 1) * (g.r + 2)} x2={6 + g.bar / 2} y2={dy + (g.flip ? -1 : 1) * (g.r + 2)} {...s} /> : null}
-      {g.crescent ? <path d={`M${g.flip ? 1.5 : 10.5} ${dy - 3.5} A 4.5 4.5 0 0 ${g.flip ? 0 : 1} ${g.flip ? 1.5 : 10.5} ${dy + 3.5}`} {...s} /> : null}
-      {g.beadMid ? <circle cx={6} cy={(dy + g.bottom) / 2 + 1} r={0.7} fill="currentColor" /> : null}
-    </svg>
+    <span
+      aria-hidden="true"
+      className={className}
+      style={{
+        display: "flex",
+        gap: `calc(var(--glyph-h, 1.3em) * ${GAP})`,
+        height: `min(var(--glyph-h, 1.3em), calc(var(--glyph-w, 1.25em) / ${pair.toFixed(3)}))`,
+      }}
+    >
+      <Mask name={`${k}-a`} aspect={a} />
+      <Mask name={`${k}-b`} aspect={b} />
+    </span>
   );
 }

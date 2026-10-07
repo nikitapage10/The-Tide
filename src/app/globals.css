@@ -315,5 +315,5 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .decode-cell { position: relative; display: inline-block; }
 .decode-letter { opacity: 0; transition: opacity 0.22s ease; }
 .decode-letter.decode-on { opacity: 1; }
-.decode-glyph { position: absolute; left: 50%; top: 50%; height: 1.05em; width: auto; translate: -50% -50%; opacity: 0.9; transition: opacity 0.22s ease, filter 0.22s ease; }
+.decode-glyph { position: absolute; left: 50%; top: 50%; translate: -50% -50%; opacity: 0.9; transition: opacity 0.22s ease, filter 0.22s ease; }
 .decode-glyph.decode-off { opacity: 0; filter: blur(1px); }
