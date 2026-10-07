@@ -584,18 +584,20 @@ export class StormPuffs {
     this.centres.push({ x, y, age: 0 });
     if (this.centres.length > 3) this.centres.shift();
     const id = this.centres[this.centres.length - 1]!;
-    const n = 760;
+    // Built from the same material as the drifting upper layer (similar puff
+    // sizes and transparency), with about as much overlap as a thick patch of
+    // it: an eyewall of smaller puffs ringing a small eye, a dense overcast
+    // around it, and three spiral bands thinning out into the open cloud.
+    const n = 290;
     const arms = 3;
     const phase = Math.random() * Math.PI * 2;
     for (let q = 0; q < n; q++) {
       if (this.ang.length >= this.max) this.drop(0);
-      // Like a hurricane from orbit: a bright, dense central mass around a
-      // pinhole eye, and three spiral bands trailing out, thinning and breaking.
-      // Radii are angular (radians on the sphere).
-      const core = q < n * 0.42;
-      const r = core ? 0.006 + Math.pow(Math.random(), 1.4) * 0.04 : 0.02 + Math.pow(Math.random(), 0.85) * 0.13;
+      const kind = q < 40 ? 0 : q < 130 ? 1 : 2; // eyewall, overcast, bands
+      const r =
+        kind === 0 ? 0.009 + Math.random() * 0.007 : kind === 1 ? 0.014 + Math.sqrt(Math.random()) * 0.032 : 0.035 + Math.pow(Math.random(), 0.9) * 0.125;
       const arm = Math.floor(Math.random() * arms);
-      const a = core ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.02) * 1.5 + (Math.random() - 0.5) * (0.25 + 1.6 * r);
+      const a = kind < 2 ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.02) * 1.5 + (Math.random() - 0.5) * (0.18 + 0.5 * r / 0.16);
       this.sid.push(this.centres.indexOf(id));
       this.ang.push(a);
       this.rad.push(r);
@@ -603,11 +605,10 @@ export class StormPuffs {
       this.oy.push(0);
       this.vx.push(0);
       this.vy.push(0);
-      this.age.push(-Math.random() * 1.2);
-      const out = Math.min(1, r / 0.15);
-      this.base.push(core ? 0.3 + Math.random() * 0.14 : (0.26 - 0.18 * out) + Math.random() * 0.08);
-      // Small puffs hug the eye (so it stays a pinhole); larger ones further out.
-      this.size.push(Math.floor(core ? 10 + Math.min(1, r / 0.03) * 18 + Math.random() * 8 : 22 + Math.random() * 26) + Math.random() * 0.98);
+      this.age.push(-Math.random() * 1.5);
+      const out = Math.min(1, (r - 0.035) / 0.125);
+      this.base.push(kind === 0 ? 0.3 + Math.random() * 0.06 : kind === 1 ? 0.22 + Math.random() * 0.06 : 0.21 - 0.12 * out + Math.random() * 0.05);
+      this.size.push(Math.floor(kind === 0 ? 14 + Math.random() * 8 : kind === 1 ? 26 + Math.random() * 20 : 30 + Math.random() * 40) + Math.random() * 0.98);
     }
     this.cx.push(x);
     this.cy.push(y);
@@ -649,7 +650,7 @@ export class StormPuffs {
         continue;
       }
       const spin = (1 - Math.min(1, Math.max(0, age) / 10)) * 0.9;
-      this.ang[i] = this.ang[i]! + (spin * 0.014 / Math.max(0.012, this.rad[i]!)) * s;
+      this.ang[i] = this.ang[i]! + (spin * 0.01 / Math.max(0.012, this.rad[i]!)) * s;
       // The bands wind in slowly; the eye never closes up or opens out.
       this.rad[i] = Math.max(0.006, this.rad[i]! * (1 - 0.025 * s));
       const k = this.sid[i]!;
@@ -666,7 +667,7 @@ export class StormPuffs {
     this.count = this.ang.length;
     for (let i = 0; i < this.count; i++) {
       const age = this.age[i]!;
-      const fade = Math.min(1, Math.max(0, age) / 1.2) * (1 - Math.min(1, Math.max(0, age - 6.5) / 3.5));
+      const fade = Math.min(1, Math.max(0, age) / 1.5) * (1 - Math.min(1, Math.max(0, age - 6.5) / 3.5));
       const k = this.sid[i]!;
       const [x, y] = this.onSphere(this.cx[k]!, this.cy[k]!, this.rad[i]!, this.ang[i]!);
       this.attrs[i * 4] = x + this.ox[i]!;

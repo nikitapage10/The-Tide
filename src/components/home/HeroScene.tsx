@@ -936,7 +936,7 @@ const PUFF_VERT = `
 precision highp float;
 attribute vec4 aP;            // disc x, y; size px + seed (fraction); alpha
 uniform vec2 uRes, uFrameC, uFrameS, uM;
-uniform float uP, uDpr, uLight;
+uniform float uP, uDpr, uLight, uIsStorm;
 varying float vA;
 varying float vSeed;
 varying vec3 vCol;
@@ -955,6 +955,9 @@ void main() {
   float z = sqrt(max(0.0, 1.0 - r2));
   gl_PointSize = floor(aP.z) * uDpr * (uFrameS.x / 2200.0) * (0.6 + 0.4 * z);
   vA = aP.w * step(r2, 0.985) * smoothstep(0.0, 0.25, z);
+  // Toward the horizon a compact cluster (a storm) piles up on screen; thin it
+  // so it never clumps into a bright blot.
+  vA *= mix(1.0, mix(0.35, 1.0, z), uIsStorm);
   vSeed = fract(aP.z) * 100.0;
   // Seen at an angle: squashed toward the horizon (radially, by z).
   vRad = length(aP.xy) > 1e-4 ? normalize(aP.xy) : vec2(1.0, 0.0);
@@ -962,7 +965,10 @@ void main() {
   vec3 nrm = vec3(aP.xy, z);
   float light = clamp(dot(nrm, normalize(vec3(-0.85, -0.35, 0.4))), 0.0, 1.0);
   float night = smoothstep(-0.3, 0.3, (aP.x + 0.62) * 0.9 + (aP.y + 0.05));
-  vCol = vec3(0.94, 0.96, 0.99) * (0.3 + 0.62 * light) * (1.0 - 0.72 * night);
+  // Storm puffs take a narrower range of light (less glare on the day side,
+  // less gloom past dusk), so they sit at the brightness of the cloud deck
+  // around them instead of blowing out or going flat grey.
+  vCol = vec3(0.94, 0.96, 0.99) * mix(0.3 + 0.62 * light, 0.4 + 0.42 * light, uIsStorm) * (1.0 - mix(0.72, 0.45, uIsStorm) * night);
   vec2 dl = uM - sp;
   vL = uLight * exp(-dot(dl, dl) / (180.0 * 180.0));
   vToL = normalize(vec2(dl.x, -dl.y) + 1e-4);
@@ -1196,7 +1202,7 @@ export function HeroScene({
           gl.linkProgram(wProg);
           if (!gl.getProgramParameter(wProg, gl.LINK_STATUS)) throw new Error("link");
           wLocA = gl.getAttribLocation(wProg, "aP");
-          for (const n of ["uRes", "uFrameC", "uFrameS", "uP", "uDpr", "uM", "uLight", "uBright"]) WU[n] = gl.getUniformLocation(wProg, n);
+          for (const n of ["uRes", "uFrameC", "uFrameS", "uP", "uDpr", "uM", "uLight", "uBright", "uIsStorm"]) WU[n] = gl.getUniformLocation(wProg, n);
           wBufA = gl.createBuffer();
         } catch {
           wProg = null; // the clouds still work, just without wisps
@@ -1221,8 +1227,8 @@ export function HeroScene({
         const bright = smooth(2.0, 5.2, tSec) * (0.07 + 0.93 * smooth(0, 1, p));
         for (const set of [wisps, stormPuffs]) {
           if (!set || set.count === 0) continue;
-          // Storms a touch brighter than the open cloud, so they read clearly.
-          gl.uniform1f(WU.uBright!, bright * (set === stormPuffs ? 1.35 : 1));
+          gl.uniform1f(WU.uBright!, bright);
+          gl.uniform1f(WU.uIsStorm!, set === stormPuffs ? 1 : 0);
           gl.bufferData(gl.ARRAY_BUFFER, set.attrs.subarray(0, set.count * 4), gl.DYNAMIC_DRAW);
           gl.vertexAttribPointer(wLocA, 4, gl.FLOAT, false, 0, 0);
           gl.drawArrays(gl.POINTS, 0, set === wisps && quality.level >= 2 ? Math.floor(set.count / 2) : set.count);

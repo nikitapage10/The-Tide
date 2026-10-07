@@ -3,8 +3,8 @@
  * visitor turns it on (browsers require a gesture, and sound should never
  * surprise anyone).
  *
- * - In space: a low "gravity" hum and a dark whoosh that swell with pointer
- *   speed, with the odd glitch tick when moving fast.
+ * - In space: a low "gravity" hum and a dark whoosh that swell gently with pointer
+ *   speed, with a rare soft blip when moving fast.
  * - Over the planet (once it is revealed): an airy cloud swish instead.
  * - A storm surge (click on the planet): rolling thunder.
  */
@@ -22,6 +22,8 @@ export class HeroSound {
   private swishFilter: BiquadFilterNode;
   private noise: AudioBuffer;
   private speed = 0;
+  /** Pointer speed as last measured; `speed` eases toward it (no sudden swells). */
+  private target = 0;
   private last = { x: 0, y: 0, t: 0 };
   private raf = 0;
   private lastSurge = 0;
@@ -33,7 +35,7 @@ export class HeroSound {
     this.master = ctx.createGain();
     this.master.gain.value = 0;
     this.master.connect(ctx.destination);
-    this.master.gain.setTargetAtTime(0.55, ctx.currentTime, 0.4);
+    this.master.gain.setTargetAtTime(0.42, ctx.currentTime, 1.2);
 
     // Shared noise buffer (2 s, looped).
     this.noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -70,7 +72,7 @@ export class HeroSound {
     this.swishFilter = ctx.createBiquadFilter();
     this.swishFilter.type = "bandpass";
     this.swishFilter.frequency.value = 1400;
-    this.swishFilter.Q.value = 0.7;
+    this.swishFilter.Q.value = 0.5;
     this.loopNoise().connect(this.swishFilter).connect(this.swish).connect(this.master);
 
     window.addEventListener("pointermove", this.onMove, { passive: true });
@@ -91,9 +93,9 @@ export class HeroSound {
     const dt = Math.max(8, now - this.last.t);
     const v = Math.hypot(e.clientX - this.last.x, e.clientY - this.last.y) / dt; // px per ms
     this.last = { x: e.clientX, y: e.clientY, t: now };
-    this.speed = Math.max(this.speed, Math.min(3, v));
+    this.target = Math.max(this.target, Math.min(3, v));
     // A glitch tick now and then when moving fast through space.
-    if (!heroSignal.overPlanet && v > 1.2 && now - this.lastGlitch > 700 && Math.random() < 0.25) {
+    if (!heroSignal.overPlanet && v > 1.6 && now - this.lastGlitch > 1500 && Math.random() < 0.15) {
       this.lastGlitch = now;
       this.glitch();
     }
@@ -101,13 +103,16 @@ export class HeroSound {
 
   private tick = () => {
     const t = this.ctx.currentTime;
-    this.speed *= 0.9;
-    const s = Math.min(1, this.speed / 1.5);
+    this.target *= 0.94;
+    this.speed += (this.target - this.speed) * 0.06;
+    // Eased curve: small movements barely register, fast ones swell gently.
+    const s0 = Math.min(1, this.speed / 1.8);
+    const s = s0 * s0 * (3 - 2 * s0);
     const over = heroSignal.overPlanet;
-    this.whoosh.gain.setTargetAtTime(over ? 0.02 * s : 0.32 * s, t, 0.12);
-    this.whooshFilter.frequency.setTargetAtTime(90 + 260 * s, t, 0.15);
-    this.swish.gain.setTargetAtTime(over ? 0.16 * s : 0, t, 0.1);
-    this.swishFilter.frequency.setTargetAtTime(900 + 1800 * s, t, 0.12);
+    this.whoosh.gain.setTargetAtTime(over ? 0.015 * s : 0.22 * s, t, 0.35);
+    this.whooshFilter.frequency.setTargetAtTime(90 + 200 * s, t, 0.4);
+    this.swish.gain.setTargetAtTime(over ? 0.1 * s : 0, t, 0.35);
+    this.swishFilter.frequency.setTargetAtTime(800 + 1200 * s, t, 0.4);
     this.hum.gain.setTargetAtTime(0.04 + 0.05 * s + 0.01 * Math.sin(t * 0.4), t, 0.5);
     if (heroSignal.surgeAt && heroSignal.surgeAt !== this.lastSurge) {
       this.lastSurge = heroSignal.surgeAt;
@@ -116,22 +121,24 @@ export class HeroSound {
     this.raf = requestAnimationFrame(this.tick);
   };
 
+  /** A faint, soft blip (a muffled sine chirp, no hard edges). */
   private glitch() {
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const o = ctx.createOscillator();
-    o.type = "square";
-    o.frequency.setValueAtTime(900 + Math.random() * 1600, t);
-    o.frequency.setValueAtTime(200 + Math.random() * 300, t + 0.025);
+    o.type = "sine";
+    o.frequency.setValueAtTime(700 + Math.random() * 500, t);
+    o.frequency.exponentialRampToValueAtTime(260 + Math.random() * 120, t + 0.12);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 1400;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.025, t + 0.003);
-    g.gain.setValueAtTime(0.0, t + 0.02);
-    g.gain.setValueAtTime(0.018, t + 0.035);
-    g.gain.linearRampToValueAtTime(0, t + 0.06);
-    o.connect(g).connect(this.master);
+    g.gain.linearRampToValueAtTime(0.012, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.16);
+    o.connect(lp).connect(g).connect(this.master);
     o.start(t);
-    o.stop(t + 0.08);
+    o.stop(t + 0.2);
   }
 
   private thunder() {
@@ -141,17 +148,18 @@ export class HeroSound {
     src.buffer = this.noise;
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.setValueAtTime(900, t);
-    lp.frequency.exponentialRampToValueAtTime(120, t + 2.2);
+    // Distant and rolling: a soft swell, a second murmur, a long tail.
+    lp.frequency.setValueAtTime(520, t);
+    lp.frequency.exponentialRampToValueAtTime(110, t + 3.2);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.5, t + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.5);
-    g.gain.setValueAtTime(0.18, t + 0.6);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 2.6);
+    g.gain.linearRampToValueAtTime(0.26, t + 0.35);
+    g.gain.linearRampToValueAtTime(0.14, t + 0.9);
+    g.gain.linearRampToValueAtTime(0.18, t + 1.3);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 3.6);
     src.connect(lp).connect(g).connect(this.master);
     src.start(t, Math.random());
-    src.stop(t + 2.7);
+    src.stop(t + 3.7);
   }
 
   dispose() {
