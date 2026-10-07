@@ -359,7 +359,8 @@ vec3 planetWithLimb(vec2 uv) {
         }
       }
       net *= smoothstep(0.35, 0.6, fbm(sc * 9.0 + 3.0) + 0.2 * coast) * max(land, 0.7 * coast);
-      vec3 sodium = vec3(1.0, 0.88, 0.74);   // muted: only a hint of warmth
+      // Mostly cool white; only the occasional town glows faintly warm.
+      vec3 sodium = mix(vec3(0.9, 0.94, 1.0), vec3(1.0, 0.9, 0.78), step(0.85, hash(ci + 13.0)));
       vec3 lights = sodium * (pts * metro * 2.2 + sprawl * 0.22 + net * 0.5);
       // Futuristic megacities (rare): ring cities with spokes, and honeycomb grids,
       // in a cooler white.
@@ -383,6 +384,29 @@ vec3 planetWithLimb(vec2 uv) {
           lights += cool * grid * 0.55 * fade;
         }
       }
+      // Planted storms knock out the power grid, district by district: districts
+      // (irregular cells) near the storm fail first and the failure cascades
+      // outward patchily; each flickers before it drops and stutters back on a
+      // second or two later, so the grid is restored within a few seconds.
+      float outage = 0.0;
+      vec2 warpD = sc * 15.0 + 0.9 * vec2(fbm(sc * 6.0), fbm(sc * 6.0 + 7.0));
+      vec2 dist = floor(warpD);
+      for (int k = 0; k < 3; k++) {
+        float sa = uStorm[k].z;
+        if (sa < 0.0 || sa > 8.0) continue;
+        float dd = length(sph - uStorm[k].xy);
+        float hD = hash(dist + uStorm[k].w * 31.0);
+        if (dd > 0.24 || hD > 1.15 * (1.0 - dd / 0.24)) continue;
+        float tFail = dd * 5.0 + hD * 0.7;
+        float tBack = tFail + 1.0 + 1.4 * hash(dist + 3.0 + uStorm[k].w);
+        float flick = step(0.5, hash(dist + floor(uT * 14.0)));
+        float o = 0.0;
+        if (sa > tFail - 0.3 && sa < tFail) o = flick;            // flicker, then drop
+        else if (sa >= tFail && sa < tBack) o = 1.0;               // dark
+        else if (sa >= tBack && sa < tBack + 0.35) o = flick;      // stutter back on
+        outage = max(outage, o);
+      }
+      lights *= 1.0 - 0.92 * outage;
       col += lights * nightSide * (1.0 - 0.85 * dens) * inside * 1.3;
     }
 
@@ -518,24 +542,54 @@ float rockId(sampler2D ids, vec2 uv) {
   vec4 t = texture2D(ids, uv);
   return floor(t.r * 255.0 + 0.5) + floor(t.g * 255.0 + 0.5) * 256.0;
 }
-// Gravity push: every movable rock moves rigidly by the displacement field at
-// its centre, plus a slow individual float. A pixel finds its rock by stepping
-// back along the field, then checks the rock really covers it.
+// Gravity push. Every movable rock is a rigid body: it moves by the gravity
+// field at its centre scaled by its mass (small rocks fly further, big ones
+// barely budge), turns a little, and floats gently. Rocks cut by the frame only
+// ever move outward past the edges they are cut by, so the cut never shows.
+// A pixel finds which rock lands on it by trying a few candidates.
 vec2 fieldAt(sampler2D field, vec2 uv) {
   return (texture2D(field, clamp(uv, 0.0, 1.0)).rg - 0.5) * 256.0 / ROCK_SZ;
+}
+float bit(float flags, float b) { return mod(floor(flags / pow(2.0, b)), 2.0); }
+// Displacement (uv) and turn for a rock, from its centre/flags texel.
+vec3 rockMotion(sampler2D field, vec4 cen, float id, float bobAmp) {
+  float flags = floor(cen.b * 255.0 + 0.5);
+  float size = floor(flags / 32.0);
+  float h = hash(vec2(id, 7.0));
+  float massK = (1.25 - 0.13 * size) * (0.75 + 0.5 * h);
+  vec2 d = fieldAt(field, cen.rg) * max(0.1, massK);
+  d += vec2(sin(uT * 0.33 + h * 6.28), cos(uT * 0.27 + h * 9.1)) * bobAmp / ROCK_SZ;
+  if (bit(flags, 1.0) > 0.5) d.x = min(d.x, 0.0);
+  if (bit(flags, 2.0) > 0.5) d.x = max(d.x, 0.0);
+  if (bit(flags, 3.0) > 0.5) d.y = min(d.y, 0.0);
+  if (bit(flags, 4.0) > 0.5) d.y = max(d.y, 0.0);
+  float edge = bit(flags, 1.0) + bit(flags, 2.0) + bit(flags, 3.0) + bit(flags, 4.0);
+  float turn = edge > 0.5 ? 0.0 : (d.x * 1672.0 * 0.004 - d.y * 941.0 * 0.003) * (h - 0.5) * (1.6 - 0.15 * size);
+  return vec3(d, turn);
 }
 vec2 rigidMove(sampler2D ids, sampler2D cent, sampler2D field, vec2 uv, float bobAmp, out float keep) {
   keep = 1.0;
   float idP = rockId(ids, uv);
   vec4 cP = texture2D(cent, clamp(uv, 0.0, 1.0));
-  if (idP > 0.5 && cP.b < 0.5) return uv;                 // a rock that stays put
-  vec2 q = uv - fieldAt(field, uv);
-  float idQ = rockId(ids, q);
-  vec4 cQ = texture2D(cent, clamp(q, 0.0, 1.0));
-  if (idQ > 0.5 && cQ.b > 0.5) {
-    float h = hash(vec2(idQ, 7.0));
-    vec2 bob = vec2(sin(uT * 0.33 + h * 6.28), cos(uT * 0.27 + h * 9.1)) * bobAmp / ROCK_SZ;
-    vec2 s2 = uv - fieldAt(field, cQ.rg) - bob;
+  float movP = bit(floor(cP.b * 255.0 + 0.5), 0.0);
+  if (idP > 0.5 && movP < 0.5) return uv;                  // a rock that stays put
+  vec2 dP = fieldAt(field, uv);
+  // Candidates: step back along the field by a few amounts and around it.
+  for (int k = 0; k < 7; k++) {
+    float fk = float(k);
+    vec2 off = k < 4 ? dP * (fk == 0.0 ? 1.0 : fk == 1.0 ? 0.0 : fk == 2.0 ? 0.5 : 1.6)
+                     : dP + vec2(k == 4 ? 12.0 : k == 5 ? -12.0 : 0.0, k == 6 ? 12.0 : 0.0) / ROCK_SZ;
+    if (k > 1 && dot(dP, dP) * 1672.0 * 1672.0 < 0.25) break;   // no push here: the plain cases suffice
+    vec2 q = uv - off;
+    float idQ = rockId(ids, q);
+    if (idQ < 0.5) continue;
+    vec4 cQ = texture2D(cent, clamp(q, 0.0, 1.0));
+    if (bit(floor(cQ.b * 255.0 + 0.5), 0.0) < 0.5) continue;
+    vec3 m = rockMotion(field, cQ, idQ, bobAmp);
+    vec2 c = cQ.rg;
+    vec2 rel = (uv - c - m.xy) * ROCK_SZ;
+    float cs = cos(-m.z), sn = sin(-m.z);
+    vec2 s2 = c + vec2(cs * rel.x - sn * rel.y, sn * rel.x + cs * rel.y) / ROCK_SZ;
     if (abs(rockId(ids, s2) - idQ) < 0.5) return s2;
   }
   if (idP > 0.5) keep = 0.0;                               // this rock has moved away
@@ -694,11 +748,14 @@ void main() {
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
     col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 9.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
+    // Overall grade: a slight cool tint.
+    col *= vec3(0.95, 0.985, 1.04);
     gl_FragColor = vec4(col, 1.0);
   } else {
     // Keep the menu strip clear at rest; once scrolling, rocks pass over it faintly.
     float band = 1.0 - smoothstep(uMenuH - 6.0, uMenuH + 36.0, sp.y);
     float keep = 1.0 - band * (1.0 - 0.4 * min(1.0, uP * 14.0));
+    col *= vec3(0.95, 0.985, 1.04);
     gl_FragColor = vec4(col, cg.a) * keep;
   }
 }

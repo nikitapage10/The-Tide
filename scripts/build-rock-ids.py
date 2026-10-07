@@ -48,15 +48,19 @@ for key, name in LAYERS.items():
     edge = [int(sl[0].start == 0 or sl[1].start == 0 or sl[0].stop == H or sl[1].stop == W) for sl in objs]
     rocks = [[round(x, 1), round(y, 1), round(float(np.sqrt(s / np.pi)), 1), e] for x, y, s, e in zip(cx, cy, area, edge)]
     # Centre map: each pixel of a rock holds its rock's centre (R = x/W, G = y/H,
-    # 8-bit) and whether it may move (B = 255), so the shader can move every rock
-    # rigidly by the gravity field sampled at its centre.
-    cent = np.zeros((H, W, 3), dtype=np.uint8)
+    # 8-bit) and B = flags: bit 0 may move; bits 1-4 touches left/right/top/bottom
+    # border; bits 5-7 size class (0-7, for mass).
     lut = np.zeros((n + 1, 3), dtype=np.uint8)
-    for i, (x, y, e) in enumerate(zip(cx, cy, edge), start=1):
-        # Front rocks may all move: a gravity push sends them outward, which keeps
-        # their cut sides beyond the frame. Middle-layer rocks cut by the border stay.
-        movable = key == "near" or not e
-        lut[i] = [round(x / (W - 1) * 255), round(y / (H - 1) * 255), 255 if movable else 0]
+    for i, (x, y, sl, s) in enumerate(zip(cx, cy, objs, area), start=1):
+        left, right = sl[1].start == 0, sl[1].stop == W
+        top, bottom = sl[0].start == 0, sl[0].stop == H
+        touches = left or right or top or bottom
+        # Front rocks may move (only outward past the edges they are cut by, so the
+        # cut never shows); middle-layer rocks cut by the border stay put.
+        movable = key == "near" or not touches
+        size = min(7, int(np.sqrt(s / np.pi) / 12))
+        flags = int(movable) | (int(left) << 1) | (int(right) << 2) | (int(top) << 3) | (int(bottom) << 4) | (size << 5)
+        lut[i] = [round(x / (W - 1) * 255), round(y / (H - 1) * 255), flags]
     cent = lut[lab]
     Image.fromarray(cent, "RGB").save(f"public/brand/{name}-centres.png", optimize=True)
     out[key] = {"w": int(a.shape[1]), "h": int(a.shape[0]), "rocks": rocks}
