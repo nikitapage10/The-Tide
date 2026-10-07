@@ -86,13 +86,20 @@ vec2 stormTwist(vec2 sph, out float bonus, out float eye) {
     vec2 d = q - c;
     float r = length(d) / 0.05;
     if (r > 2.6) continue;
-    float spinA = (1.4 * sa - 0.09 * sa * sa + 1.0) * grow;
+    // A gentle twist only draws nearby cloud in; the storm brings its own.
+    float spinA = (0.6 * sa - 0.04 * sa * sa + 0.4) * grow;
     float a = spinA * exp(-r * r * 0.9);
     float cs = cos(a), sn = sin(a);
     q = c + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
-    float th = atan(d.y, d.x) + a;
-    float bands = 0.55 + 0.45 * sin(2.0 * th + 3.0 * log(r + 0.1) + uStorm[k].w * 6.0);
-    bonus = max(bonus, grow * smoothstep(1.9, 0.6, r) * bands);
+    // Its own cloud, generated whether or not there was any here: two smooth
+    // logarithmic spiral arms that keep turning (slowing as it dies), softened
+    // by low-frequency noise so the edges are soft rather than jagged.
+    float th = atan(d.y, d.x);
+    float turn = 2.2 * sa - 0.14 * sa * sa;
+    float spiral = 0.5 + 0.5 * cos(2.0 * th - 3.2 * log(r + 0.12) - turn + uStorm[k].w * 6.0);
+    spiral = smoothstep(0.15, 0.95, spiral);
+    float soft = 0.7 + 0.3 * vnoise(vec2(th * 2.0 + uStorm[k].w * 9.0, r * 2.0));
+    bonus = max(bonus, grow * smoothstep(2.2, 0.55, r) * mix(0.35, 1.0, spiral) * soft);
     eye = max(eye, grow * exp(-r * r * 14.0));
   }
   return q;
@@ -103,7 +110,7 @@ float cloudBase(vec2 sph) {
   vec2 p = cloudCoords(tw);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
   float base = fbm5(p * 1.7 + 0.45 * w);
-  return base + bonus * (0.06 + 0.22 * base) - eye * 0.3;
+  return max(base, 0.4 + 0.38 * bonus) - eye * 0.3;
 }
 // Cloud displacement field (simulated on the GPU, 256² over the disc): how far
 // the cloud at each point has been carried from where the weather put it, in
@@ -160,8 +167,8 @@ uniform float uE;
 uniform float uDpr;
 uniform float uS;         // smoothed scroll speed (progress per second, >= 0)
 uniform float uMenuH;     // header height (CSS px); rocks are kept off the menu at rest
-uniform vec4 uStrandA[4]; // planet: strands drawn off the planet: start (xy) and control point (zw), CSS px
-uniform vec4 uStrandT[4]; // planet: strand tip (xy), width (z), strength (w)
+uniform vec4 uStrandA[6]; // planet: strands drawn off the planet: start (xy) and control point (zw), CSS px
+uniform vec4 uStrandT[6]; // planet: strand tip (xy), width (z), strength (w)
 uniform vec4 uStrandBox;  // planet: their bounding box (padded); empty when off
 
 const vec2 SRC = vec2(2000.0, 1126.0);
@@ -379,16 +386,23 @@ vec3 planetWithLimb(vec2 uv) {
     // Where the cloud now here came from (carried by the air you stirred).
     // (Displacement fades strongly toward the limb, where foreshortening would
     // make any shift look like the horizon itself bending.)
-    vec2 offH = cloudOffAt(uClouds, sph * 0.5 + 0.5) * z * z;
-    // Clouds break apart rather than smear: each puff (cloud-scale noise in the
-    // cloud's own coordinates, so it travels with it) is carried a different
-    // amount, so clumps separate and gaps open; weaker puffs thin out as they go.
+    vec2 offH = cloudOffAt(uClouds, sph * 0.5 + 0.5) * smoothstep(0.1, 0.55, z);
+    // Clouds break apart rather than smear: each small puff (noise at puff
+    // scale in the cloud's own coordinates, so it travels with it) is carried a
+    // different amount, so clumps pull apart, and holes tear open in the cloud
+    // where it was pushed (more pushing, more holes).
     float moved = length(offH);
-    float clumpN = moved > 0.0005 ? fbm(cloudCoords(sph - offH) * 2.6 + 7.0) : 0.5;
-    vec2 srcH = sph - offH * (0.25 + 1.5 * clumpN);
+    float clumpN = 0.5, holes = 0.5;
+    if (moved > 0.0005) {
+      vec2 mc = cloudCoords(sph - offH);
+      clumpN = vnoise(mc * 9.0 + 7.0) * 0.7 + vnoise(mc * 18.0 + 3.0) * 0.3;
+      holes = vnoise(mc * 14.0 + 11.0) * 0.6 + vnoise(mc * 30.0) * 0.4;
+    }
+    vec2 srcH = sph - offH * (0.1 + 1.8 * clumpN);
     srcH *= min(1.0, 0.985 / max(length(srcH), 1e-4));
     vec2 srcS = srcH + sunStepS;
-    float coverH = 1.0 - 0.7 * smoothstep(0.004, 0.03, moved) * smoothstep(0.62, 0.3, clumpN);
+    float tear = smoothstep(0.003, 0.03, moved);
+    float coverH = 1.0 - smoothstep(0.95 - 0.38 * tear, 1.05 - 0.38 * tear, 1.0 - holes) * tear;
     float coverS = coverH;
     float baseHere = cloudBase(srcH);
     float baseSun = cloudBase(srcS);
@@ -397,6 +411,8 @@ vec3 planetWithLimb(vec2 uv) {
     // The cloud amount drifts with the particles; the fine texture stays put
     // (moving it made the clouds shimmer while they settled).
     float dens = clamp(cloudDetail(baseHere, pw) * coverH, 0.0, 1.0);
+    // Smooth storm cloud (fine detail would break its arms into jagged bits).
+    dens = mix(dens, smoothstep(0.42, 0.72, baseHere) * coverH, sbH * 0.65);
     float densSun = clamp(cloudDetail(baseSun, cloudCoords(stormTwist(srcS, sbH, seH))) * coverS, 0.0, 1.0);
     cleared = max(cleared, clamp(1.0 - coverH, 0.0, 1.0));
     vec2 eyes[3];
@@ -843,28 +859,24 @@ void main() {
       ghosts += smoothstep(gr, gr * 0.35, length(sp - gpos)) * (0.07 - 0.012 * fi);
     }
     col += vec3(0.85, 0.92, 1.0) * ghosts * e * pointerInSpace;
-    // A small soft flare at the cursor in space: a glow and a faint horizontal
-    // streak (cropped by the planet, like everything of the lens).
-    // It is alive: the streak stretches along the cursor's motion (longer when
-    // faster), thin rays turn slowly and shimmer, and the glow breathes.
+    // In space the cursor acts like a small lens: light already there (the
+    // streams, the ribbons) is gathered and brightened in a soft ring with a
+    // faint prismatic edge, and a dim glow sits at its centre. Nothing drawn
+    // on empty black, so it reads as optics, not as a shape.
     vec2 dmF = sp - uM;
-    float spd = clamp(length(uV) / 12.0, 0.0, 1.0);
-    vec2 sdir = length(uV) > 0.01 ? normalize(uV) : vec2(1.0, 0.0);
-    float along = dot(dmF, sdir), acrossF = dot(dmF, vec2(-sdir.y, sdir.x));
-    float coreF = exp(-dot(dmF, dmF) / (R * R * (0.01 + 0.004 * sin(uT * 2.1))));
-    float streakF = exp(-acrossF * acrossF / (R * R * 0.0004)) * exp(-abs(along) / (R * (0.35 + 1.2 * spd)));
-    float angF = atan(dmF.y, dmF.x) + uT * 0.25;
-    float rays = pow(max(0.0, cos(angF * 3.0)), 30.0) * (0.6 + 0.4 * vnoise(vec2(angF * 4.0, uT * 3.0)));
-    rays *= exp(-length(dmF) / (R * 0.35));
-    vec3 tintF = mix(vec3(0.72, 0.82, 0.98), vec3(0.92, 0.86, 0.95), 0.5 + 0.5 * sin(uT * 0.7));
-    col += tintF * (coreF * 0.1 + streakF * (0.05 + 0.08 * spd) + rays * 0.06) * e * pointerInSpace;
+    float rF = length(dmF);
+    float lensRing = exp(-pow((rF - R * 0.32) / (R * 0.12), 2.0));
+    float lit0 = dot(col, vec3(0.3333));
+    vec3 prism = vec3(1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5), 1.0, 1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5 + 2.0));
+    col *= 1.0 + e * pointerInSpace * (0.9 * lensRing * prism - 0.0);
+    col += vec3(0.72, 0.8, 0.95) * exp(-rF * rF / (R * R * 0.02)) * 0.05 * e * pointerInSpace * (0.6 + 0.4 * smoothstep(0.02, 0.2, lit0));
     // Strands of energy drawn off the planet toward the cursor: a few curved
     // filaments leave the limb nearest the pointer, bending and swaying as if
     // stretched and pulled, with light flowing outward along them. Mild, cool
     // grey-blue; they fade with distance and when the cursor returns.
     if (sp.x > uStrandBox.x && sp.y > uStrandBox.y && sp.x < uStrandBox.z && sp.y < uStrandBox.w) {
       vec3 sc3 = vec3(0.0);
-      for (int k = 0; k < 4; k++) {
+      for (int k = 0; k < 6; k++) {
         vec2 A = uStrandA[k].xy, C = uStrandA[k].zw, T = uStrandT[k].xy;
         float wid = uStrandT[k].z, str = uStrandT[k].w;
         if (str <= 0.001) continue;
@@ -888,9 +900,9 @@ void main() {
       }
       // The sheet between them: a soft gradient filling the fan, brightest along
       // its middle, with faint striations flowing outward.
-      vec2 A0 = uStrandA[0].xy, A3 = uStrandA[3].xy;
-      vec2 Cm = (uStrandA[1].zw + uStrandA[2].zw) * 0.5;
-      vec2 Tm = (uStrandT[1].xy + uStrandT[2].xy) * 0.5;
+      vec2 A0 = uStrandA[0].xy, A3 = uStrandA[5].xy;
+      vec2 Cm = (uStrandA[2].zw + uStrandA[3].zw) * 0.5;
+      vec2 Tm = (uStrandT[2].xy + uStrandT[3].xy) * 0.5;
       vec2 Am = (A0 + A3) * 0.5;
       vec2 prevC = Am;
       float bestC = 1e9, tC = 0.0;
@@ -904,18 +916,18 @@ void main() {
         prevC = P;
       }
       // Half-width of the fan at this point: wide at the planet, pinching to the tip.
-      float spreadC = length(uStrandA[3].zw - uStrandA[0].zw);
+      float spreadC = length(uStrandA[5].zw - uStrandA[0].zw);
       float halfW = length(A3 - A0) * 0.5 * (1.0 - tC) * (1.0 - tC) + spreadC * 0.6 * 4.0 * tC * (1.0 - tC) + 4.0;
       float across = bestC / halfW;
       // Made of many faint filaments (not a flat fill), so the strands dissolve into it.
       float fil = vnoise(vec2(across * 12.0 + 0.6 * sin(tC * 6.0 + uT * 0.4), tC * 4.0 - uT * 1.1));
       fil = 0.3 * fil + 0.7 * pow(vnoise(vec2(across * 26.0, tC * 7.0 - uT * 1.6)), 2.0) + 0.25 * fil * fil;
       float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.12, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
-      float sheetStr = max(uStrandT[1].w, uStrandT[2].w);
+      float sheetStr = max(uStrandT[2].w, uStrandT[3].w);
       // Fade out well inside the region it is drawn in (no visible mask edges).
       vec2 e2 = min(sp - uStrandBox.xy, uStrandBox.zw - sp);
       float edgeFade = smoothstep(0.0, 50.0, min(e2.x, e2.y));
-      col += vec3(0.78, 0.82, 0.88) * (sc3 * 0.34 + sheet * sheetStr * 0.16) * pointerInSpace * edgeFade;
+      col += vec3(0.78, 0.82, 0.88) * (sc3 * 0.3 + sheet * sheetStr * 0.24) * pointerInSpace * edgeFade;
     }
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
@@ -1084,8 +1096,8 @@ export function HeroScene({
       // Strands drawn off the planet toward the cursor (planet layer).
       const head = { x: -9999, y: -9999 };
       const strand = { on: 0 };
-      const strandA = new Float32Array(16);
-      const strandT = new Float32Array(16);
+      const strandA = new Float32Array(24);
+      const strandT = new Float32Array(24);
       // Pointer-driven simulations: weather over the planet, rocks in the meteor layer.
       const flow = layer === "planet" ? new FlowSim() : null;
       const fieldFar = layer === "meteors" ? new RockBodies(ROCKS.far.rocks, ROCKS.far.w, ROCKS.far.h, 110, 0.012) : null;
@@ -1252,23 +1264,30 @@ export function HeroScene({
             // Roots spread across the middle of the limb (fixed points, like the
             // streams in the artwork); each leaves along the streams and bends
             // toward the cursor, where they gather.
-            const baseAng = Math.atan2(ay - pcy, ax - pcx);
-            for (let k = 0; k < 4; k++) {
-              const s = k - 1.5;
-              const ra = baseAng + s * 0.11;
+            // (Centred a little higher up the limb than the streams' crossing.)
+            const baseAng = Math.atan2(ay - pcy, ax - pcx) + 0.1;
+            const mrx = pcx + Math.cos(baseAng) * (pr - 14);
+            const mry = pcy + Math.sin(baseAng) * (pr - 14);
+            for (let k = 0; k < 6; k++) {
+              const s = k - 2.5;
+              const ra = baseAng + s * 0.075;
               const rx = pcx + Math.cos(ra) * (pr - 14);
               const ry = pcy + Math.sin(ra) * (pr - 14);
               const reachK = Math.hypot(head.x - rx, head.y - ry);
-              const cxp = rx + tx0 * reachK * 0.5 + px * s * reachK * 0.05;
-              const cyp = ry + ty0 * reachK * 0.5 + py * s * reachK * 0.05;
-              const tx = head.x + px * s * 3;
-              const ty = head.y + py * s * 3;
+              const tx = head.x + px * s * 2.5;
+              const ty = head.y + py * s * 2.5;
+              // Concave: each strand bows in toward the shared middle line (root
+              // middle → cursor), leaning slightly along the streams.
+              const midx = (rx + tx) / 2, midy = (ry + ty) / 2;
+              const axmx = (mrx + head.x) / 2, axmy = (mry + head.y) / 2;
+              const cxp = midx + (axmx - midx) * 1.15 + tx0 * reachK * 0.1;
+              const cyp = midy + (axmy - midy) * 1.15 + ty0 * reachK * 0.1;
               x0 = Math.min(x0, rx);
               y0 = Math.min(y0, ry);
               x1 = Math.max(x1, rx);
               y1 = Math.max(y1, ry);
               strandA.set([rx, ry, cxp, cyp], k * 4);
-              strandT.set([tx, ty, 1.6 + 0.6 * (k % 2), strand.on * (k === 1 || k === 2 ? 1 : 0.7) * (1 - 0.5 * Math.min(1, reach / (pr * 1.3)))], k * 4);
+              strandT.set([tx, ty, 1.5 + 0.6 * (k % 2), strand.on * (k === 2 || k === 3 ? 1 : 0.75) * (1 - 0.5 * Math.min(1, reach / (pr * 1.3)))], k * 4);
               x0 = Math.min(x0, cxp);
               y0 = Math.min(y0, cyp);
               x1 = Math.max(x1, cxp);
