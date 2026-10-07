@@ -7,6 +7,7 @@ import { api, messageFor, type ApiError } from "@/lib/client/api";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { SmokyButton } from "@/components/ui/SmokyButton";
 import { Notice } from "@/components/ui/States";
 import { useCanEdit } from "@/components/shell/EditAccess";
 
@@ -215,9 +216,9 @@ function Workbench({ exampleBundle }: { exampleBundle: string | null }) {
               title="Publish this release?"
               description="This switches the active published lore for everyone with access. Live records are not affected. You can roll back later as a new release."
               trigger={
-                <Button variant="primary" disabled={!preview.ok || stale || busy}>
+                <SmokyButton disabled={!preview.ok || stale || busy} status="goes live for everyone">
                   Publish release
-                </Button>
+                </SmokyButton>
               }
             >
               <p className="mb-4 text-sm">
@@ -225,9 +226,9 @@ function Workbench({ exampleBundle }: { exampleBundle: string | null }) {
               </p>
               <div className="flex justify-end gap-2">
                 <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-                <Button variant="primary" onClick={publish} disabled={busy}>
+                <SmokyButton onClick={publish} disabled={busy}>
                   Confirm publish
-                </Button>
+                </SmokyButton>
               </div>
             </Dialog>
           </div>

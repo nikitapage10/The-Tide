@@ -1,7 +1,7 @@
 "use client";
 import { createBrowserClient } from "@supabase/ssr";
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { SmokyButton } from "@/components/ui/SmokyButton";
 import { Field, Input } from "@/components/ui/Field";
 
 /** Email magic-link sign-in. Only the public URL and publishable key reach the browser. */
@@ -32,9 +32,9 @@ export function LoginForm({ url, publishableKey }: { url: string; publishableKey
       <Field id="email" label="Email address">
         <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
-      <Button type="submit" variant="primary" disabled={state === "sending"}>
+      <SmokyButton type="submit" disabled={state === "sending"} status={state === "sending" ? "sending" : "magic link"}>
         Send sign-in link
-      </Button>
+      </SmokyButton>
       <p role="status" className={state === "error" ? "text-danger" : "text-ok"}>
         {message}
       </p>

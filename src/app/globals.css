@@ -268,3 +268,44 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 
 /* The haiku arrives with the interface, a little after the callouts. */
 .hero-haiku { opacity: clamp(0, calc((var(--p) - 0.5) * 4), 1); }
+
+/* Smoky button (components/ui/SmokyButton): smoke drifting through a dark
+   pane, for a page's one headline action. Square, hairline, mono status line,
+   like the hero's callouts. */
+.smoky-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.55rem 1.4rem 0.55rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.3s ease, color 0.3s ease;
+}
+.smoky-button__canvas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  opacity: 0.75;
+  transition: opacity 0.4s ease;
+}
+/* Without WebGL: a still wash in the same colours. */
+.smoky-button__canvas[data-off="true"] {
+  background: linear-gradient(100deg, transparent 25%, rgba(79, 98, 120, 0.55) 60%, rgba(195, 204, 215, 0.35) 100%);
+}
+.smoky-button:hover:not(:disabled) { border-color: var(--muted); color: var(--accent-strong); }
+.smoky-button:hover:not(:disabled) .smoky-button__canvas { opacity: 1; }
+.smoky-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.smoky-button:disabled { cursor: not-allowed; opacity: 0.5; }
+.smoky-button:disabled .smoky-button__canvas { opacity: 0.35; }
+.smoky-button__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; text-shadow: 0 0 10px rgba(0, 0, 0, 0.85); }
+.smoky-button__label { font-size: 0.875rem; font-weight: 500; letter-spacing: 0.02em; }
+.smoky-button__status { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
