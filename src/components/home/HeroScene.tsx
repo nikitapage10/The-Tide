@@ -40,8 +40,8 @@ uniform float uDpr;
 uniform float uS;         // smoothed scroll speed (progress per second, >= 0)
 
 const vec2 SRC = vec2(2000.0, 1126.0);
-const vec2 LIMB_C = vec2(0.975, 0.626);   // planet centre in artwork uv
-const float LIMB_R = 811.0;               // planet radius in source px
+const vec2 LIMB_C = vec2(1.0122, 0.6500); // planet centre in artwork uv (fitted to the horizon)
+const float LIMB_R = 883.0;               // planet radius in source px
 
 float intro(float a, float b) { return smoothstep(a, b, uT); }
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -51,29 +51,49 @@ vec4 tex(sampler2D s, vec2 uv) {
   return texture2D(s, uv);
 }
 
-// Luminance-masked unsharp mask: crisper streams without amplifying dark blocks.
+// Two-scale, luminance-masked unsharp mask: a fine pass for line edges and a
+// wider pass for local contrast, so the streams read crisp when upscaled,
+// without amplifying the dark blocks.
 vec3 sharpPlanet(vec2 uv) {
   vec2 tx = 1.0 / SRC;
   vec3 c0 = tex(uPlanet, uv).rgb;
-  vec3 blur = (tex(uPlanet, uv + vec2(tx.x, 0.0)).rgb + tex(uPlanet, uv - vec2(tx.x, 0.0)).rgb
-             + tex(uPlanet, uv + vec2(0.0, tx.y)).rgb + tex(uPlanet, uv - vec2(0.0, tx.y)).rgb) * 0.25;
-  float k = 1.1 * smoothstep(0.05, 0.3, dot(c0, vec3(0.3333)));
-  return max(c0 + (c0 - blur) * k, 0.0);
+  vec3 b1 = (tex(uPlanet, uv + vec2(tx.x, 0.0)).rgb + tex(uPlanet, uv - vec2(tx.x, 0.0)).rgb
+           + tex(uPlanet, uv + vec2(0.0, tx.y)).rgb + tex(uPlanet, uv - vec2(0.0, tx.y)).rgb) * 0.25;
+  vec2 t2 = tx * 2.5;
+  vec3 b2 = (tex(uPlanet, uv + vec2(t2.x, t2.y)).rgb + tex(uPlanet, uv - vec2(t2.x, t2.y)).rgb
+           + tex(uPlanet, uv + vec2(t2.x, -t2.y)).rgb + tex(uPlanet, uv - vec2(t2.x, -t2.y)).rgb) * 0.25;
+  float l = dot(c0, vec3(0.3333));
+  float m = smoothstep(0.04, 0.25, l);
+  vec3 c = c0 + (c0 - b1) * 1.6 * m + (c0 - b2) * 0.55 * m;
+  // Gentle S-curve: deeper blacks between the strands, brighter cores.
+  c = max(c, 0.0);
+  c = mix(c, c * c * (3.0 - 2.0 * c), 0.35);
+  return c;
 }
 
-// Slow ripple of space just outside the planet's edge, plus a faint photon ring.
+// Black-hole-like horizon, kept very light: space just outside the planet's edge
+// is slightly lensed (the streams stretch along the horizon and shimmer slowly),
+// a thin photon ring hugs the limb (brighter on one side, slowly drifting), with
+// a fainter second ring and a soft halo beyond it.
 vec3 planetWithLimb(vec2 uv) {
   vec2 q = (uv - LIMB_C) * SRC;
   float rq = length(q);
   float dl = rq - LIMB_R;
   float ang = atan(q.y, q.x);
-  float band = exp(-pow(dl / 55.0, 2.0));
   vec2 nrm = q / max(rq, 1.0);
-  vec2 tan2 = vec2(-nrm.y, nrm.x);
-  vec2 wob = tan2 * sin(ang * 16.0 + uT * 0.28) * 1.8 + nrm * sin(ang * 7.0 - uT * 0.2) * 1.4;
-  vec3 col = sharpPlanet(uv + wob * band / SRC);
-  float ring = exp(-pow((dl - 4.0) / 6.0, 2.0));
-  col += vec3(0.75, 0.84, 0.98) * ring * 0.06 * (0.55 + 0.45 * sin(ang * 5.0 + uT * 0.45));
+  vec2 tng = vec2(-nrm.y, nrm.x);
+  float outside = smoothstep(-2.0, 8.0, dl);
+  float near = exp(-max(dl, 0.0) / 110.0) * outside;
+  float lens = 16.0 * near + sin(dl * 0.07 - uT * 0.5 + ang * 3.0) * 2.2 * near;
+  vec2 swirl = tng * sin(ang * 9.0 + uT * 0.22) * 1.6 * near;
+  vec3 col = sharpPlanet(uv + (nrm * lens + swirl) / SRC);
+
+  float beam = 0.55 + 0.45 * cos(ang + 2.1 + 0.25 * sin(uT * 0.15));
+  float ring1 = exp(-pow((dl - 3.0) / 2.6, 2.0));
+  float ring2 = exp(-pow((dl - 13.0 - 1.5 * sin(uT * 0.3 + ang * 2.0)) / 1.6, 2.0));
+  float halo = exp(-max(dl, 0.0) / 60.0) * outside;
+  vec3 tint = vec3(0.86, 0.91, 1.0);
+  col += tint * (ring1 * 0.2 * beam + ring2 * 0.06 * beam + halo * 0.035);
   return col;
 }
 
@@ -132,23 +152,25 @@ vec4 scene(vec2 sp) {
   vec2 oF = vec2(0.5);
   vec4 far = flyby(uFar, oF + (f - oF) / sF, oF, 0.012 * depth + 0.02 * rush,
                    mix(0.22, 0.4, uP), mix(0.22, 0.4, uP), px / sF, 1.6 + 3.5 * depth);
-  far *= iFar * clamp(1.0 - 0.7 * uP, 0.0, 1.0);
+  // Stays solid through most of the scroll; gone by the last frame (only the planet remains).
+  far *= iFar * (1.0 - smoothstep(0.78, 0.99, uP));
 
   // Outer rocks: brightest; they rise and fly past the camera, catching a glint
-  // of light on their rims as they go, gone by the last frame.
+  // of light on their rims as they go.
   float sN = 1.05 + 1.7 * uP + 0.1 * (1.0 - iNear);
   vec2 oN = vec2(0.5, 0.95);
   vec2 uvN = oN + (f - oN) / sN;
   float glint = 0.35 + 0.5 * sin(3.14159 * clamp(uP * 1.4, 0.0, 1.0));
   vec4 near = flyby(uNear, uvN, oN, 0.02 * depth + 0.035 * rush, 0.8, glint, px / sN, 7.0 * depth * depth);
-  near *= iNear * clamp(1.0 - 1.45 * uP, 0.0, 1.0);
+  // Fully opaque until the very end of the scroll, then gone by the last frame.
+  near *= iNear * (1.0 - smoothstep(0.84, 0.97, uP));
   return near + far * (1.0 - near.a);
 }
 
 void main() {
   vec2 sp = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uDpr;
   vec2 res = uRes / uDpr;
-  float R = 0.2 * min(res.x, res.y);
+  float R = 0.14 * min(res.x, res.y);
 
   vec2 d = sp - uM;
   float r = length(d);
@@ -186,7 +208,9 @@ void main() {
       ghosts += smoothstep(gr, gr * 0.35, length(sp - gpos)) * (0.07 - 0.012 * fi);
     }
     col += vec3(0.85, 0.92, 1.0) * ghosts * e;
-    col += (hash(sp + fract(uT)) - 0.5) * (2.2 / 255.0);
+    // Fine grain baked into the image: a little heavier on the bright strands.
+    float lum = dot(col, vec3(0.3333));
+    col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 9.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
     gl_FragColor = vec4(col, 1.0);
   } else {
     gl_FragColor = vec4(col, cg.a);
@@ -287,8 +311,8 @@ export function HeroScene({
     gl.uniform1i(u("uLayer"), transparent ? 1 : 0);
     gl.clearColor(0, 0, 0, 0);
 
-    // Pointer state with slow, smooth easing: the lens drifts after the cursor
-    // and builds up / settles over a couple of seconds.
+    // Pointer state: the lens follows the cursor closely, while its strength
+    // builds up / settles slowly over a couple of seconds.
     const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
     let dpr = 1;
     // Scroll speed, smoothed, so streaks swell while you scroll and settle after.
@@ -305,8 +329,8 @@ export function HeroScene({
     const draw = (now: number) => {
       const rect = canvas.getBoundingClientRect();
       const g = frameGeometry(rect.width, rect.height);
-      pointer.x += (pointer.tx - pointer.x) * 0.022;
-      pointer.y += (pointer.ty - pointer.y) * 0.022;
+      pointer.x += (pointer.tx - pointer.x) * 0.09;
+      pointer.y += (pointer.ty - pointer.y) * 0.09;
       pointer.target *= 0.988;
       pointer.e += (pointer.target - pointer.e) * 0.012;
       pointer.svx += (pointer.vx - pointer.svx) * 0.015;
