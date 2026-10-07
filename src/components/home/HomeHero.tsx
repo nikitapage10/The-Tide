@@ -155,7 +155,7 @@ export function HomeHero({ callouts, observations, spaceNotes, code }: HeroProps
               </div>
             ))}
             <Observations items={observations} active={revealed} />
-            <Observations items={spaceNotes} active={revealed} startDelay={4800} />
+            <Observations items={spaceNotes} active={revealed} startDelay={4800} calc />
           </div>
           {/* Glyph panel, bottom right (decorative script, no meaning). */}
           <div aria-hidden="true" className="absolute bottom-24 right-4 font-[family-name:var(--font-mono)] text-white/70 sm:right-10">
@@ -279,7 +279,7 @@ function Typed({ text, active, delay = 0, speed = 28 }: { text: string; active: 
 }
 
 /** One note at a time, cycling through the list at different spots on the planet. */
-function Observations({ items, active, startDelay = 1600 }: { items: HeroObservation[]; active: boolean; startDelay?: number }) {
+function Observations({ items, active, startDelay = 1600, calc = false }: { items: HeroObservation[]; active: boolean; startDelay?: number; calc?: boolean }) {
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -321,8 +321,52 @@ function Observations({ items, active, startDelay = 1600 }: { items: HeroObserva
         <span className="tracked block text-[0.68rem] leading-5 text-muted">
           <Typed key={`l${index}`} text={o.line} active={on} delay={250 + o.title.length * 28 + 150} speed={18} />
         </span>
+        {calc ? <Working key={`w${index}`} active={on} seed={index} /> : null}
       </div>
     </div>
+  );
+}
+
+/** Made-up glyphs (the same family as the glyph panel), mixed into the working. */
+const GLYPHS = ["⟁", "⋎", "⍙", "⊼", "⨯", "⟊", "⌖", "⍜", "⟟", "⏃"];
+const OPS = ["∫", "Σ", "Δ", "∂", "√", "λ", "θ", "≈", "∝", "∇"];
+
+/**
+ * A few lines of "working" under a note in space: formulas mixing maths and the
+ * made-up glyphs churn for a moment as the object is identified, then settle.
+ */
+function Working({ active, seed }: { active: boolean; seed: number }) {
+  const [lines, setLines] = useState<string[]>([]);
+  useEffect(() => {
+    if (!active) return;
+    let rnd = seed * 9301 + 49297;
+    const r = () => ((rnd = (rnd * 9301 + 49297) % 233280) / 233280);
+    const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]!;
+    const num = () => (Math.random() * 9.99).toFixed(3);
+    const line = () => `${pick(OPS)}${pick(GLYPHS)} ${num()} ${pick(["·", "×", "/", "→"])} ${pick(GLYPHS)}${pick(GLYPHS)} ${num()}`;
+    const final = [0, 1, 2].map(() => `${OPS[Math.floor(r() * OPS.length)]}${GLYPHS[Math.floor(r() * GLYPHS.length)]} ${(r() * 9.99).toFixed(3)} → ${GLYPHS[Math.floor(r() * GLYPHS.length)]}${GLYPHS[Math.floor(r() * GLYPHS.length)]} ${(r() * 9.99).toFixed(3)}`);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const id = window.setTimeout(() => setLines(final), 0);
+      return () => window.clearTimeout(id);
+    }
+    let ticks = 0;
+    const timer = window.setInterval(() => {
+      ticks += 1;
+      // Lines lock in one by one as the identification resolves.
+      setLines([0, 1, 2].map((i) => (ticks > 14 + i * 6 ? final[i]! : line())).slice(0, Math.min(3, 1 + Math.floor(ticks / 4))));
+      if (ticks > 30) window.clearInterval(timer);
+    }, 70);
+    return () => window.clearInterval(timer);
+  }, [active, seed]);
+  if (!active) return null;
+  return (
+    <span className="mt-1 block font-[family-name:var(--font-mono)] text-[0.58rem] leading-4 tracking-[0.12em] text-white/35">
+      {lines.map((l, i) => (
+        <span key={i} className="block whitespace-nowrap">
+          {l}
+        </span>
+      ))}
+    </span>
   );
 }
 
