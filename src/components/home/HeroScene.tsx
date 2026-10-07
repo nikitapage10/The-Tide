@@ -8,8 +8,9 @@
  * - Intro (shared clock): menu, then outer rocks, then middle rocks, then the
  *   planet. Each layer is darker than the one in front; the planet starts very
  *   dark and gains its light as you scroll in (progress p: 0 → 1).
- * - Planet limb: a very slow, faint ripple and photon-ring shimmer along the
- *   edge, like light bending around a heavy mass.
+ * - Planet limb and streams: always in motion, kept light (see planetWithLimb):
+ *   a flow orbiting the horizon like light bending around a heavy mass, a
+ *   photon ring with travelling knots, and strands flowing in and out.
  * - Gravity lens: the pointer slowly bends space. Bright light passing through
  *   the bend is gathered into a faint magnified ring with a slight prism split
  *   (no halo over empty black); small ghost flares trail off the pointer.
@@ -107,19 +108,35 @@ vec3 planetWithLimb(vec2 uv) {
   vec2 w = (uv - PINCH) * SRC;
   float along = length(w);
   float across = atan(w.y, abs(w.x));
+  // Signed distance along the flow: negative on the left of the crossing, so the
+  // current runs continuously from the left edge, through the crossing, into the planet.
+  float s = w.x < 0.0 ? -along : along;
+  float left = smoothstep(0.0, -200.0, w.x);
+  // Each strand has its own direction: some flow in toward the planet, some flow
+  // out. Keyed on the strand's line through the crossing, so it holds on both sides.
+  float strandId = across * (w.x < 0.0 ? -1.0 : 1.0);
+  float inward = smoothstep(0.38, 0.62, vnoise(vec2(strandId * 22.0, 4.0)));
+  float dsg = inward * 2.0 - 1.0;
   // Outside the planet, and faded out right at the crossing point (polar singularity).
   float space = (1.0 - smoothstep(0.0, 40.0, -dl)) * smoothstep(20.0, 90.0, along);
-  float wave = sin(along * 0.012 - uT * 0.9 + across * 18.0);
-  vec2 perp = normalize(vec2(-w.y, w.x) + 1e-4);
-  disp += perp * wave * 1.3 * space * outside;
+  // Flow map: the wisps inside each strand slide steadily along it (two phases,
+  // cross-faded, so the motion is continuous without stretching the image).
+  vec2 flowDir = (w.x < 0.0 ? -w : w) / max(along, 1.0);
+  float ph = uT * 0.22;
+  float f1 = fract(ph), f2 = fract(ph + 0.5);
+  float flowLen = 36.0 * space * outside;
+  vec2 o1 = -flowDir * dsg * (f1 - 0.5) * flowLen;
+  vec2 o2 = -flowDir * dsg * (f2 - 0.5) * flowLen;
+  float wgt = abs(1.0 - 2.0 * f1);
+  vec3 col = mix(sharpPlanet(uv + (disp + o1) / SRC), sharpPlanet(uv + (disp + o2) / SRC), wgt);
 
-  vec3 col = sharpPlanet(uv + disp / SRC);
-
-  // Light travelling along the strands, toward the planet (masked to bright strands).
+  // Long, soft pulses of light riding each strand's current (on the strands only).
   float lum = dot(col, vec3(0.3333));
-  float strand = smoothstep(0.08, 0.5, lum) * outside * smoothstep(20.0, 90.0, along);
-  float pulse = fbm(vec2(along * 0.005 - uT * 0.32, across * 26.0));
-  col *= 1.0 + strand * (0.55 * smoothstep(0.5, 0.85, pulse) - 0.12);
+  float strand = smoothstep(0.035, 0.4, lum) * outside * smoothstep(20.0, 90.0, along);
+  float pulseIn = fbm(vec2(s * 0.0035 - uT * 0.3, across * 34.0));
+  float pulseOut = fbm(vec2(s * 0.0035 + uT * 0.3, across * 34.0 + 11.0));
+  float pulse = mix(pulseOut, pulseIn, inward);
+  col *= 1.0 + strand * (mix(0.55, 0.8, left) * smoothstep(0.5, 0.85, pulse) - 0.12);
 
   // Photon ring with knots of light circling the planet, a second ring, a halo.
   float knots = 0.45 + 1.1 * smoothstep(0.45, 0.9, fbm(vec2(ang * 22.0 - uT * 1.1, uT * 0.1)));
