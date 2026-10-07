@@ -10,6 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GLYPH_PRESENCE_DEFAULT, glyphPresence } from "./GlyphTrail";
+import { HeroDrifters } from "./HeroDrifters";
 import { HeroScene } from "./HeroScene";
 import { SoundToggle } from "./SoundToggle";
 
@@ -148,6 +149,9 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
 
         {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
         <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} tip={tip} anchors={anchors} className="hero-layer z-[1] h-full w-full" />
+
+        {/* Things passing through: orbiters on the dashed orbit, debris drifting by. */}
+        <HeroDrifters progress={progress} className="pointer-events-none absolute inset-0 z-[1] overflow-hidden" />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
         <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
