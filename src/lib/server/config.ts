@@ -60,7 +60,7 @@ export function resolveMode(env: NodeJS.ProcessEnv = process.env): ModeInfo {
 
 /** Accepts the public names and the server-side names the Vercel ↔ Supabase integration may set. */
 export function supabaseUrlFrom(env: NodeJS.ProcessEnv): string {
-  return (env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL || "").trim();
+  return (env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL || bySuffix(env, "SUPABASE_URL")).trim();
 }
 export function supabaseKeyFrom(env: NodeJS.ProcessEnv): string {
   return (
@@ -68,8 +68,17 @@ export function supabaseKeyFrom(env: NodeJS.ProcessEnv): string {
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     env.SUPABASE_PUBLISHABLE_KEY ||
     env.SUPABASE_ANON_KEY ||
-    ""
+    bySuffix(env, "SUPABASE_PUBLISHABLE_KEY") ||
+    bySuffix(env, "SUPABASE_ANON_KEY")
   ).trim();
+}
+
+/** The Vercel integration can add a custom prefix (e.g. STORAGE_SUPABASE_URL). Only public-safe names are matched. */
+function bySuffix(env: NodeJS.ProcessEnv, suffix: string): string {
+  const key = Object.keys(env)
+    .filter((k) => k.endsWith(`_${suffix}`))
+    .sort()[0];
+  return (key && env[key]) || "";
 }
 
 // Kept in sync with fixtures/ids.json and supabase/seed.sql (asserted by tests).

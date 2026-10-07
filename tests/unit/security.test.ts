@@ -18,6 +18,10 @@ describe("mode resolution fails closed", () => {
   it("accepts the server-side variable names used by the Vercel integration", () => {
     expect(resolveMode(env({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon" })).mode).toBe("supabase");
   });
+  it("accepts integration variables with a custom prefix", () => {
+    expect(resolveMode(env({ STORAGE_SUPABASE_URL: "https://x.supabase.co", STORAGE_SUPABASE_ANON_KEY: "anon" })).mode).toBe("supabase");
+    expect(resolveMode(env({ STORAGE_SUPABASE_SERVICE_ROLE_KEY: "secret", STORAGE_SUPABASE_URL: "https://x.supabase.co" })).mode).toBe("setup-required");
+  });
   it("requires explicit configuration", () => {
     expect(resolveMode(env({})).mode).toBe("setup-required");
     expect(resolveMode(env({ TIDE_DATA_MODE: "prod" })).mode).toBe("setup-required");
