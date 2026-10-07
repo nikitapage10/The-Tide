@@ -472,7 +472,7 @@ export class CloudPuffs {
     this.lat = Float32Array.from(lat);
     this.attrs = new Float32Array(this.count * 4);
     for (let i = 0; i < this.count; i++) {
-      this.attrs[i * 4 + 2] = 34 + Math.floor(Math.random() * 46) + Math.random() * 0.98;
+      this.attrs[i * 4 + 2] = 50 + Math.floor(Math.random() * 64) + Math.random() * 0.98;
       this.attrs[i * 4 + 3] = 0.06 + 0.14 * dens[i]!;
     }
     this.ox = new Float32Array(this.count);
@@ -492,7 +492,7 @@ export class CloudPuffs {
   }
 
   /** dt: frames (≈1). The drift matches the lower deck's (see cloudCoords). */
-  step(flow: FlowSim, dt: number, strength = 1) {
+  step(flow: FlowSim, dt: number, strength = 1, storms: { x: number; y: number; age: number }[] = []) {
     const s = dt / 60;
     for (let i = 0; i < this.count; i++) {
       let lo = this.lon[i]! - 0.004 * s;
@@ -505,8 +505,19 @@ export class CloudPuffs {
       const [ax, ay] = flow.velocityAt(x, y);
       const k = this.coupling[i]!;
       // Follow the stirred air (disc units per second), spring gently home.
-      let vx = this.vx[i]! + (ax * 60 * 6 * strength - this.vx[i]!) * Math.min(1, s * k);
-      let vy = this.vy[i]! + (ay * 60 * 6 * strength - this.vy[i]!) * Math.min(1, s * k);
+      let tx = ax * 60 * 6 * strength, ty = ay * 60 * 6 * strength;
+      // A storm nearby draws this puff into its spin (and slightly inward).
+      for (const st of storms) {
+        const ex = x - st.x, ey = y - st.y;
+        const d = Math.hypot(ex, ey);
+        if (d > 0.3 || d < 1e-4) continue;
+        const life = Math.min(1, st.age / 1.5) * (1 - Math.min(1, Math.max(0, st.age - 7) / 4));
+        const w = Math.exp(-(d * d) / (0.12 * 0.12)) * life;
+        tx += (-ey / d) * 0.05 * w - (ex / d) * 0.012 * w;
+        ty += (ex / d) * 0.05 * w - (ey / d) * 0.012 * w;
+      }
+      let vx = this.vx[i]! + (tx - this.vx[i]!) * Math.min(1, s * k);
+      let vy = this.vy[i]! + (ty - this.vy[i]!) * Math.min(1, s * k);
       vx -= this.ox[i]! * 0.5 * s;
       vy -= this.oy[i]! * 0.5 * s;
       vx *= Math.exp(-s * 1.2);
@@ -521,18 +532,21 @@ export class CloudPuffs {
 }
 
 /**
- * Storms made of the upper layer's puff material: a click spawns puffs laid
- * out along spiral bands around a clear eye; they orbit (faster near the eye,
- * slowing as the storm dies) and are carried by the stirred air like the rest
- * of the layer, so a storm can be pushed around. Fades out after ~8 s.
+ * Storms made of the upper layer's puff material. A click spawns puffs laid out
+ * along a dense eyewall and broken spiral bands; they orbit (faster near the
+ * eye, slowing as the storm dies) in the planet's tangent plane at that spot,
+ * so a storm is foreshortened toward the limb like everything else. They are
+ * carried by the stirred air, and the storm draws the upper layer's nearby
+ * puffs into its spin (see CloudPuffs.step). Lasts about ten seconds.
  * attrs layout matches CloudPuffs.
  */
 export class StormPuffs {
-  readonly max = 900;
-  readonly attrs = new Float32Array(900 * 4);
+  readonly max = 1400;
+  readonly attrs = new Float32Array(1400 * 4);
   count = 0;
-  private cx: number[] = [];
-  private cy: number[] = [];
+  /** Active storms: centre (disc), age (s), for the upper layer to swirl into. */
+  readonly centres: { x: number; y: number; age: number }[] = [];
+  private sid: number[] = [];
   private ang: number[] = [];
   private rad: number[] = [];
   private ox: number[] = [];
@@ -541,63 +555,93 @@ export class StormPuffs {
   private vy: number[] = [];
   private age: number[] = [];
   private base: number[] = [];
+  private size: number[] = [];
 
   spawn(x: number, y: number) {
-    const n = 170;
-    const arms = 3;
+    this.centres.push({ x, y, age: 0 });
+    if (this.centres.length > 3) this.centres.shift();
+    const id = this.centres[this.centres.length - 1]!;
+    const n = 420;
+    const arms = 4;
     const phase = Math.random() * Math.PI * 2;
     for (let q = 0; q < n; q++) {
-      if (this.cx.length >= this.max) this.drop(0);
-      // Eyewall (a dense ring) plus feathered bands spiralling in.
-      const wall = q < n * 0.3;
-      // Small and local: about a twentieth of the disc across.
-      const r = wall ? 0.008 + Math.random() * 0.005 : 0.013 + Math.pow(Math.random(), 0.8) * 0.035;
+      if (this.ang.length >= this.max) this.drop(0);
+      const wall = q < n * 0.28;
+      // Angular radius on the sphere (radians): eyewall ~0.03, bands out to ~0.17,
+      // with ragged, uneven outer reach (not a neat circle).
+      const r = wall ? 0.022 + Math.random() * 0.014 : 0.04 + Math.pow(Math.random(), 0.7) * (0.08 + 0.08 * Math.random());
       const arm = Math.floor(Math.random() * arms);
-      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.013) * 1.7 + (Math.random() - 0.5) * 0.6;
-      this.cx.push(x);
-      this.cy.push(y);
+      const a = wall ? Math.random() * Math.PI * 2 : phase + (arm / arms) * Math.PI * 2 - Math.log(r / 0.04) * 1.9 + (Math.random() - 0.5) * 0.9;
+      this.sid.push(this.centres.indexOf(id));
       this.ang.push(a);
       this.rad.push(r);
       this.ox.push(0);
       this.oy.push(0);
       this.vx.push(0);
       this.vy.push(0);
-      this.age.push(-Math.random() * 0.8);
-      this.base.push((wall ? 0.16 : 0.1) + Math.random() * 0.08);
+      this.age.push(-Math.random() * 1.2);
+      this.base.push((wall ? 0.15 : 0.08) + Math.random() * 0.08);
+      this.size.push(Math.floor(wall ? 22 + Math.random() * 20 : 30 + Math.random() * 40) + Math.random() * 0.98);
     }
+    this.cx.push(x);
+    this.cy.push(y);
   }
+  private cx: number[] = [];
+  private cy: number[] = [];
 
   private drop(i: number) {
-    for (const arr of [this.cx, this.cy, this.ang, this.rad, this.ox, this.oy, this.vx, this.vy, this.age, this.base]) arr.splice(i, 1);
+    for (const arr of [this.sid, this.ang, this.rad, this.ox, this.oy, this.vx, this.vy, this.age, this.base, this.size]) arr.splice(i, 1);
+  }
+
+  /** Disc position of a point at angular radius r, angle a, around centre (x, y). */
+  private onSphere(x: number, y: number, r: number, a: number): [number, number] {
+    const z = Math.sqrt(Math.max(0, 1 - x * x - y * y));
+    // Tangent basis at the centre: e1 along longitude, e2 along latitude.
+    let e1x = z, e1y = 0, e1z = -x;
+    const l1 = Math.hypot(e1x, e1y, e1z) || 1;
+    e1x /= l1;
+    e1y /= l1;
+    e1z /= l1;
+    const e2x = y * e1z - z * e1y, e2y = z * e1x - x * e1z;
+    const c = Math.cos(r), sn = Math.sin(r);
+    return [x * c + (e1x * Math.cos(a) + e2x * Math.sin(a)) * sn, y * c + (e1y * Math.cos(a) + e2y * Math.sin(a)) * sn];
   }
 
   step(flow: FlowSim, dt: number) {
     const s = dt / 60;
-    for (let i = this.cx.length - 1; i >= 0; i--) {
+    for (const c of this.centres) c.age += s;
+    while (this.centres.length && this.centres[0]!.age > 11) {
+      this.centres.shift();
+      for (let i = 0; i < this.sid.length; i++) this.sid[i] = this.sid[i]! - 1;
+      this.cx.shift();
+      this.cy.shift();
+    }
+    for (let i = this.ang.length - 1; i >= 0; i--) {
       const age = (this.age[i] = this.age[i]! + s);
-      if (age > 8) {
+      if (age > 10 || this.sid[i]! < 0) {
         this.drop(i);
         continue;
       }
-      const spin = (1 - Math.min(1, Math.max(0, age) / 8)) * 0.9;
-      this.ang[i] = this.ang[i]! + (spin * 0.012 / Math.max(0.008, this.rad[i]!)) * s;
-      // Slowly drawn inward as it spins.
-      this.rad[i] = Math.max(0.007, this.rad[i]! - 0.0008 * s);
-      const x = this.cx[i]! + Math.cos(this.ang[i]!) * this.rad[i]! + this.ox[i]!;
-      const y = this.cy[i]! + Math.sin(this.ang[i]!) * this.rad[i]! + this.oy[i]!;
-      const [ax, ay] = flow.velocityAt(x, y);
+      const spin = (1 - Math.min(1, Math.max(0, age) / 10)) * 0.9;
+      this.ang[i] = this.ang[i]! + (spin * 0.02 / Math.max(0.02, this.rad[i]!)) * s;
+      this.rad[i] = Math.max(0.018, this.rad[i]! - 0.0015 * s);
+      const k = this.sid[i]!;
+      const [x, y] = this.onSphere(this.cx[k]!, this.cy[k]!, this.rad[i]!, this.ang[i]!);
+      const [ax, ay] = flow.velocityAt(x + this.ox[i]!, y + this.oy[i]!);
       this.vx[i] = (this.vx[i]! + (ax * 60 * 6 - this.vx[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8);
       this.vy[i] = (this.vy[i]! + (ay * 60 * 6 - this.vy[i]!) * Math.min(1, s * 4)) * Math.exp(-s * 0.8);
       this.ox[i] = clamp(this.ox[i]! + this.vx[i]! * s, -0.3, 0.3);
       this.oy[i] = clamp(this.oy[i]! + this.vy[i]! * s, -0.3, 0.3);
     }
-    this.count = this.cx.length;
+    this.count = this.ang.length;
     for (let i = 0; i < this.count; i++) {
       const age = this.age[i]!;
-      const fade = Math.min(1, Math.max(0, age) / 0.9) * (1 - Math.min(1, Math.max(0, age - 5) / 3));
-      this.attrs[i * 4] = this.cx[i]! + Math.cos(this.ang[i]!) * this.rad[i]! + this.ox[i]!;
-      this.attrs[i * 4 + 1] = this.cy[i]! + Math.sin(this.ang[i]!) * this.rad[i]! + this.oy[i]!;
-      this.attrs[i * 4 + 2] = 12 + (i % 14) + ((i * 0.618) % 1) * 0.98;
+      const fade = Math.min(1, Math.max(0, age) / 1.2) * (1 - Math.min(1, Math.max(0, age - 6.5) / 3.5));
+      const k = this.sid[i]!;
+      const [x, y] = this.onSphere(this.cx[k]!, this.cy[k]!, this.rad[i]!, this.ang[i]!);
+      this.attrs[i * 4] = x + this.ox[i]!;
+      this.attrs[i * 4 + 1] = y + this.oy[i]!;
+      this.attrs[i * 4 + 2] = this.size[i]!;
       this.attrs[i * 4 + 3] = this.base[i]! * fade;
     }
   }

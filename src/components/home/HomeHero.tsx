@@ -55,6 +55,11 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
   const ui = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
   const tip = useRef<HTMLDivElement>(null);
+  // Marked spots on the planet, where the cursor's strands rise from.
+  const anchors = useRef<{ x: number; y: number }[]>([]);
+  useEffect(() => {
+    anchors.current = [...callouts, ...observations].map((c) => ({ x: c.x, y: c.y }));
+  }, [callouts, observations]);
   const progress = useRef(0);
   // The interface (callouts) is revealed late in the scroll; it types itself in.
   const [revealed, setRevealed] = useState(false);
@@ -140,7 +145,7 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
         </div>
 
         {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
-        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} tip={tip} className="hero-layer z-[1] h-full w-full" />
+        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} tip={tip} anchors={anchors} className="hero-layer z-[1] h-full w-full" />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
         <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">

@@ -152,6 +152,7 @@ uniform float uE;
 uniform float uDpr;
 uniform float uS;         // smoothed scroll speed (progress per second, >= 0)
 uniform float uMenuH;     // header height (CSS px); rocks are kept off the menu at rest
+uniform float uQ;         // quality level: 0 full, 1 lighter, 2 light (set automatically)
 uniform vec4 uStrandA[6]; // planet: strands drawn off the planet: start (xy) and control point (zw), CSS px
 uniform vec4 uStrandT[6]; // planet: strand tip (xy), width (z), strength (w)
 uniform vec4 uStrandBox;  // planet: their bounding box (padded); empty when off
@@ -250,7 +251,8 @@ vec3 planetWithLimb(vec2 uv) {
   // patch of surface shows, with a faint prism split along its edges.
   float riftSlot = floor(uT / 25.0);
   float riftT = uT - riftSlot * 25.0 - 6.0;
-  float riftOn = smoothstep(0.0, 0.8, riftT) * (1.0 - smoothstep(2.6, 4.0, riftT));
+  // (Retired for performance: fewer effects overall.)
+  float riftOn = 0.0 * smoothstep(0.0, 0.8, riftT);
   vec3 riftCol = vec3(0.0);
   float riftMask = 0.0;
   if (riftOn > 0.001) {
@@ -360,7 +362,7 @@ vec3 planetWithLimb(vec2 uv) {
     // Mid layer: a thin veil between the ground and the clouds, stretched into
     // soft streaks and drifting slowly the other way. Not interactive.
     vec2 vq = vec2(sph.x / (0.35 + z), sph.y * 1.0) * vec2(1.4, 4.0) + vec2(-uT * 0.006, uT * 0.002);
-    float veil = smoothstep(0.42, 0.8, fbm5(vq + 0.6 * vec2(fbm(vq * 0.7), fbm(vq * 0.7 + 4.0))));
+    float veil = uQ < 0.5 ? smoothstep(0.42, 0.8, fbm5(vq + 0.6 * vec2(fbm(vq * 0.7), fbm(vq * 0.7 + 4.0)))) : 0.0;
     float veilA = veil * 0.26 * (0.45 + 0.55 * light) * smoothstep(0.0, 0.2, z);
     col *= 1.0 - 0.18 * veil;                                   // its faint shadow
     col = mix(col, skyCol * (0.55 + 0.45 * light), veilA);
@@ -436,7 +438,7 @@ vec3 planetWithLimb(vec2 uv) {
     // sprinkle of rural lights elsewhere. Settled in pockets (post-ravage), on
     // land only (baked mask), shown across the planet, brightest past dusk.
     float landHere = texture2D(uMasks, uv).r;
-    if (landHere > 0.01) {
+    if (landHere > 0.01 && uQ < 1.5) {
       float lat = asin(clamp(sph.y, -1.0, 1.0));
       float lon = atan(sph.x, z);
       vec2 sc = vec2(lon * cos(lat), lat);
@@ -533,7 +535,7 @@ vec3 planetWithLimb(vec2 uv) {
     float water = 1.0 - smoothstep(0.05, 0.16, dot(tex(uPlanet, uv).rgb, vec3(0.3333)));
     vec3 halfV = normalize(sunDir + vec3(0.0, 0.0, 1.0));
     float spec = pow(clamp(dot(nrm3, halfV), 0.0, 1.0), 48.0);
-    col += vec3(0.9, 0.94, 1.0) * spec * water * (1.0 - dens) * 0.22 * (0.75 + 0.25 * fbm(sph * 60.0 + uT * 0.3));
+    col += vec3(0.9, 0.94, 1.0) * spec * water * (1.0 - dens) * 0.22;
 
     // Meteors entering the atmosphere: a short burning streak near the limb
     // every few seconds, gone in about a second.
@@ -712,7 +714,7 @@ vec4 scene(vec2 sp) {
     float dust = step(0.82, dh) * exp(-dot(sp - dp, sp - dp) * 1.8) * (0.05 + 0.06 * hash(dc + 2.0));
     dust *= 0.6 + 0.4 * sin(uT * (0.5 + dh) + dh * 30.0);
     vec2 nq = sp * 0.0016 + vec2(uT * 0.004, -uT * 0.002);
-    float neb = fbm5(nq + 1.3 * vec2(fbm(nq * 1.7), fbm(nq * 1.7 + 5.0)));
+    float neb = uQ < 0.5 ? fbm5(nq + 1.3 * vec2(fbm(nq * 1.7), fbm(nq * 1.7 + 5.0))) : 0.0;
     float nebula = smoothstep(0.45, 0.85, neb) * 0.035;
     col += (vec3(0.78, 0.84, 0.95) * (dust + nebula)) * empty * leftBias;
     // Intro (no movement): the streams of light fade in first as a soft wipe from
@@ -861,9 +863,13 @@ void main() {
           if (d < best) { best = d; bestT = (float(j) - 1.0 + h) / 14.0; }
           prev = P;
         }
-        float w = wid * (1.0 - 0.6 * bestT);                       // tapering toward the tip
+        // Near its root a strand loosens into faint wisps and fades into the
+        // marked spot (no hard line end): wider, broken and dimmer there.
+        float rootW = 1.0 - smoothstep(0.0, 0.3, bestT);
+        float w = wid * (1.0 - 0.6 * bestT) * (1.0 + 2.5 * rootW);
         float flow = 0.55 + 0.45 * vnoise(vec2(bestT * 9.0 - uT * 1.6, float(k) * 7.0));
-        float fadeTip = 1.0 - smoothstep(0.7, 1.0, bestT);
+        float wisp = mix(1.0, smoothstep(0.35, 0.8, vnoise(vec2(best * 0.25 + float(k) * 3.0, bestT * 22.0 - uT * 0.8))), rootW);
+        float fadeTip = (1.0 - smoothstep(0.7, 1.0, bestT)) * smoothstep(0.0, 0.28, bestT) * wisp;
         // Soft cores that melt into a wide glow (they read as part of the sheet).
         float line = 0.55 * exp(-best * best / (w * w)) + 0.4 * exp(-best * best / (14.0 * w * w));
         sc3 = max(sc3, vec3(line * flow * fadeTip * str));
@@ -892,12 +898,13 @@ void main() {
       // Made of many faint filaments (not a flat fill), so the strands dissolve into it.
       float fil = vnoise(vec2(across * 12.0 + 0.6 * sin(tC * 6.0 + uT * 0.4), tC * 4.0 - uT * 1.1));
       fil = 0.3 * fil + 0.7 * pow(vnoise(vec2(across * 26.0, tC * 7.0 - uT * 1.6)), 2.0) + 0.25 * fil * fil;
-      float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.12, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
+      float sheet = exp(-across * across * 1.3) * (0.35 + 0.9 * fil) * smoothstep(0.0, 0.32, tC) * (1.0 - smoothstep(0.7, 1.0, tC));
       float sheetStr = max(uStrandT[1].w, uStrandT[2].w);
       // Fade out well inside the region it is drawn in (no visible mask edges).
       vec2 e2 = min(sp - uStrandBox.xy, uStrandBox.zw - sp);
       float edgeFade = smoothstep(0.0, 50.0, min(e2.x, e2.y));
-      col += vec3(0.78, 0.82, 0.88) * (sc3 * 0.3 + sheet * sheetStr * 0.24) * pointerInSpace * edgeFade;
+      // Not cropped by the planet: the strands rise out of marked spots on it.
+      col += vec3(0.78, 0.82, 0.88) * (sc3 * 0.3 + sheet * sheetStr * 0.24) * mix(0.75, 1.0, pointerInSpace) * edgeFade;
     }
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
@@ -1019,6 +1026,7 @@ export function HeroScene({
   onFail,
   onStorm,
   tip,
+  anchors,
   className,
 }: {
   layer: "planet" | "meteors";
@@ -1030,6 +1038,8 @@ export function HeroScene({
   onStorm?: (x: number, y: number) => void;
   /** Element placed at the ribbons' tip (the cursor in space) while they show. */
   tip?: { current: HTMLElement | null };
+  /** Marked spots on the artwork (percent), where the cursor's strands start. */
+  anchors?: { current: { x: number; y: number }[] };
   onFail?: () => void;
   className?: string;
 }) {
@@ -1094,7 +1104,7 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), storm: u("uStorm[0]"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
@@ -1191,7 +1201,7 @@ export function HeroScene({
           if (!set || set.count === 0) continue;
           gl.bufferData(gl.ARRAY_BUFFER, set.attrs.subarray(0, set.count * 4), gl.DYNAMIC_DRAW);
           gl.vertexAttribPointer(wLocA, 4, gl.FLOAT, false, 0, 0);
-          gl.drawArrays(gl.POINTS, 0, set.count);
+          gl.drawArrays(gl.POINTS, 0, set === wisps && quality.level >= 2 ? Math.floor(set.count / 2) : set.count);
         }
         gl.disable(gl.BLEND);
         if (wLocA !== loc) gl.disableVertexAttribArray(wLocA);
@@ -1201,7 +1211,13 @@ export function HeroScene({
         gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       };
       // Adaptive quality: lower the planet's render scale if frames run long.
-      const quality = { scale: 1, ema: 16, last: 0, changed: 0 };
+      // Quality: render scale first, then whole tiers of effects (0 full, 1 no
+      // veil or nebula haze, 2 also no city lights and half the puffs); if even
+      // that cannot keep up, fall back to the still images. Modest machines
+      // (few cores, little memory, touch-first) start a tier down.
+      const nav = navigator as Navigator & { deviceMemory?: number };
+      const modest = (nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4 || window.matchMedia("(pointer: coarse)").matches;
+      const quality = { scale: 1, ema: 16, last: 0, changed: 0, level: modest ? 1 : 0, slowSince: 0 };
       const menuH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 84;
       // Scroll speed, smoothed, so streaks swell while you scroll and settle after.
       const scroll = { p: progress.current, t: 0, v: 0 };
@@ -1211,7 +1227,9 @@ export function HeroScene({
         return t * t * (3 - 2 * t);
       };
       const resize = () => {
-        dpr = Math.min(window.devicePixelRatio || 1, 2) * quality.scale;
+        // Capped at 1.5× on high-density screens (barely visible on this soft,
+        // grainy image, and far less work).
+        dpr = Math.min(window.devicePixelRatio || 1, 1.5) * quality.scale;
         const rect = canvas.getBoundingClientRect();
         canvas.width = Math.round(rect.width * dpr);
         canvas.height = Math.round(rect.height * dpr);
@@ -1246,15 +1264,11 @@ export function HeroScene({
             g.cy - g.fh / 2 + (0.58 + (sy / 1126 - 0.58) * sP) * g.fh,
           ];
           const [ax, ay] = toScreen(2024.4 - 0.9906 * (883 - 14), 731.9 - 0.1353 * (883 - 14));
-          const [lx, ly] = toScreen(2024.4 - 0.9906 * 883, 731.9 - 0.1353 * 883);
-          const ox = lx - ax || -1, oy = ly - ay;
-          const on = Math.hypot(ox, oy);
-          const tx0 = ox / on, ty0 = oy / on;                 // outward, along the streams
           const reach = Math.hypot(head.x - ax, head.y - ay);
           // Present while the cursor is out in space, not too far off; eases in/out.
           // Only as the rocks clear: faint while the last ones leave, full once gone.
           const clear = smooth(0.72, 0.97, progress.current);
-          const want = head.x > -9000 && out > 8 && reach < pr * 1.3 && clear > 0 && !reduced ? clear : 0;
+          const want = head.x > -9000 && out > 8 && out < pr * 0.9 && clear > 0 && !reduced ? clear : 0;
           strand.on += (want - strand.on) * (1 - Math.pow(1 - (want > strand.on ? 0.04 : 0.06), strandDt));
           strandA.fill(0);
           strandT.fill(0);
@@ -1264,18 +1278,32 @@ export function HeroScene({
             const px = -uy, py = ux;
             let x0 = Math.min(head.x, ax), y0 = Math.min(head.y, ay);
             let x1 = Math.max(head.x, ax), y1 = Math.max(head.y, ay);
-            // Roots spread across the middle of the limb (fixed points, like the
-            // streams in the artwork); each leaves along the streams and bends
-            // toward the cursor, where they gather.
-            // (Centred a little higher up the limb than the streams' crossing.)
+            // Roots: the marked spots on the planet (the callouts and notes) nearest
+            // the cursor, as if the strands were drawn out of those places;
+            // fallback roots along the limb if too few are in view.
+            const roots: [number, number][] = [];
+            for (const a of anchors?.current ?? []) {
+              const ax2 = (a.x / 100) * 2000, ay2 = (a.y / 100) * 1126;
+              if (Math.hypot(ax2 - 2024.4, ay2 - 731.9) > 883 - 30) continue;
+              roots.push(toScreen(ax2, ay2));
+            }
+            roots.sort((p1, p2) => Math.hypot(p1[0] - head.x, p1[1] - head.y) - Math.hypot(p2[0] - head.x, p2[1] - head.y));
             const baseAng = Math.atan2(ay - pcy, ax - pcx) + 0.1;
-            const mrx = pcx + Math.cos(baseAng) * (pr - 14);
-            const mry = pcy + Math.sin(baseAng) * (pr - 14);
+            for (let k = roots.length; k < 4; k++) {
+              const ra = baseAng + (k - 1.5) * 0.09;
+              roots.push([pcx + Math.cos(ra) * (pr - 14), pcy + Math.sin(ra) * (pr - 14)]);
+            }
+            const use = roots.slice(0, 4);
+            // Order around the cursor, so the outer strands are the fan's edges.
+            use.sort((p1, p2) => (p1[0] - head.x) * py + (p1[1] - head.y) * -px - ((p2[0] - head.x) * py + (p2[1] - head.y) * -px));
+            const mrx = use.reduce((a2, r) => a2 + r[0], 0) / use.length;
+            const mry = use.reduce((a2, r) => a2 + r[1], 0) / use.length;
             for (let k = 0; k < 4; k++) {
               const s = k - 1.5;
-              const ra = baseAng + s * 0.09;
-              const rx = pcx + Math.cos(ra) * (pr - 14);
-              const ry = pcy + Math.sin(ra) * (pr - 14);
+              const [rx, ry] = use[k]!;
+              // Lean outward from the planet at the root.
+              const rl = Math.max(1, Math.hypot(rx - pcx, ry - pcy));
+              const nox = (rx - pcx) / rl, noy = (ry - pcy) / rl;
               // Ethereal, not elastic: each strand's tip and bend drift after the
               // cursor at their own unhurried pace, with a slow independent sway,
               // so they trail and settle like smoke rather than snapping.
@@ -1298,8 +1326,8 @@ export function HeroScene({
               // Concave: bowing in toward the shared middle line, leaning along the streams.
               const midx = (rx + tx) / 2, midy = (ry + ty) / 2;
               const axmx = (mrx + tx) / 2, axmy = (mry + ty) / 2;
-              const gcx = midx + (axmx - midx) * 1.15 + tx0 * reachK * 0.12 + px * wob * reachK * 0.04;
-              const gcy = midy + (axmy - midy) * 1.15 + ty0 * reachK * 0.12 + py * wob * reachK * 0.04;
+              const gcx = midx + (axmx - midx) * 1.15 + nox * reachK * 0.18 + px * wob * reachK * 0.04;
+              const gcy = midy + (axmy - midy) * 1.15 + noy * reachK * 0.18 + py * wob * reachK * 0.04;
               if (st.cx < -9000) {
                 st.cx = gcx;
                 st.cy = gcy;
@@ -1357,6 +1385,7 @@ export function HeroScene({
         scroll.t = now;
         gl.uniform1f(U.s, reduced ? 0 : scroll.v);
         gl.uniform1f(U.menu, menuH);
+        gl.uniform1f(U.q, quality.level);
         const tSec = (now - clock.current) / 1000 + timeShift;
         const p = progress.current;
         const fx = (pointer.tx - (g.cx - g.fw / 2)) / g.fw;
@@ -1377,8 +1406,8 @@ export function HeroScene({
           // The pointer's wake gently moves the air, and the air carries the cloud.
           flow.step(mx, my, dmx, dmy, dt);
           if (wisps) {
-            wisps.step(flow, dt);
             stormPuffs?.step(flow, dt);
+            wisps.step(flow, dt, 1, stormPuffs?.centres);
           }
           prevSim.disc = [mx, my];
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
@@ -1414,7 +1443,26 @@ export function HeroScene({
                 quality.scale = next;
                 quality.changed = now;
                 resize();
+              } else if (quality.ema > 26 && quality.scale <= 0.55) {
+                // Still slow at the lowest scale: drop a tier of effects.
+                if (quality.level < 2) {
+                  quality.level += 1;
+                  quality.scale = 0.8;
+                  quality.changed = now;
+                  resize();
+                } else if (quality.ema > 45 && !/[?&]gl=force\b/.test(window.location.search)) {
+                  if (!quality.slowSince) quality.slowSince = now;
+                  if (now - quality.slowSince > 4000) {
+                    disposed = true;
+                    onFail?.();
+                    return;
+                  }
+                }
+              } else if (quality.ema < 13 && quality.scale >= 1 && quality.level > (modest ? 1 : 0)) {
+                quality.level -= 1;
+                quality.changed = now;
               }
+              if (quality.ema <= 45) quality.slowSince = 0;
             }
           }
           quality.last = now;
@@ -1522,7 +1570,7 @@ export function HeroScene({
       disposed = true;
       teardown?.();
     };
-  }, [layer, progress, clock, onReady, onFail, onStorm, tip]);
+  }, [layer, progress, clock, onReady, onFail, onStorm, tip, anchors]);
 
   return <canvas ref={ref} aria-hidden="true" className={className} />;
 }
