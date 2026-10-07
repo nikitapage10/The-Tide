@@ -10,6 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GLYPH_PRESENCE_DEFAULT, glyphPresence } from "./GlyphTrail";
+import { Decode, decodeMs } from "@/components/glyphs/Decode";
 import { HeroDrifters } from "./HeroDrifters";
 import { HeroScene } from "./HeroScene";
 import { SoundToggle } from "./SoundToggle";
@@ -244,10 +245,10 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
             <span className={`obs-line absolute top-0 h-px bg-white/50 ${stormNote.left ? "right-2 origin-right" : "left-2 origin-left"}`} />
             <div className={`absolute -top-2.5 w-max ${stormNote.left ? "right-[4.5rem] text-right" : "left-[4.5rem]"}`}>
               <span className="tracked block text-white">
-                <Typed text={stormNote.title} active delay={150} />
+                <Decode text={stormNote.title} active delay={150} calc />
               </span>
               <span className="tracked block text-[0.68rem] leading-5 text-muted">
-                <Typed text={stormNote.line} active delay={150 + stormNote.title.length * 28 + 120} speed={18} />
+                <Decode text={stormNote.line} active delay={150 + decodeMs(stormNote.title, true) * 0.55} />
               </span>
             </div>
           </div>
@@ -356,13 +357,13 @@ function Observations({ items, active, startDelay = 1600, calc = false }: { item
       <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />
       <span className={`obs-line absolute top-0 h-px bg-white/50 ${o.side === "right" ? "left-2 origin-left" : "right-2 origin-right"}`} />
       <div className={`absolute -top-2.5 w-max max-w-[16rem] ${o.side === "right" ? "left-[4.5rem]" : "right-[4.5rem] text-right"}`}>
-        {/* In space, the identification is worked out first; the name replaces it. */}
+        {/* Identified first (working), written in the script, then translated. */}
         {calc ? <Working key={`w${index}`} active={on} seed={index} /> : null}
         <span className="tracked block text-white">
-          <Typed key={`t${index}`} text={o.title} active={on} delay={(calc ? WORKING_MS : 0) + 250} />
+          <Decode key={`t${index}`} text={o.title} active={on} delay={(calc ? WORKING_MS : 0) + 250} calc={!calc} />
         </span>
         <span className="tracked block text-[0.68rem] leading-5 text-muted">
-          <Typed key={`l${index}`} text={o.line} active={on} delay={(calc ? WORKING_MS : 0) + 250 + o.title.length * 28 + 150} speed={18} />
+          <Decode key={`l${index}`} text={o.line} active={on} delay={(calc ? WORKING_MS : 0) + 250 + decodeMs(o.title, !calc) * 0.55} />
         </span>
       </div>
     </div>
@@ -455,11 +456,11 @@ function Callout({ c, active, delay }: { c: HeroCallout; active: boolean; delay:
   const body = (
     <>
       <span className="tracked block text-white">
-        <Typed text={c.title} active={active} delay={delay} />
+        <Decode text={c.title} active={active} delay={delay} calc />
       </span>
       {c.lines.map((l) => (
         <span key={l} className="tracked block text-[0.68rem] leading-5 text-muted">
-          <Typed text={l} active={active} delay={delay + c.title.length * 28 + 120} speed={18} />
+          <Decode text={l} active={active} delay={delay + decodeMs(c.title, true) * 0.55} />
         </span>
       ))}
     </>

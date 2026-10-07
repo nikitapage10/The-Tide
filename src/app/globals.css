@@ -309,3 +309,11 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .smoky-button__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; text-shadow: 0 0 10px rgba(0, 0, 0, 0.85); }
 .smoky-button__label { font-size: 0.875rem; font-weight: 500; letter-spacing: 0.02em; }
 .smoky-button__status { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+
+/* Decode (components/glyphs/Decode): each glyph sits in its letter's slot and
+   crossfades into it, so the line never shifts while it resolves. */
+.decode-cell { position: relative; display: inline-block; }
+.decode-letter { opacity: 0; transition: opacity 0.22s ease; }
+.decode-letter.decode-on { opacity: 1; }
+.decode-glyph { position: absolute; left: 50%; top: 50%; height: 1.05em; width: auto; translate: -50% -50%; opacity: 0.9; transition: opacity 0.22s ease, filter 0.22s ease; }
+.decode-glyph.decode-off { opacity: 0; filter: blur(1px); }
