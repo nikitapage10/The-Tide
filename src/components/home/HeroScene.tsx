@@ -100,9 +100,16 @@ vec2 stormTwist(vec2 sph, out float bonus, out float eye) {
     vec2 bq = vec2(cos(sp), sin(sp)) * (1.2 + 0.4 * r) + vec2(r * 2.2, uStorm[k].w * 9.0);
     float bandsN = fbm(bq * 1.6) * 0.65 + fbm(bq * 4.2 + 3.0) * 0.35;
     float bands = smoothstep(0.35, 0.75, bandsN) * smoothstep(1.9, 0.5, r);
-    float eyewall = exp(-pow((r - 0.42) / 0.22, 2.0));
-    bonus = max(bonus, grow * clamp(eyewall + bands * 0.85, 0.0, 1.0));
-    eye = max(eye, grow * (1.0 - smoothstep(0.16, 0.3, r)));
+    // A lower layer beneath the top bands: tighter, turning more slowly and
+    // offset, so the storm has depth (top deck over lower cloud over ground).
+    float spL = th + 2.6 * log(r + 0.05) - turn * 0.6 + uStorm[k].w * 3.0 + 1.3;
+    vec2 lq = vec2(cos(spL), sin(spL)) * (1.0 + 0.5 * r) + vec2(r * 3.0, uStorm[k].w * 5.0);
+    float lower = smoothstep(0.4, 0.75, fbm(lq * 2.2)) * smoothstep(1.4, 0.35, r);
+    float eyewall = exp(-pow((r - 0.45) / 0.26, 2.0));
+    bonus = max(bonus, grow * clamp(eyewall * 0.85 + bands * 0.6 + lower * 0.35, 0.0, 1.0));
+    // The eye as a funnel going down: deepest at the centre, its walls
+    // shading inward rather than a cut-out hole.
+    eye = max(eye, grow * (1.0 - smoothstep(0.05, 0.42, r)));
   }
   return q;
 }
@@ -112,7 +119,7 @@ float cloudBase(vec2 sph) {
   vec2 p = cloudCoords(tw);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
   float base = fbm5(p * 1.7 + 0.45 * w);
-  return max(base, 0.4 + 0.38 * bonus) - eye * 0.6;
+  return max(base, 0.38 + 0.34 * bonus) - eye * eye * 0.45;
 }
 // Final cloud density from the (simulated) base amount plus fine detail.
 float cloudDetail(float base, vec2 pw) {
@@ -373,7 +380,8 @@ vec3 planetWithLimb(vec2 uv) {
     float baseSun = cloudBase(srcS);
     float dens = clamp(cloudDetail(baseHere, pw) * coverH, 0.0, 1.0);
     // Smooth storm cloud (fine detail would break its arms into jagged bits).
-    dens = mix(dens, smoothstep(0.42, 0.72, baseHere) * coverH, sbH * 0.45);
+    // Storm cloud keeps the deck's own texture (no flat, cartoon-smooth fill).
+    dens = mix(dens, smoothstep(0.42, 0.72, baseHere) * coverH, sbH * 0.15);
     float densSun = clamp(cloudDetail(baseSun, cloudCoords(stormTwist(srcS, sbH, seH))) * coverS, 0.0, 1.0);
     vec2 eyes[3];
     eyes[0] = vec2(-0.4127, -0.0255);
@@ -387,6 +395,9 @@ vec3 planetWithLimb(vec2 uv) {
     vec3 cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
     float alpha = pow(dens, 1.3) * 0.8 * smoothstep(0.0, 0.15, z);
     col = mix(col, cloudCol, inside * alpha);
+    // Storm depth: the eyewall's inner slope falls into shadow toward the
+    // centre (looking down a funnel to the surface).
+    col *= 1.0 - 0.38 * seH * smoothstep(0.0, 0.6, seH);
 
     // Lightning inside the storms: now and then (rarely) a flash lights a cloud
     // from within.
@@ -1007,6 +1018,7 @@ export function HeroScene({
   onReady,
   onFail,
   onStorm,
+  tip,
   className,
 }: {
   layer: "planet" | "meteors";
@@ -1016,6 +1028,8 @@ export function HeroScene({
   onReady?: () => void;
   /** A storm was planted at this point (CSS px, relative to the canvas). */
   onStorm?: (x: number, y: number) => void;
+  /** Element placed at the ribbons' tip (the cursor in space) while they show. */
+  tip?: { current: HTMLElement | null };
   onFail?: () => void;
   className?: string;
 }) {
@@ -1316,6 +1330,10 @@ export function HeroScene({
             for (const st of flowState) st.tx = st.cx = -9999;
             gl.uniform4f(U.strandBox, 0, 0, -1, -1);
           }
+          if (tip?.current) {
+            tip.current.style.opacity = String(Math.min(1, strand.on * 1.4));
+            tip.current.style.transform = `translate(${head.x}px, ${head.y}px)`;
+          }
           gl.uniform4fv(U.strandA, strandA);
           gl.uniform4fv(U.strandT, strandT);
         }
@@ -1507,7 +1525,7 @@ export function HeroScene({
       disposed = true;
       teardown?.();
     };
-  }, [layer, progress, clock, onReady, onFail, onStorm]);
+  }, [layer, progress, clock, onReady, onFail, onStorm, tip]);
 
   return <canvas ref={ref} aria-hidden="true" className={className} />;
 }

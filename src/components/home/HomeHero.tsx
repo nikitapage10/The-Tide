@@ -54,6 +54,7 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
+  const tip = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
   // The interface (callouts) is revealed late in the scroll; it types itself in.
   const [revealed, setRevealed] = useState(false);
@@ -139,7 +140,7 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
         </div>
 
         {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
-        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} className="hero-layer z-[1] h-full w-full" />
+        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} tip={tip} className="hero-layer z-[1] h-full w-full" />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
         <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
@@ -219,6 +220,10 @@ export function HomeHero({ callouts, observations, spaceNotes }: HeroProps) {
               The Tide
             </h1>
           </div>
+        </div>
+
+        <div ref={tip} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 z-[6] opacity-0">
+          <Locator />
         </div>
 
         {stormNote ? (
@@ -389,6 +394,45 @@ function Working({ active, seed }: { active: boolean; seed: number }) {
     <span className="absolute inset-x-0 top-0 block font-[family-name:var(--font-mono)] text-[0.6rem] leading-4 tracking-[0.12em] text-white/40">
       {lines.map((l, i) => (
         <span key={i} className="block whitespace-nowrap">
+          {l}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Readout at the ribbons' tip: as if the strands were locating something,
+ * lines of working in maths and the made-up script churn, and a fix converges.
+ */
+function Locator() {
+  const [lines, setLines] = useState<string[]>([]);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]!;
+    const num = (d = 3) => (Math.random() * 9.99).toFixed(d);
+    let fix = [Math.random() * 180 - 90, Math.random() * 360 - 180];
+    let n = 0;
+    const id = window.setInterval(() => {
+      n += 1;
+      // The fix wanders, then settles, then a new search begins.
+      const settle = Math.min(1, (n % 60) / 40);
+      if (n % 60 === 0) fix = [Math.random() * 180 - 90, Math.random() * 360 - 180];
+      const jitter = (1 - settle) * 4;
+      const la = fix[0]! + (Math.random() - 0.5) * jitter;
+      const lo = fix[1]! + (Math.random() - 0.5) * jitter;
+      setLines([
+        `${pick(GLYPHS)}${pick(GLYPHS)} ${settle < 1 ? "locating" : "fixed"}`,
+        `${pick(OPS)}${pick(GLYPHS)} ${num()} ${pick(["·", "×", "→"])} ${pick(GLYPHS)} ${num(2)}`,
+        `${la >= 0 ? "+" : "−"}${Math.abs(la).toFixed(3)} ${pick(GLYPHS)} ${lo >= 0 ? "+" : "−"}${Math.abs(lo).toFixed(3)}`,
+      ]);
+    }, 110);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <span className="absolute left-5 top-3 block font-[family-name:var(--font-mono)] text-[0.58rem] leading-4 tracking-[0.12em] text-white/45">
+      {lines.map((l, i) => (
+        <span key={i} className={`block whitespace-nowrap ${i === 2 ? "text-white/70" : ""}`}>
           {l}
         </span>
       ))}

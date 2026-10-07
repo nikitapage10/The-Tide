@@ -11,16 +11,31 @@
  *                scatters them, and they drift slowly back.
  *  4. Dissipate: the deck stays put; the cursor thins it and sheds small
  *                evaporating wisps (what the home hero does now).
+ *  5. Nebula:    layered, glowing volumetric haze; the cursor stirs the air and
+ *                the haze is re-drawn through the stirred coordinates.
+ *  6. Curl flow: the deck drifts on a field of gentle eddies (curl noise); the
+ *                cursor whips up local turbulence that billows the cloud apart.
+ *  7. Wake:      the fluid with a thin, focused wind: the cursor leaves a narrow
+ *                wake that slowly feathers apart, like a contrail.
+ *  8. Puffs + air: soft puffs carried by a simple air simulation the cursor stirs.
+ *  9. Light:     nothing moves; the cursor is a low light skimming the cloud
+ *                tops, raising highlights and casting shadows.
  */
 import { useEffect, useRef, useState } from "react";
+import { FlowSim } from "@/components/home/heroPhysics";
 
-type Mode = "fluid" | "eddies" | "particles" | "dissipate";
+type Mode = "fluid" | "eddies" | "particles" | "dissipate" | "nebula" | "curl" | "wake" | "airpuffs" | "light";
 
 const MODES: { id: Mode; label: string; note: string }[] = [
   { id: "fluid", label: "1 · Fluid", note: "Real fluid: the cursor is wind, the cloud is carried by the air." },
   { id: "eddies", label: "2 · Eddies", note: "The cursor sheds counter-rotating eddies: clouds curl and tear." },
   { id: "particles", label: "3 · Particles", note: "The deck is soft puffs; the cursor is a gust that scatters them." },
   { id: "dissipate", label: "4 · Dissipate", note: "Cloud thins where you pass and sheds evaporating wisps." },
+  { id: "nebula", label: "5 · Nebula", note: "Layered glowing haze; the cursor stirs it and light glows through the thin parts." },
+  { id: "curl", label: "6 · Curl flow", note: "Clouds drift on gentle eddies; the cursor whips up turbulence that billows them apart." },
+  { id: "wake", label: "7 · Wake", note: "A thin, focused wind: the cursor leaves a wake that slowly feathers apart." },
+  { id: "airpuffs", label: "8 · Puffs + air", note: "Soft puffs carried by moving air that the cursor stirs." },
+  { id: "light", label: "9 · Light", note: "Nothing moves: the cursor is a low light skimming the cloud tops." },
 ];
 
 const VERT = `
@@ -207,6 +222,122 @@ void main() {
 }
 `;
 
+// Reference map (RG = the coordinates the haze is drawn from), carried by the
+// air and relaxing back to the identity.
+const ADVECT_MAP = `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uVel, uSrc;
+uniform float uDt, uK;
+void main() {
+  vec2 back = vUv - uDt * texture2D(uVel, vUv).xy;
+  vec2 m = texture2D(uSrc, back).xy;
+  gl_FragColor = vec4(mix(m, vUv, uK), 0.0, 1.0);
+}
+`;
+
+const NEBULA = `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uMap;
+uniform float uAspect, uT;
+uniform vec2 uM;
+${NOISE}
+void main() {
+  vec2 q = texture2D(uMap, vUv).xy;
+  vec2 p = vec2(q.x * uAspect, q.y) * 1.7;
+  float t = uT * 0.02;
+  vec2 w = vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t));
+  float n1 = fbm(p * 1.4 + 2.2 * w);
+  float n2 = fbm(p * 3.1 - 1.4 * w + vec2(t * 2.0, 0.0));
+  float n3 = fbm(p * 7.0 + 3.0 * w);
+  // Back layer: broad dim dust; mid layer: brighter filaments; front: wisps.
+  float back = smoothstep(0.3, 0.9, n1);
+  float mid = smoothstep(0.5, 0.85, n2) * (0.6 + 0.6 * n3);
+  float front = smoothstep(0.62, 0.9, n3) * smoothstep(0.4, 0.7, n1);
+  // Light glowing through where the haze is thin (the edges of the clouds).
+  float rim = smoothstep(0.35, 0.55, n1) * (1.0 - smoothstep(0.55, 0.8, n1));
+  vec2 dm = vec2((vUv.x - uM.x) * uAspect, vUv.y - uM.y);
+  float near = exp(-dot(dm, dm) / 0.03);
+  vec3 col = vec3(0.012, 0.016, 0.024);
+  // Faint stars behind, dimmed by the haze.
+  vec2 sg = vUv * vec2(uAspect, 1.0) * 220.0;
+  vec2 si = floor(sg);
+  float st = step(0.985, hash(si)) * exp(-dot(sg - si - 0.5, sg - si - 0.5) * 6.0);
+  col += vec3(0.8, 0.85, 0.95) * st * (1.0 - back) * 0.7;
+  col += vec3(0.32, 0.36, 0.44) * back * 0.55;
+  col += vec3(0.62, 0.68, 0.78) * mid * 0.45;
+  col += vec3(0.85, 0.88, 0.95) * front * 0.35;
+  col += vec3(0.7, 0.78, 0.95) * rim * (0.12 + 0.5 * near);
+  col *= 1.0 + 0.35 * near;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+// Velocity from curl noise (drift of gentle eddies), plus cursor turbulence.
+const CURLVEL = `
+precision highp float;
+varying vec2 vUv;
+uniform float uAspect, uT, uStir, uRad;
+uniform vec2 uM;
+${NOISE}
+float psi(vec2 p, float s) { return fbm(p * s + vec2(uT * 0.05, -uT * 0.03)); }
+void main() {
+  vec2 p = vec2(vUv.x * uAspect, vUv.y);
+  float e = 0.004;
+  float a = psi(p + vec2(0.0, e), 2.0) - psi(p - vec2(0.0, e), 2.0);
+  float b = psi(p + vec2(e, 0.0), 2.0) - psi(p - vec2(e, 0.0), 2.0);
+  vec2 v = vec2(a, -b) / (2.0 * e) * 0.004;
+  vec2 dm = vec2((vUv.x - uM.x) * uAspect, vUv.y - uM.y);
+  float g = exp(-dot(dm, dm) / uRad) * uStir;
+  if (g > 0.001) {
+    float a2 = psi(p + vec2(0.0, e), 14.0) - psi(p - vec2(0.0, e), 14.0);
+    float b2 = psi(p + vec2(e, 0.0), 14.0) - psi(p - vec2(e, 0.0), 14.0);
+    v += vec2(a2, -b2) / (2.0 * e) * 0.02 * g;
+  }
+  gl_FragColor = vec4(v, 0.0, 1.0);
+}
+`;
+
+// A low light at the cursor skimming the (static) cloud tops.
+const LIGHT = `
+precision highp float;
+varying vec2 vUv;
+uniform float uAspect;
+uniform vec2 uM;
+uniform float uOn;
+${NOISE}
+float h(vec2 uv) { return deck(vec2(uv.x * uAspect, uv.y) * 2.0); }
+void main() {
+  vec2 p = vec2(vUv.x * uAspect, vUv.y);
+  float land = smoothstep(0.52, 0.56, fbm(p * 1.6 + 20.0));
+  vec3 ground = mix(vec3(0.07, 0.085, 0.1), vec3(0.16, 0.17, 0.17), land);
+  float d = h(vUv);
+  float tex = fbm(p * 22.0) * 0.5 + fbm(p * 50.0) * 0.5;
+  float hgt = d * (0.75 + 0.5 * tex);
+  float e = 0.003;
+  float hx = h(vUv + vec2(e, 0.0)) - h(vUv - vec2(e, 0.0));
+  float hy = h(vUv + vec2(0.0, e)) - h(vUv - vec2(0.0, e));
+  vec3 n = normalize(vec3(-hx * 6.0, -hy * 6.0, 1.0));
+  vec3 lp = vec3((uM.x - vUv.x) * uAspect, uM.y - vUv.y, 0.12);
+  float dist = length(lp);
+  vec3 L = lp / dist;
+  float diff = clamp(dot(n, L), 0.0, 1.0) / (1.0 + dist * dist * 18.0);
+  // Soft shadow: march toward the light over the height field.
+  float shade = 1.0;
+  for (int i = 1; i <= 10; i++) {
+    float t = float(i) / 10.0;
+    vec2 sp = mix(vUv, uM, t * 0.35);
+    float hh = h(sp);
+    float rayH = hgt + t * 0.35 * 0.6;
+    shade = min(shade, 1.0 - smoothstep(0.0, 0.25, hh - rayH) * 0.8);
+  }
+  vec3 base = mix(ground, vec3(0.55, 0.58, 0.62) * (0.7 + 0.3 * tex), smoothstep(0.05, 0.85, hgt));
+  vec3 col = base * (0.55 + 1.3 * diff * shade * uOn) + vec3(0.9, 0.93, 1.0) * pow(diff, 3.0) * 0.4 * uOn;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
 const PUFF_VERT = `
 attribute vec4 aP;     // x, y (uv); size px; alpha
 varying float vA;
@@ -338,6 +469,10 @@ export function CloudLab() {
         grad: program(VERT, GRADIENT),
         display: program(VERT, DISPLAY),
         puff: program(PUFF_VERT, PUFF_FRAG),
+        advectMap: program(VERT, ADVECT_MAP),
+        nebula: program(VERT, NEBULA),
+        curlVel: program(VERT, CURLVEL),
+        light: program(VERT, LIGHT),
       };
     } catch (e) {
       queueMicrotask(() => setError(String(e)));
@@ -420,6 +555,20 @@ export function CloudLab() {
     // Fill the dye with the natural deck (one advection step with full recovery).
     const resetDye = () => {
       bindQuad();
+      if (params.current.mode === "nebula") {
+        gl.useProgram(P.advectMap!.p);
+        gl.uniform1i(P.advectMap!.u("uVel"), tex(0, vel.read.tex));
+        gl.uniform1i(P.advectMap!.u("uSrc"), tex(1, dye.read.tex));
+        gl.uniform1f(P.advectMap!.u("uDt"), 0);
+        gl.uniform1f(P.advectMap!.u("uK"), 1);
+        draw(dye.write, DYE, DYE);
+        dye.swap();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, vel.read.fb);
+        gl.viewport(0, 0, SIM, SIM);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        return;
+      }
       gl.useProgram(P.advectDye!.p);
       gl.uniform1i(P.advectDye!.u("uVel"), tex(0, vel.read.tex));
       gl.uniform1i(P.advectDye!.u("uSrc"), tex(1, dye.read.tex));
@@ -461,6 +610,8 @@ export function CloudLab() {
     // Wisps for mode 4 (separate pool appended after nothing; reuse arrays).
     const wisps: { x: number; y: number; vx: number; vy: number; age: number; life: number; size: number; a: number }[] = [];
     const puffBuf = gl.createBuffer();
+    let stir = 0;
+    let air = new FlowSim();
 
     const pointer = { x: 0.5, y: 0.5, px: 0.5, py: 0.5, moved: false, inside: false };
     const onMove = (e: PointerEvent) => {
@@ -498,6 +649,8 @@ export function CloudLab() {
         resetDye();
         placeDeck();
         wisps.length = 0;
+        air = new FlowSim();
+        stir = 0;
       }
       bindQuad();
       const dx = pointer.x - pointer.px, dy = pointer.y - pointer.py;
@@ -505,8 +658,27 @@ export function CloudLab() {
       const texel: [number, number] = [1 / SIM, 1 / SIM];
       const rad = 0.00015 + radius * 0.0012;
 
-      if (mode === "fluid" || mode === "eddies" || mode === "dissipate") {
+      const fluidLike = mode === "fluid" || mode === "eddies" || mode === "wake" || mode === "nebula";
+      if (fluidLike || mode === "dissipate" || mode === "curl") {
         // Forces.
+        if (moving && mode === "wake") {
+          splat(vel, SIM, SIM, pointer.x, pointer.y, [dx * 70 * strength, dy * 70 * strength, 0], rad * 0.18);
+        }
+        if (moving && mode === "nebula") {
+          splat(vel, SIM, SIM, pointer.x, pointer.y, [dx * 40 * strength, dy * 40 * strength, 0], rad * 1.5);
+          splat(vel, SIM, SIM, pointer.x, pointer.y, [3 * strength * Math.min(1, Math.hypot(dx, dy) * 80), 0, 0], rad * 1.2, 1);
+        }
+        if (mode === "curl") {
+          stir = Math.min(1.5, stir * Math.exp(-dt * 1.2) + (moving ? Math.hypot(dx, dy) * 40 * strength : 0));
+          gl.useProgram(P.curlVel!.p);
+          gl.uniform1f(P.curlVel!.u("uAspect"), aspect);
+          gl.uniform1f(P.curlVel!.u("uT"), now / 1000);
+          gl.uniform1f(P.curlVel!.u("uStir"), stir);
+          gl.uniform1f(P.curlVel!.u("uRad"), rad * 3);
+          gl.uniform2f(P.curlVel!.u("uM"), pointer.x, pointer.y);
+          draw(vel.write, SIM, SIM);
+          vel.swap();
+        }
         if (moving && mode === "fluid") {
           splat(vel, SIM, SIM, pointer.x, pointer.y, [dx * 60 * strength * 2, dy * 60 * strength * 2, 0], rad);
         }
@@ -541,7 +713,7 @@ export function CloudLab() {
           if (wisps.length > 1500) wisps.splice(0, wisps.length - 1500);
         }
 
-        if (mode !== "dissipate") {
+        if (fluidLike) {
           // Vorticity (keeps the swirls alive), pressure projection, advection.
           gl.useProgram(P.curl!.p);
           gl.uniform1i(P.curl!.u("uVel"), tex(0, vel.read.tex));
@@ -551,7 +723,7 @@ export function CloudLab() {
           gl.uniform1i(P.vort!.u("uVel"), tex(0, vel.read.tex));
           gl.uniform1i(P.vort!.u("uCurl"), tex(1, curlT.tex));
           gl.uniform2f(P.vort!.u("uTexel"), ...texel);
-          gl.uniform1f(P.vort!.u("uStrength"), mode === "eddies" ? 30 : 12);
+          gl.uniform1f(P.vort!.u("uStrength"), mode === "eddies" ? 30 : mode === "wake" ? 45 : 12);
           gl.uniform1f(P.vort!.u("uDt"), dt);
           draw(vel.write, SIM, SIM);
           vel.swap();
@@ -581,6 +753,15 @@ export function CloudLab() {
           draw(vel.write, SIM, SIM);
           vel.swap();
         }
+        if (mode === "nebula") {
+          gl.useProgram(P.advectMap!.p);
+          gl.uniform1i(P.advectMap!.u("uVel"), tex(0, vel.read.tex));
+          gl.uniform1i(P.advectMap!.u("uSrc"), tex(1, dye.read.tex));
+          gl.uniform1f(P.advectMap!.u("uDt"), dt);
+          gl.uniform1f(P.advectMap!.u("uK"), 1 - Math.exp(-dt * recover * recover * 1.5));
+          draw(dye.write, DYE, DYE);
+          dye.swap();
+        } else {
         gl.useProgram(P.advectDye!.p);
         gl.uniform1i(P.advectDye!.u("uVel"), tex(0, vel.read.tex));
         gl.uniform1i(P.advectDye!.u("uSrc"), tex(1, dye.read.tex));
@@ -590,6 +771,32 @@ export function CloudLab() {
         gl.uniform1f(P.advectDye!.u("uAspect"), aspect);
         draw(dye.write, DYE, DYE);
         dye.swap();
+        }
+      }
+
+      // Puffs + air: a simple air simulation (the hero's) carries the puffs.
+      if (mode === "airpuffs") {
+        const mx = pointer.x * 2 - 1, my = pointer.y * 2 - 1;
+        air.step(mx, my, moving ? dx * 2 * (0.5 + strength) : 0, moving ? dy * 2 * (0.5 + strength) : 0, dt * 60);
+        const k = 0.1 + recover * 1.0;
+        for (let i = 0; i < pCount; i++) {
+          const o = i * 4;
+          let x = pA[o]!, y = pA[o + 1]!;
+          const [ax, ay] = air.velocityAt(x * 2 - 1, y * 2 - 1);
+          // Air velocity (disc units per frame) → uv per second.
+          const wx = ax * 30 * (1 + 2 * strength), wy = ay * 30 * (1 + 2 * strength);
+          let vx = pv[i * 2]!, vy = pv[i * 2 + 1]!;
+          vx += (wx - vx) * Math.min(1, dt * (2 + 6 * hash(i, 3)));
+          vy += (wy - vy) * Math.min(1, dt * (2 + 6 * hash(i, 4)));
+          vx += (homes[i * 2]! - x) * k * dt;
+          vy += (homes[i * 2 + 1]! - y) * k * dt;
+          x += vx * dt;
+          y += vy * dt;
+          pA[o] = x;
+          pA[o + 1] = y;
+          pv[i * 2] = vx;
+          pv[i * 2 + 1] = vy;
+        }
       }
 
       // Particles (mode 3): a gust scatters puffs; they drift back.
@@ -638,17 +845,31 @@ export function CloudLab() {
 
       // Display.
       bindQuad();
-      gl.useProgram(P.display!.p);
-      gl.uniform1i(P.display!.u("uDye"), tex(0, dye.read.tex));
-      gl.uniform1f(P.display!.u("uAspect"), aspect);
-      gl.uniform1f(P.display!.u("uUseDye"), mode === "particles" ? 0 : 1);
-      gl.uniform2f(P.display!.u("uTexel"), 1 / DYE, 1 / DYE);
+      const puffMode = mode === "particles" || mode === "airpuffs";
+      if (mode === "nebula") {
+        gl.useProgram(P.nebula!.p);
+        gl.uniform1i(P.nebula!.u("uMap"), tex(0, dye.read.tex));
+        gl.uniform1f(P.nebula!.u("uAspect"), aspect);
+        gl.uniform1f(P.nebula!.u("uT"), now / 1000);
+        gl.uniform2f(P.nebula!.u("uM"), pointer.x, pointer.y);
+      } else if (mode === "light") {
+        gl.useProgram(P.light!.p);
+        gl.uniform1f(P.light!.u("uAspect"), aspect);
+        gl.uniform2f(P.light!.u("uM"), pointer.x, pointer.y);
+        gl.uniform1f(P.light!.u("uOn"), pointer.inside ? 0.6 + strength * 0.8 : 0.0);
+      } else {
+        gl.useProgram(P.display!.p);
+        gl.uniform1i(P.display!.u("uDye"), tex(0, dye.read.tex));
+        gl.uniform1f(P.display!.u("uAspect"), aspect);
+        gl.uniform1f(P.display!.u("uUseDye"), puffMode ? 0 : 1);
+        gl.uniform2f(P.display!.u("uTexel"), 1 / DYE, 1 / DYE);
+      }
       draw(null, canvas.width, canvas.height);
 
-      const puffs = mode === "particles" ? pCount : wisps.length;
+      const puffs = puffMode ? pCount : mode === "dissipate" ? wisps.length : 0;
       if (puffs > 0) {
-        const data = mode === "particles" ? pA.subarray(0, pCount * 4) : new Float32Array(wisps.length * 4);
-        if (mode !== "particles")
+        const data = puffMode ? pA.subarray(0, pCount * 4) : new Float32Array(wisps.length * 4);
+        if (!puffMode)
           wisps.forEach((w, i) => data.set([w.x, w.y, w.size * (1 + w.age), w.a * Math.sin(Math.PI * Math.min(1, w.age * 1.2 + 0.05))], i * 4));
         gl.useProgram(P.puff!.p);
         gl.uniform1f(P.puff!.u("uDpr"), dpr);
