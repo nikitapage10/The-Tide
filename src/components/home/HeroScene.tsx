@@ -39,6 +39,7 @@ uniform vec2 uV;
 uniform float uE;
 uniform float uDpr;
 uniform float uS;         // smoothed scroll speed (progress per second, >= 0)
+uniform float uPush;      // how hard the pointer is shoving the rocks (0..1)
 uniform float uMenuH;     // header height (CSS px); rocks are kept off the menu at rest
 
 const vec2 SRC = vec2(2000.0, 1126.0);
@@ -84,6 +85,22 @@ float fbm(vec2 p) { return 0.6 * vnoise(p) + 0.3 * vnoise(p * 2.03 + 7.1) + 0.1 
 
 // Screen position of the pixel being shaded (set in scene(); used by the clouds).
 vec2 gSp;
+
+float fbm5(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) { v += a * vnoise(p); p = p * 2.02 + vec2(3.1, 1.7); a *= 0.5; }
+  return v / 0.97;
+}
+
+// Cloud density (0..1, continuous): domain-warped billows whose edges are eroded
+// by fine detail into soft wisps, so thin cloud lets the surface show through.
+float cloudDensity(vec2 p) {
+  vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
+  float base = fbm5(p * 1.9 + 1.1 * w);
+  float detail = fbm5(p * 8.0 + 0.6 * w + vec2(uT * 0.04, 0.0));
+  float v = base + (detail - 0.5) * 0.5;
+  return smoothstep(0.42, 0.72, v);
+}
 
 const vec2 PINCH = vec2(0.20, 0.453); // where the streams cross, in artwork uv
 
@@ -158,28 +175,67 @@ vec3 planetWithLimb(vec2 uv) {
   vec3 tint = vec3(0.86, 0.91, 1.0);
   col += tint * (ring1 * 0.2 * beam * knots + ring2 * 0.07 * beam * knots + halo * 0.04);
 
-  // Atmosphere: a faint veil of haze plus white swirling cloud bands, projected
-  // onto the sphere (foreshortened toward the limb). The pointer parts the
-  // clouds a little (pushes them aside and thins them); as the lens energy
-  // settles they drift back together.
+  // Atmosphere and weather, wrapped onto the sphere (foreshortened at the limb).
+  // - Clouds: dense, eroded cloud systems with fine wisps at their edges, lit
+  //   from the bright limb side with soft self-shadowing; they drift around the
+  //   globe and wind into cyclones (one sits on the storm in the artwork).
+  // - Atmosphere: a lit scattering haze over the disc, thickening to a glowing
+  //   shell at the horizon and just beyond it.
+  // The pointer pushes through both: clouds and haze part around it and drift
+  // back together as the lens energy settles.
   float inside = 1.0 - smoothstep(-6.0, 0.0, dl);
   vec2 sph = q / LIMB_R;
   float z = sqrt(max(0.0, 1.0 - dot(sph, sph)));
-  vec2 cuv = sph / (0.35 + z) * 3.2;
   vec2 toM = gSp - uM;
-  float part = uE * exp(-dot(toM, toM) / (120.0 * 120.0));
-  cuv += normalize(toM + 1e-4) * part * 0.35;
-  float haze = fbm(cuv + vec2(uT * 0.012, uT * 0.004));
-  haze = smoothstep(0.42, 0.8, haze * 0.75 + fbm(cuv * 2.3 - vec2(uT * 0.02, 0.0)) * 0.35);
-  // Domain-warped noise: slowly turning, marbled swirls.
-  vec2 p0 = cuv * 1.1;
-  vec2 wq = vec2(fbm(p0 + vec2(0.0, uT * 0.015)), fbm(p0 + vec2(5.2, 1.3 - uT * 0.012)));
-  vec2 wr = vec2(fbm(p0 + 3.5 * wq + vec2(1.7, 9.2) + uT * 0.02), fbm(p0 + 3.5 * wq + vec2(8.3, 2.8) - uT * 0.017));
-  float swirl = smoothstep(0.52, 0.86, fbm(p0 + 3.0 * wr));
-  float thin = 1.0 - 0.75 * clamp(part, 0.0, 1.0);
-  float rimMist = pow(1.0 - z, 3.0);
-  col += vec3(0.82, 0.88, 0.95) * inside * (haze * (0.07 + 0.08 * rimMist) * thin + rimMist * 0.06);
-  col += vec3(0.95, 0.97, 1.0) * inside * swirl * (0.13 + 0.06 * rimMist) * thin * smoothstep(0.0, 0.25, z);
+  float part = clamp(uE * 1.4 * exp(-dot(toM, toM) / (140.0 * 140.0)), 0.0, 1.0);
+  vec2 pushDir = normalize(toM + 1e-4);
+  vec3 nrm3 = vec3(sph, z);
+  vec3 sunDir = normalize(vec3(-0.85, -0.35, 0.4));
+  float light = clamp(dot(nrm3, sunDir), 0.0, 1.0);
+
+  float alpha = 0.0;
+  vec3 cloudCol = vec3(0.0);
+  if (dl < 0.0) {
+    // Cyclones: a fixed spiral warp around each eye.
+    vec2 eyes[3];
+    eyes[0] = (vec2(0.83, 0.63) - LIMB_C) * SRC / LIMB_R;   // the storm in the artwork
+    eyes[1] = vec2(-0.45, -0.55);
+    eyes[2] = vec2(-0.2, 0.32);
+    vec2 ps = sph;
+    for (int k = 0; k < 3; k++) {
+      vec2 d = ps - eyes[k];
+      float fall = exp(-dot(d, d) / 0.02);
+      float a = fall * (k == 1 ? -2.6 : 2.6);
+      float cs = cos(a), sn = sin(a);
+      ps = eyes[k] + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
+    }
+    vec2 pw = ps / (0.35 + z) * 3.0 + vec2(uT * 0.03, uT * 0.007) + pushDir * part * 0.5;
+    vec2 sunStep = normalize(sunDir.xy) * 0.035;
+    float dens = cloudDensity(pw);
+    float densSun = cloudDensity(pw + sunStep);
+    dens *= 1.0 - 0.85 * part;
+    // Shadows cast on the surface by cloud lying toward the sun.
+    col *= 1.0 - 0.45 * densSun * (1.0 - dens) * inside;
+    // Cloud tops: bumpy fine texture; sides facing away from the sun fall into
+    // soft shade; thin cloud stays translucent and slightly cooler.
+    float tops = fbm5(pw * 18.0 + vec2(uT * 0.05, 0.0));
+    float shade = clamp(0.8 - (densSun - dens) * 1.4, 0.35, 1.0);
+    float bright = (0.28 + 0.62 * light) * shade * (0.72 + 0.4 * tops);
+    cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
+    alpha = pow(dens, 1.3) * 0.88 * smoothstep(0.0, 0.15, z);
+  }
+
+  // Scattering haze over the disc (lit side brighter), thickening at the horizon.
+  float hazeN = fbm(sph * 6.0 + vec2(uT * 0.02, 0.0) + pushDir * part * 0.6);
+  float fres = pow(1.0 - z, 2.2);
+  float hazeA = (0.07 + 0.05 * hazeN + 0.38 * fres) * (0.45 + 0.75 * light) * (1.0 - 0.7 * part);
+  vec3 skyCol = vec3(0.78, 0.86, 0.96);
+  col = mix(col, skyCol, inside * clamp(hazeA, 0.0, 0.6));
+  col = mix(col, cloudCol, inside * alpha);
+  // The atmosphere's shell just beyond the horizon, glowing on the lit side.
+  float lit2 = clamp(dot(nrm, normalize(vec2(-0.9, -0.4))) * 0.5 + 0.5, 0.0, 1.0);
+  float shell = exp(-max(dl, 0.0) / 46.0) * outside * (0.3 + 0.7 * lit2) * (1.0 - 0.6 * part);
+  col += skyCol * shell * 0.2;
   return col;
 }
 
@@ -239,6 +295,15 @@ vec4 flyby(sampler2D s, vec2 uv, vec2 origin, float streak, float bright, float 
   return mix(base, vec4(acc / 6.0, aa / 6.0), w);
 }
 
+// Signed distance (source px) from the planet's horizon for a screen point.
+float planetDl(vec2 sp) {
+  vec2 f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;
+  float sP = 1.25 - 0.25 * uP + 0.06 * (1.0 - intro(2.0, 3.8));
+  vec2 oP = vec2(0.85, 0.58);
+  vec2 puv = oP + (f - oP) / sP;
+  return length((puv - LIMB_C) * SRC) - LIMB_R;
+}
+
 vec4 scene(vec2 sp) {
   gSp = sp;
   vec2 f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;
@@ -256,6 +321,12 @@ vec4 scene(vec2 sp) {
     col *= iPlanet * mix(0.07, 1.0, smoothstep(0.0, 1.0, uP));
     return vec4(col, 1.0);
   }
+  // Before you scroll, the pointer shoves nearby rocks aside; they drift back as
+  // the push settles. (Displacement d(r) = r·k·exp(-r²/s²), k < 1: no folding.)
+  vec2 dM = sp - uM;
+  float pushAmt = uPush * (1.0 - smoothstep(0.0, 0.12, uP));
+  sp -= dM * 0.85 * exp(-dot(dM, dM) / (160.0 * 160.0)) * pushAmt;
+  f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;
   float iNear = intro(0.6, 1.9);
   float iFar = intro(1.3, 2.7);
 
@@ -300,6 +371,14 @@ void main() {
   float cs = cos(twist), sn = sin(twist);
   vec2 dRot = vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
   vec2 warped = uM + dRot - dir * pull;
+  if (uLayer == 0) {
+    // The lens bends space, not the planet: no warp over the planet's disc (its
+    // clouds still part, and the light ring, prism and flares still show).
+    float onSpace = smoothstep(0.0, 40.0, planetDl(sp));
+    warped = mix(sp, warped, onSpace);
+    dir *= onSpace;
+  }
+  float onSpaceCA = uLayer == 0 ? smoothstep(0.0, 40.0, planetDl(sp)) : 1.0;
 
   // Light gathered by the lens: a magnification ring that brightens what is
   // actually there (streams, limb, rock rims) with a slight prism split.
@@ -308,7 +387,7 @@ void main() {
   vec4 cg = scene(warped);
   vec3 col = cg.rgb;
   // The prism split only costs extra samples where the lens is actually active.
-  if (ca > 0.05) {
+  if (ca * onSpaceCA > 0.05) {
     col.r = scene(warped + dir * ca).r;
     col.b = scene(warped - dir * ca).b;
   }
@@ -427,7 +506,7 @@ export function HeroScene({
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const u = (n: string) => gl.getUniformLocation(prog, n);
-    const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH") };
+    const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), push: u("uPush") };
     gl.uniform1i(u("uLayer"), transparent ? 1 : 0);
     gl.clearColor(0, 0, 0, 0);
 
@@ -435,6 +514,8 @@ export function HeroScene({
     // builds up / settles slowly over a couple of seconds.
     const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
     let dpr = 1;
+    // Rock push: responds quickly to movement, relaxes over a couple of seconds.
+    const push = { t: 0, e: 0 };
     const menuH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 84;
     // Scroll speed, smoothed, so streaks swell while you scroll and settle after.
     const scroll = { p: progress.current, t: 0, v: 0 };
@@ -458,6 +539,8 @@ export function HeroScene({
       pointer.svy += (pointer.vy - pointer.svy) * 0.015;
       pointer.vx *= 0.96;
       pointer.vy *= 0.96;
+      push.t *= 0.975;
+      push.e += (push.t - push.e) * 0.06;
       gl.uniform2f(U.res, canvas.width, canvas.height);
       gl.uniform2f(U.fc, g.cx, g.cy);
       gl.uniform2f(U.fs, g.fw, g.fh);
@@ -476,6 +559,7 @@ export function HeroScene({
       scroll.t = now;
       gl.uniform1f(U.s, reduced ? 0 : scroll.v);
       gl.uniform1f(U.menu, menuH);
+      gl.uniform1f(U.push, reduced ? 0 : push.e);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
@@ -507,6 +591,7 @@ export function HeroScene({
       pointer.tx = x;
       pointer.ty = y;
       pointer.target = Math.min(1, pointer.target + Math.min(0.04, Math.hypot(vx, vy) / 400));
+      push.t = Math.min(1, push.t + Math.min(0.12, Math.hypot(vx, vy) / 160));
     };
 
     const src = SOURCES[layer];
