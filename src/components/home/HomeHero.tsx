@@ -168,7 +168,7 @@ export function HomeHero({ callouts, observations, code }: HeroProps) {
         </div>
 
         {/* Screen-anchored interface: scroll cue and footer line. */}
-        <div className="pointer-events-none absolute inset-0 z-[3] mx-auto flex max-w-[96rem] flex-col justify-end px-4 pb-6 sm:px-10">
+        <div className="page-x pointer-events-none absolute inset-0 z-[3] flex flex-col justify-end pb-6">
           <div className="hero-ui tracked flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-[0.68rem] text-faint">
             <span className="flex items-center gap-4">
               A living atlas of worlds <span aria-hidden="true" className="hidden h-px w-14 bg-white/25 sm:inline-block" /> The Tide
@@ -193,7 +193,7 @@ export function HomeHero({ callouts, observations, code }: HeroProps) {
         <div className="hero-vignette pointer-events-none absolute inset-0 z-[5]" />
 
         {/* Title: in front of the DOM fallback meteors; behind the WebGL meteors. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[6] mx-auto max-w-[96rem] px-4 pt-[calc(var(--header-h)+2.5rem)] sm:px-10">
+        <div className="page-x pointer-events-none absolute inset-x-0 top-0 z-[6] pt-[calc(var(--header-h)+2.5rem)]">
           <div className="hero-title max-w-xl">
             <p className="tracked flex items-center gap-3 text-faint">
               <span>01 / Home</span>

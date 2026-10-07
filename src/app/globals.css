@@ -179,10 +179,13 @@ main:has(> .hero-track) { padding-top: 0; }
 /* No header bar over the landing scene. */
 body:has(.hero-track) header { position: fixed; inset-inline: 0; }
 body:has(.hero-track):not([data-past-hero="true"]) header { background: transparent; border-color: transparent; backdrop-filter: none; }
-/* A soft dark fade behind the menu on the landing scene, instead of a bar. */
-body:has(.hero-track):not([data-past-hero="true"]) header::before {
-  content: ""; position: absolute; inset: 0 0 auto 0; height: 190px; z-index: -1; pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,.9) 0%, rgba(0,0,0,.6) 45%, rgba(0,0,0,0) 100%);
+/* On the landing scene the darkness sits only behind the menu's words (logo and
+   links), as soft local shadows, never as a bar across the top. */
+body:has(.hero-track):not([data-past-hero="true"]) header :is(a, button, summary) { position: relative; }
+body:has(.hero-track):not([data-past-hero="true"]) header :is(a, button, summary)::before {
+  content: ""; position: absolute; inset: -14px -22px; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(0,0,0,.6), rgba(0,0,0,.3) 55%, transparent);
+  filter: blur(6px);
 }
 /* A little darkness hugging every menu word, so it reads over anything behind it. */
 header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0,0,0,.9), 0 0 28px rgba(0,0,0,.7); }
@@ -257,3 +260,8 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
   .obs-on .obs-ping { animation: obs-ping 1.6s ease-out 1; }
 }
 @keyframes obs-ping { from { transform: scale(2.4); opacity: 0; } 40% { opacity: 1; } to { transform: scale(1); opacity: 1; } }
+
+/* Page gutters that grow with the screen: content anchors left on wide displays
+   instead of sitting in a centred column. */
+.page-x { padding-inline: clamp(16px, 3.2vw, 96px); }
+.page-mx { margin-inline: clamp(16px, 3.2vw, 96px); }

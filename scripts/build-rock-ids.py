@@ -2,7 +2,8 @@
 """Split the hero's meteor layers into individual rocks (for the pointer physics).
 
 For each layer image in public/brand/, writes:
-  public/brand/<name>-ids.png   rock ID per pixel (R = id & 255, G = id >> 8; 0 = none)
+  public/brand/<name>-ids.png      rock ID per pixel (R = id & 255, G = id >> 8; 0 = none)
+  public/brand/<name>-centres.png  each rock pixel's rock centre and whether it can move
 and src/components/home/rocks.ts with each rock's centre and radius (source px).
 
 Rocks are connected shapes in the alpha channel; each label is grown into the
@@ -46,6 +47,18 @@ for key, name in LAYERS.items():
     H, W = lab.shape
     edge = [int(sl[0].start == 0 or sl[1].start == 0 or sl[0].stop == H or sl[1].stop == W) for sl in objs]
     rocks = [[round(x, 1), round(y, 1), round(float(np.sqrt(s / np.pi)), 1), e] for x, y, s, e in zip(cx, cy, area, edge)]
+    # Centre map: each pixel of a rock holds its rock's centre (R = x/W, G = y/H,
+    # 8-bit) and whether it may move (B = 255), so the shader can move every rock
+    # rigidly by the gravity field sampled at its centre.
+    cent = np.zeros((H, W, 3), dtype=np.uint8)
+    lut = np.zeros((n + 1, 3), dtype=np.uint8)
+    for i, (x, y, e) in enumerate(zip(cx, cy, edge), start=1):
+        # Front rocks may all move: a gravity push sends them outward, which keeps
+        # their cut sides beyond the frame. Middle-layer rocks cut by the border stay.
+        movable = key == "near" or not e
+        lut[i] = [round(x / (W - 1) * 255), round(y / (H - 1) * 255), 255 if movable else 0]
+    cent = lut[lab]
+    Image.fromarray(cent, "RGB").save(f"public/brand/{name}-centres.png", optimize=True)
     out[key] = {"w": int(a.shape[1]), "h": int(a.shape[0]), "rocks": rocks}
     print(key, n, "rocks")
 

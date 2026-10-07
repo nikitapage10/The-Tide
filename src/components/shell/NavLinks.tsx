@@ -17,7 +17,7 @@ function isActive(pathname: string, href: string) {
 export function TopNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname() ?? "/";
   return (
-    <ul className="flex items-center gap-2 xl:gap-8">
+    <ul className="flex items-center gap-2 xl:gap-[clamp(2rem,3vw,4.5rem)]">
       {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
@@ -26,7 +26,7 @@ export function TopNav({ items }: { items: NavItem[] }) {
               href={item.href}
               aria-current={pathname === item.href ? "page" : active ? "true" : undefined}
               className={cx(
-                "transition-tide relative block px-3 py-2 font-[family-name:var(--font-mono)] text-[0.74rem] uppercase tracking-[0.3em] no-underline",
+                "transition-tide relative block px-3 py-2 font-[family-name:var(--font-mono)] text-[clamp(0.72rem,0.62rem+0.2vw,0.9rem)] uppercase tracking-[0.3em] no-underline",
                 active ? "text-white" : "text-[#d4d4d8] hover:text-white",
               )}
             >
@@ -47,7 +47,7 @@ export function SubNav({ items }: { items: NavItem[] }) {
   if (!section?.children?.length) return null;
   return (
     <nav aria-label={`${section.label} sections`} className="border-b border-border bg-bg/80">
-      <ul className="mx-auto flex max-w-[96rem] gap-1 overflow-x-auto px-4 sm:px-10">
+      <ul className="page-x flex gap-1 overflow-x-auto">
         <li>
           <Link href={section.href} aria-current={pathname === section.href ? "page" : undefined} className={tab(pathname === section.href)}>
             Overview

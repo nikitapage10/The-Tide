@@ -2,18 +2,19 @@ import Link from "next/link";
 import { HomeHero, type HeroCallout, type HeroObservation } from "@/components/home/HomeHero";
 
 /**
- * Rotating notes on the hero. Wording is taken from the GM's own documents
- * ("The Tide - Intro" and "Tide 101"); positions are on the artwork (percent).
+ * Rotating notes on the hero. Names come from the GM's own documents ("The Tide -
+ * Intro", "Tide 101"); the lines are kept deliberately vague (the GM prefers the
+ * lore unresolved). Positions are on the artwork (percent).
  * "Storm cell" describes the animated weather, not lore.
  */
 const OBSERVATIONS: HeroObservation[] = [
   { x: 80, y: 62, side: "left", title: "Storm cell", line: "Atmosphere unstable" },
-  { x: 70, y: 22, side: "right", title: "The Drowning", line: "Coastlines lost beneath rising water" },
-  { x: 76, y: 40, side: "right", title: "The Divergence", line: "Latent abilities awakened" },
-  { x: 34, y: 60, side: "right", title: "The Drift", line: "Enclaves from other times" },
-  { x: 74, y: 52, side: "right", title: "The Undertow", line: "First cataclysm · c. 2102 B.U." },
-  { x: 78, y: 30, side: "left", title: "Age of the Veil", line: "Some seven centuries, scarcely recorded" },
-  { x: 70, y: 12, side: "right", title: "Era of Verdancy", line: "The present age" },
+  { x: 70, y: 22, side: "right", title: "The Drowning", line: "Shorelines that no longer hold" },
+  { x: 76, y: 40, side: "right", title: "The Divergence", line: "Something woke" },
+  { x: 82, y: 47, side: "left", title: "The Drift", line: "Arrivals from elsewhere" },
+  { x: 74, y: 52, side: "right", title: "The Undertow", line: "Before the Veil" },
+  { x: 78, y: 30, side: "left", title: "Age of the Veil", line: "Records scarce" },
+  { x: 70, y: 12, side: "right", title: "Era of Verdancy", line: "Present, for now" },
 ];
 import { PrintCard } from "@/components/live/PrintCard";
 import { Badge, DemoBadge } from "@/components/ui/Badge";

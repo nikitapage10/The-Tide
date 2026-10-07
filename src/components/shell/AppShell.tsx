@@ -50,7 +50,7 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
         Skip to content
       </a>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur-md [text-shadow:0_1px_8px_rgba(0,0,0,.9)]">
-        <div className="mx-auto flex h-[var(--header-h)] max-w-[96rem] items-center gap-4 px-4 sm:px-10">
+        <div className="page-x flex h-[var(--header-h)] items-center gap-4">
           <Link href="/" className="flex items-center gap-3 text-white no-underline">
             <Mark />
             <span className="whitespace-nowrap font-[family-name:var(--font-display)] text-lg uppercase tracking-[0.3em] sm:text-xl sm:tracking-[0.4em]">The Tide</span>
@@ -93,11 +93,11 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
         </div>
       </header>
       <SubNav items={NAV} />
-      <div className="mx-auto max-w-[96rem]">
-        <main id="main" tabIndex={-1} className="px-4 py-8 focus:outline-none sm:px-10 sm:py-10">
+      <div>
+        <main id="main" tabIndex={-1} className="page-x py-8 focus:outline-none sm:py-10">
           {children}
         </main>
-        <footer className="tracked mx-4 flex flex-wrap justify-between gap-2 border-t border-white/10 py-6 text-[0.62rem] text-faint sm:mx-10">
+        <footer className="tracked page-mx flex flex-wrap justify-between gap-2 border-t border-white/10 py-6 text-[0.62rem] text-faint">
           <span>Authored lore lives in Space Pages. This dashboard shows published releases only.</span>
           <span>{mode === "demo" ? "Local demo · not production data" : canEdit ? `Signed in · ${actorLabel}` : "Public view · read-only"}</span>
         </footer>
