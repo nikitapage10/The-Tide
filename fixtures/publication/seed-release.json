@@ -1,0 +1,1361 @@
+{
+  "schemaVersion": "tide.publication.v1",
+  "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+  "releaseId": "8a7664ed-9363-46fe-b355-9cd87e505be6",
+  "baseReleaseId": null,
+  "createdAt": "2026-10-07T00:00:00Z",
+  "title": "Seed release: confirmed names from the GM brief, plus labelled demo records",
+  "notes": "Confirmed facts are limited to names and statements in the GM brief. Every demonstration record has demo: true and canonStatus non_canon.",
+  "operations": [
+    {
+      "op": "upsert",
+      "record": {
+        "type": "source",
+        "id": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+        "title": "GM project brief (initial dashboard build)",
+        "url": null,
+        "documentId": null,
+        "revision": null,
+        "contentHash": null,
+        "access": "private",
+        "notes": "The confirmed setting facts seeded in this release come from the GM's written brief. It is not a lore document.",
+        "visibility": "gm_only",
+        "demo": false
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "source",
+        "id": "d202568e-f6ad-4ccb-aaca-9db6b6671dcb",
+        "title": null,
+        "url": "https://drive.google.com/file/d/1ciGtIcqaqkMyMOkx2fZNKw0LlQfZKjrt/view",
+        "documentId": "1ciGtIcqaqkMyMOkx2fZNKw0LlQfZKjrt",
+        "revision": null,
+        "contentHash": null,
+        "access": "unknown",
+        "notes": "Source document reference supplied by the GM. Not read during the initial build; title, contents, revision and hash have not been supplied.",
+        "visibility": "gm_only",
+        "demo": false
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "source",
+        "id": "c06e9ac7-a511-4326-a49c-6a1f35eec036",
+        "title": null,
+        "url": "https://drive.google.com/file/d/1TdNyHr08nG4rOtP3hXMR2S2DSVQx3PPx/view",
+        "documentId": "1TdNyHr08nG4rOtP3hXMR2S2DSVQx3PPx",
+        "revision": null,
+        "contentHash": null,
+        "access": "unknown",
+        "notes": "Source document reference supplied by the GM. Not read during the initial build; title, contents, revision and hash have not been supplied.",
+        "visibility": "gm_only",
+        "demo": false
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "title": "Future Earth",
+        "kind": "place",
+        "summary": "A transformed future Earth — the setting of The Tide. Its new planet name is undecided.",
+        "body": "**Planet name: undecided.**\n\n“Primus” is the former working name found in historical sources. It is not the current canonical name. Original source titles and quoted historical language keep their wording.\n\nGeography, regions and environments: source material has not been supplied.",
+        "tags": [
+          "setting"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "aliases": [
+          "Primus (former working name)"
+        ],
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "e2460018-cc1e-44dd-8e3f-db871722a6da",
+        "title": "Cataclysms",
+        "kind": "history",
+        "summary": "The lore involves cataclysms. Their number, nature and chronology have not been supplied.",
+        "body": null,
+        "tags": [
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "afa2b5c9-60d6-4d39-bfdd-b9771f9e5022",
+        "title": "The seven cycles",
+        "kind": "history",
+        "summary": "The lore involves seven cycles. Their names, order and definitions have not been supplied.",
+        "body": "The dashboard does not assign names to the cycles or place them in a sequence. Add them through a publication when the source material is supplied.",
+        "tags": [
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "9c0b36a4-1211-4f0d-879e-215f8fc77bcf",
+        "title": "Drowning",
+        "kind": "concept",
+        "summary": "A concept or name in the lore. Its definition and place in the chronology have not been supplied.",
+        "body": null,
+        "tags": [
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "497daed1-2010-4bcc-8500-befa5a237c63",
+        "title": "Divergence",
+        "kind": "concept",
+        "summary": "A concept or name in the lore. Its definition and place in the chronology have not been supplied.",
+        "body": null,
+        "tags": [
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "c61ddb6e-a3cc-45c7-ab3a-ee376b527d4d",
+        "title": "Drift",
+        "kind": "concept",
+        "summary": "A concept or name in the lore. Its definition and place in the chronology have not been supplied.",
+        "body": null,
+        "tags": [
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "909a4973-956d-4700-8ff8-39b908012473",
+        "title": "Undertow",
+        "kind": "concept",
+        "summary": "A name in the lore involved in an unresolved chronology or naming question.",
+        "body": null,
+        "tags": [
+          "open question",
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "conflicts": [
+          {
+            "description": "Unresolved chronology or naming inconsistency involving Undertow, the Age of the Abyssal Veil and the later use of The Tide. Not reconciled; these are not asserted to be ordered eras.",
+            "sourceIds": [
+              "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0"
+            ],
+            "status": "open"
+          }
+        ],
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "f6e7f171-0575-46f4-8ea8-182eee80a50c",
+        "title": "Age of the Abyssal Veil",
+        "kind": "concept",
+        "summary": "A name in the lore involved in an unresolved chronology or naming question. Not asserted to be a defined era.",
+        "body": null,
+        "tags": [
+          "open question",
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "conflicts": [
+          {
+            "description": "Unresolved chronology or naming inconsistency involving Undertow, the Age of the Abyssal Veil and the later use of The Tide. Not reconciled; these are not asserted to be ordered eras.",
+            "sourceIds": [
+              "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0"
+            ],
+            "status": "open"
+          }
+        ],
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "33c80aca-bc2e-4aa4-8255-a9f90d50aa04",
+        "title": "The Tide (in-lore usage)",
+        "kind": "concept",
+        "summary": "“The Tide” is the project name and also appears later in the lore. Its in-world meaning and placement are unresolved.",
+        "body": null,
+        "tags": [
+          "open question",
+          "chronology"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "chronology": {
+          "label": null,
+          "certainty": "unknown",
+          "sortKey": null,
+          "notes": "Chronology not supplied."
+        },
+        "conflicts": [
+          {
+            "description": "Unresolved chronology or naming inconsistency involving Undertow, the Age of the Abyssal Veil and the later use of The Tide. Not reconciled; these are not asserted to be ordered eras.",
+            "sourceIds": [
+              "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0"
+            ],
+            "status": "open"
+          }
+        ],
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "dabef000-c21e-451e-a73e-33401893896e",
+        "title": "Blightmourn",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "8c61dc8d-c5d7-4371-b63e-72b07166f509",
+        "title": "Irridosai",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "29b07ecc-8191-4579-8fd5-ac1d70795ccc",
+        "title": "Nyth’rok",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "932dad00-579f-45db-83e9-215201f5afab",
+        "title": "Obscarron",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "e8cb646a-3b27-4ae8-90cd-d46bcd01e994",
+        "title": "Resonara",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "91026a63-0ca2-4cc3-bf1e-22f80a4cbc08",
+        "title": "Syntherion",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "dbc4d47c-1535-466c-bacb-8ca47aacb897",
+        "title": "Teruānga",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "6029ef13-b955-49cb-88c5-52382cd4d17f",
+        "title": "Umbrasa",
+        "kind": "people",
+        "summary": "One of the eight established peoples of The Tide.",
+        "body": "Culture, abilities, appearance and relationships: source material has not been supplied.",
+        "tags": [
+          "the eight peoples"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "confirmed",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "768ecd80-a3d5-4bbf-b310-90b92fcfd5a2",
+        "fromId": "dabef000-c21e-451e-a73e-33401893896e",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "1ff0d6db-b7cb-4e47-97d0-5fdd2b6d7bb8",
+        "fromId": "8c61dc8d-c5d7-4371-b63e-72b07166f509",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "14eb5010-b230-4c41-a21d-811303010347",
+        "fromId": "29b07ecc-8191-4579-8fd5-ac1d70795ccc",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "93163b51-19e0-4dbd-8c5d-442546ea6a3f",
+        "fromId": "932dad00-579f-45db-83e9-215201f5afab",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "5767feb2-7207-4073-999a-83a7e6b5e3bd",
+        "fromId": "e8cb646a-3b27-4ae8-90cd-d46bcd01e994",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "5dd6ac0b-32f6-4085-a6f1-22240f48b08f",
+        "fromId": "91026a63-0ca2-4cc3-bf1e-22f80a4cbc08",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "a5b0dd87-4e47-4048-b7f9-5596fbba1b43",
+        "fromId": "dbc4d47c-1535-466c-bacb-8ca47aacb897",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "8f31d95e-d512-41da-bb4b-26f6067a640f",
+        "fromId": "6029ef13-b955-49cb-88c5-52382cd4d17f",
+        "toId": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
+        "label": "People of the setting",
+        "inverseLabel": "Peoples of the setting",
+        "note": "Structural link: listed among the eight peoples of The Tide's setting. Nothing further is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "provisional",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "9a46b54a-e616-430f-a561-ca41b7aff4dc",
+        "fromId": "909a4973-956d-4700-8ff8-39b908012473",
+        "toId": "f6e7f171-0575-46f4-8ea8-182eee80a50c",
+        "label": "Unresolved chronology/naming question with",
+        "inverseLabel": null,
+        "note": "Recorded as an open question; no order is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "unverified",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "e0610884-7454-47a3-bc06-821cdf136460",
+        "fromId": "f6e7f171-0575-46f4-8ea8-182eee80a50c",
+        "toId": "33c80aca-bc2e-4aa4-8255-a9f90d50aa04",
+        "label": "Unresolved chronology/naming question with",
+        "inverseLabel": null,
+        "note": "Recorded as an open question; no order is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "unverified",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "8fd756a2-5aa4-4522-b6c3-aad04214aa45",
+        "fromId": "909a4973-956d-4700-8ff8-39b908012473",
+        "toId": "33c80aca-bc2e-4aa4-8255-a9f90d50aa04",
+        "label": "Unresolved chronology/naming question with",
+        "inverseLabel": null,
+        "note": "Recorded as an open question; no order is implied.",
+        "visibility": "gm_only",
+        "canonStatus": "unverified",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "open_question",
+        "id": "53340920-1a41-42b2-ac4a-7ba94e55af72",
+        "title": "Undertow, the Age of the Abyssal Veil and The Tide",
+        "summary": "Chronology or naming inconsistency, unresolved.",
+        "body": "The sources show an inconsistency involving **Undertow**, the **Age of the Abyssal Veil** and the later use of **The Tide**. The dashboard does not reconcile it or treat these as ordered eras. Resolve it in Space Pages, then publish.",
+        "status": "open",
+        "relatedIds": [
+          "909a4973-956d-4700-8ff8-39b908012473",
+          "f6e7f171-0575-46f4-8ea8-182eee80a50c",
+          "33c80aca-bc2e-4aa4-8255-a9f90d50aa04"
+        ],
+        "tags": [
+          "open question"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "unverified",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "open_question",
+        "id": "00c590f6-0dd6-4d37-b963-2c57ce821ad2",
+        "title": "The planet's name is undecided",
+        "summary": "Primus is the former working name; no replacement has been chosen.",
+        "body": "Use “future Earth” or “the world” until a name is chosen. Original source titles and quoted historical language that use “Primus” keep their wording.",
+        "status": "open",
+        "relatedIds": [
+          "263af39c-3500-41ef-b891-5f3bbcdf45f2"
+        ],
+        "tags": [
+          "open question"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "unverified",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "open_question",
+        "id": "930faf72-871b-4819-b7eb-ad91b67fb7bd",
+        "title": "The seven cycles: names, order and definitions",
+        "summary": "Drowning, Divergence and Drift are named, but their definitions and positions are not supplied.",
+        "body": "The dashboard does not invent missing cycles or assign these names to a sequence.",
+        "status": "open",
+        "relatedIds": [
+          "afa2b5c9-60d6-4d39-bfdd-b9771f9e5022",
+          "9c0b36a4-1211-4f0d-879e-215f8fc77bcf",
+          "497daed1-2010-4bcc-8500-befa5a237c63",
+          "c61ddb6e-a3cc-45c7-ab3a-ee376b527d4d",
+          "e2460018-cc1e-44dd-8e3f-db871722a6da"
+        ],
+        "tags": [
+          "open question"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "unverified",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "8a8b7f57-6487-4e8e-8d0e-3eb7480e12f0",
+            "locator": null,
+            "note": null
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "a43b6b07-c4ad-461a-abc6-babb81daeb44",
+        "title": "Demo place",
+        "kind": "place",
+        "summary": "Demonstration entry showing how a place nested in the world appears.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true,
+        "parentId": "263af39c-3500-41ef-b891-5f3bbcdf45f2"
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "9c2f2a78-7e00-48e2-b0dc-f2dd8d076d4f",
+        "title": "Demo technology",
+        "kind": "technology",
+        "summary": "Demonstration technology entry.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "72ec6d2b-eb53-42df-a85f-5922bca959da",
+        "title": "Demo event with unknown date",
+        "kind": "event",
+        "summary": "Demonstration of an event whose date is uncertain.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true,
+        "chronology": {
+          "label": "Sometime after the demo place was founded (demo)",
+          "certainty": "uncertain",
+          "sortKey": null,
+          "notes": "Demonstrates uncertain chronology."
+        }
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "6d0bff90-9adf-401a-b91d-769b4fe9bf3f",
+        "title": "Demo character",
+        "kind": "character",
+        "summary": "Demonstration character used as a viewpoint for the demo novel.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "bc36e0e2-e4f0-465d-878b-457bc9fa22ee",
+        "title": "Demo faction",
+        "kind": "faction",
+        "summary": "Demonstration faction.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "60593fe4-7812-4af2-8a78-dd0fb9ff1cfe",
+        "title": "Demo creature",
+        "kind": "creature",
+        "summary": "Demonstration creature entry.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "97e1ec07-3ced-4e33-a10b-c1df285d178e",
+        "fromId": "6d0bff90-9adf-401a-b91d-769b4fe9bf3f",
+        "toId": "bc36e0e2-e4f0-465d-878b-457bc9fa22ee",
+        "label": "Member of",
+        "inverseLabel": "Has member",
+        "note": null,
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "relationship",
+        "id": "f41db49f-513f-48cf-8725-c4ca3b4b8501",
+        "fromId": "bc36e0e2-e4f0-465d-878b-457bc9fa22ee",
+        "toId": "a43b6b07-c4ad-461a-abc6-babb81daeb44",
+        "label": "Based at",
+        "inverseLabel": "Base of",
+        "note": null,
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "story",
+        "id": "01f56c44-9a68-4b28-b951-8b3f8ea84d5b",
+        "title": "Demo campaign",
+        "format": "campaign",
+        "summary": "Demonstration ongoing campaign with sessions, prep items and print jobs.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "continuity": "story_specific",
+        "draftStatus": null,
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true,
+        "relatedIds": [
+          "a43b6b07-c4ad-461a-abc6-babb81daeb44",
+          "bc36e0e2-e4f0-465d-878b-457bc9fa22ee",
+          "e8cb646a-3b27-4ae8-90cd-d46bcd01e994"
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "story",
+        "id": "6e823dd4-787b-4c76-bb4f-8f6f459fb6f7",
+        "title": "Demo one-shot",
+        "format": "one_shot",
+        "summary": "Demonstration one-shot.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "continuity": "story_specific",
+        "draftStatus": null,
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true,
+        "relatedIds": [
+          "60593fe4-7812-4af2-8a78-dd0fb9ff1cfe"
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "story",
+        "id": "6464d1d0-ea72-4caf-8fff-8f208f1f070d",
+        "title": "Demo novel",
+        "format": "novel",
+        "summary": "Demonstration novel with an outline and a chapter.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "continuity": "story_specific",
+        "draftStatus": "outlining",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true,
+        "viewpointIds": [
+          "6d0bff90-9adf-401a-b91d-769b4fe9bf3f"
+        ],
+        "relatedIds": [
+          "a43b6b07-c4ad-461a-abc6-babb81daeb44"
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "story",
+        "id": "b0696e63-82f5-4e22-90ec-3a69348eecdd",
+        "title": "Demo short story",
+        "format": "short_fiction",
+        "summary": "Demonstration short fiction.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "continuity": "story_specific",
+        "draftStatus": "idea",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true,
+        "relatedIds": [
+          "6d0bff90-9adf-401a-b91d-769b4fe9bf3f"
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "story_part",
+        "id": "1cee4a41-ccd2-4d61-9fd7-9360a0b401a0",
+        "title": "Demo outline",
+        "storyId": "6464d1d0-ea72-4caf-8fff-8f208f1f070d",
+        "partType": "outline",
+        "sequence": 0,
+        "draftStatus": "outlining",
+        "continuity": "story_specific",
+        "summary": "Demonstration story part.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "viewpointIds": [
+          "6d0bff90-9adf-401a-b91d-769b4fe9bf3f"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "story_part",
+        "id": "ba011964-14d0-4624-ae91-aec31334fea0",
+        "title": "Demo chapter 1",
+        "storyId": "6464d1d0-ea72-4caf-8fff-8f208f1f070d",
+        "partType": "chapter",
+        "sequence": 1,
+        "draftStatus": "idea",
+        "continuity": "story_specific",
+        "summary": "Demonstration story part.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "viewpointIds": [
+          "6d0bff90-9adf-401a-b91d-769b4fe9bf3f"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "session",
+        "id": "9b170e71-da9c-4fb0-b48f-986fb2bb8585",
+        "title": "Demo session 1",
+        "storyId": "01f56c44-9a68-4b28-b951-8b3f8ea84d5b",
+        "sequence": 1,
+        "summary": "Demonstration session.",
+        "prep": "Demo preparation placeholder. Real prep is authored in Space Pages and published here; it is read-only in the dashboard.",
+        "recap": null,
+        "relatedIds": [
+          "a43b6b07-c4ad-461a-abc6-babb81daeb44",
+          "bc36e0e2-e4f0-465d-878b-457bc9fa22ee"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "session",
+        "id": "7b208f44-aadd-41f0-88d5-679b8894980a",
+        "title": "Demo session 2",
+        "storyId": "01f56c44-9a68-4b28-b951-8b3f8ea84d5b",
+        "sequence": 2,
+        "summary": "Demonstration session.",
+        "prep": "Demo preparation placeholder. Real prep is authored in Space Pages and published here; it is read-only in the dashboard.",
+        "recap": null,
+        "relatedIds": [
+          "60593fe4-7812-4af2-8a78-dd0fb9ff1cfe"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "session",
+        "id": "e06f4882-f307-4478-b84e-9a3ddef2b232",
+        "title": "Demo one-shot session",
+        "storyId": "6e823dd4-787b-4c76-bb4f-8f6f459fb6f7",
+        "sequence": 1,
+        "summary": "Demonstration session.",
+        "prep": "Demo preparation placeholder. Real prep is authored in Space Pages and published here; it is read-only in the dashboard.",
+        "recap": null,
+        "relatedIds": [
+          "60593fe4-7812-4af2-8a78-dd0fb9ff1cfe"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "media",
+        "id": "030f0fa5-7b0d-449b-a6ea-fd895edfd1a1",
+        "title": "Demo music link",
+        "mediaType": "music",
+        "stage": "inspiration",
+        "summary": "Demonstration Studio item.",
+        "url": "https://example.com/demo-music-link",
+        "asset": null,
+        "attribution": {
+          "creator": null,
+          "license": null,
+          "licenseUrl": null
+        },
+        "linkedIds": [
+          "9b170e71-da9c-4fb0-b48f-986fb2bb8585",
+          "01f56c44-9a68-4b28-b951-8b3f8ea84d5b"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "media",
+        "id": "a3e6348b-1d47-4875-8e20-2aa7cc41516b",
+        "title": "Demo artwork reference",
+        "mediaType": "artwork",
+        "stage": "draft",
+        "summary": "Demonstration Studio item.",
+        "url": "https://example.com/demo-artwork",
+        "asset": null,
+        "attribution": {
+          "creator": null,
+          "license": null,
+          "licenseUrl": null
+        },
+        "linkedIds": [
+          "a43b6b07-c4ad-461a-abc6-babb81daeb44"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "media",
+        "id": "bd2f1c03-0d0d-423a-b628-8dd05279f1b7",
+        "title": "Demo aesthetic board",
+        "mediaType": "aesthetic",
+        "stage": "inspiration",
+        "summary": "Demonstration Studio item.",
+        "url": "https://example.com/demo-aesthetic",
+        "asset": null,
+        "attribution": {
+          "creator": null,
+          "license": null,
+          "licenseUrl": null
+        },
+        "linkedIds": [
+          "6464d1d0-ea72-4caf-8fff-8f208f1f070d"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "media",
+        "id": "c964a022-6e8f-4d93-a981-842d7abcfafb",
+        "title": "Demo branding sketch",
+        "mediaType": "branding",
+        "stage": "draft",
+        "summary": "Demonstration Studio item.",
+        "url": "https://example.com/demo-branding",
+        "asset": null,
+        "attribution": {
+          "creator": null,
+          "license": null,
+          "licenseUrl": null
+        },
+        "linkedIds": [],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "media",
+        "id": "183bc481-2fef-44dd-8795-d3f3d9f47239",
+        "title": "Demo private asset",
+        "mediaType": "artwork",
+        "stage": "final",
+        "summary": "Demonstration Studio item.",
+        "url": null,
+        "asset": {
+          "bucket": "tide-private",
+          "path": "333ea628-f6a1-4f3a-8b83-ce98d12f2565/demo/placeholder.png"
+        },
+        "attribution": {
+          "creator": null,
+          "license": null,
+          "licenseUrl": null
+        },
+        "linkedIds": [
+          "a43b6b07-c4ad-461a-abc6-babb81daeb44"
+        ],
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    }
+  ]
+}

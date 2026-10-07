@@ -1,0 +1,194 @@
+{
+  "note": "Demonstration live records. Every record has demo: true. Timestamps are fixture placeholders, not real activity.",
+  "sessionStates": [],
+  "checklist": [
+    {
+      "id": "26d154bb-306c-42c2-af33-1bf3041c0d33",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "subjectId": "9b170e71-da9c-4fb0-b48f-986fb2bb8585",
+      "label": "Demo prep item: review published prep",
+      "done": true,
+      "sortOrder": 0,
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    },
+    {
+      "id": "938e559a-e9e1-495d-b32a-78b9c7065c9d",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "subjectId": "9b170e71-da9c-4fb0-b48f-986fb2bb8585",
+      "label": "Demo prep item: gather table props",
+      "done": false,
+      "sortOrder": 1,
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    },
+    {
+      "id": "a1f56244-3f23-463b-a8a9-6fe20a64bc2f",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "subjectId": "9b170e71-da9c-4fb0-b48f-986fb2bb8585",
+      "label": "Demo prep item: queue session music",
+      "done": false,
+      "sortOrder": 2,
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    },
+    {
+      "id": "8ae277f5-cf11-4352-8cf4-d9ea5c43d51d",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "subjectId": "01f56c44-9a68-4b28-b951-8b3f8ea84d5b",
+      "label": "Demo campaign item: confirm player availability",
+      "done": false,
+      "sortOrder": 0,
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    }
+  ],
+  "gmNotes": [
+    {
+      "id": "f9696c41-ab22-4a12-be5e-e8bb5a2879af",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "subjectId": "9b170e71-da9c-4fb0-b48f-986fb2bb8585",
+      "body": "Demo GM note: private working notes appear here and never become published canon.",
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "authorLabel": "Demo GM"
+    }
+  ],
+  "printJobs": [
+    {
+      "id": "1f27fdad-5be9-485b-83a7-99ec477bbdd8",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "title": "Demo terrain print",
+      "sourceUrl": "https://example.com/demo-terrain-model",
+      "fileReference": null,
+      "fileFormat": "3MF",
+      "printerProfile": null,
+      "material": null,
+      "scale": null,
+      "dimensions": null,
+      "estimatedMinutes": null,
+      "actualMinutes": null,
+      "requestedQuantity": 4,
+      "completedQuantity": 1,
+      "failedQuantity": 0,
+      "status": "printing",
+      "priority": "high",
+      "notes": "Demonstration print job. Printer and material are left blank because they are unknown.",
+      "linkedRecordIds": [
+        "a43b6b07-c4ad-461a-abc6-babb81daeb44",
+        "9b170e71-da9c-4fb0-b48f-986fb2bb8585"
+      ],
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    },
+    {
+      "id": "35f4b990-73ab-4336-b5a5-d95254763302",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "title": "Demo miniature print",
+      "sourceUrl": null,
+      "fileReference": null,
+      "fileFormat": null,
+      "printerProfile": null,
+      "material": null,
+      "scale": null,
+      "dimensions": null,
+      "estimatedMinutes": null,
+      "actualMinutes": null,
+      "requestedQuantity": 2,
+      "completedQuantity": 0,
+      "failedQuantity": 0,
+      "status": "planned",
+      "priority": "normal",
+      "notes": "Demonstration print job. Printer and material are left blank because they are unknown.",
+      "linkedRecordIds": [
+        "60593fe4-7812-4af2-8a78-dd0fb9ff1cfe",
+        "7b208f44-aadd-41f0-88d5-679b8894980a"
+      ],
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    },
+    {
+      "id": "645b78ef-7896-4245-b88a-84718b31d0da",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "title": "Demo blocked print",
+      "sourceUrl": null,
+      "fileReference": null,
+      "fileFormat": null,
+      "printerProfile": null,
+      "material": null,
+      "scale": null,
+      "dimensions": null,
+      "estimatedMinutes": null,
+      "actualMinutes": null,
+      "requestedQuantity": 1,
+      "completedQuantity": 0,
+      "failedQuantity": 0,
+      "status": "blocked",
+      "priority": "low",
+      "notes": "Demonstration of a blocked job.",
+      "linkedRecordIds": [
+        "6e823dd4-787b-4c76-bb4f-8f6f459fb6f7"
+      ],
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    }
+  ],
+  "printAttempts": [],
+  "builds": [
+    {
+      "id": "a27218cf-ec1d-41c3-baac-46cfd1ae79bc",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "title": "Demo build: table terrain base",
+      "category": "physical",
+      "purpose": "Demonstration physical build record.",
+      "status": "in_progress",
+      "links": [
+        {
+          "label": "Demo reference",
+          "url": "https://example.com/demo-build"
+        }
+      ],
+      "versions": [],
+      "notes": null,
+      "linkedRecordIds": [
+        "a43b6b07-c4ad-461a-abc6-babb81daeb44",
+        "01f56c44-9a68-4b28-b951-8b3f8ea84d5b"
+      ],
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    },
+    {
+      "id": "f8b2a9cf-76e5-4fa6-8d41-e81ad017d076",
+      "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+      "title": "Demo build: dashboard notes",
+      "category": "dashboard",
+      "purpose": "Demonstration record for tracking work on this dashboard.",
+      "status": "idea",
+      "links": [],
+      "versions": [],
+      "notes": null,
+      "linkedRecordIds": [],
+      "revision": 1,
+      "demo": true,
+      "createdAt": "2026-10-07T00:00:00.000Z",
+      "updatedAt": "2026-10-07T00:00:00.000Z"
+    }
+  ],
+  "activity": []
+}

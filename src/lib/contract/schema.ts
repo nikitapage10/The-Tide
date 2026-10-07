@@ -90,14 +90,28 @@ const baseFields = {
   conflicts: z.array(zConflict).max(20).optional(),
 };
 
+/**
+ * Entity kinds. Each kind belongs to exactly one dashboard section (see
+ * src/lib/domain/sections.ts). New kinds can be added here without touching identity.
+ */
 export const ENTITY_KINDS = [
-  "people",
-  "faction",
-  "location",
-  "creature",
+  // The World
+  "environment",
+  "place",
+  "history",
   "event",
+  "technology",
+  "relic",
+  "phenomenon",
+  "world_mechanic",
   "concept",
-  "item",
+  // People & Powers
+  "people",
+  "character",
+  "creature",
+  "faction",
+  "institution",
+  // Either; shown under The World
   "other",
 ] as const;
 
@@ -117,24 +131,50 @@ export const zEntity = z.strictObject({
   ...baseFields,
   type: z.literal("entity"),
   kind: z.enum(ENTITY_KINDS),
+  /** Optional nesting: a broader entry this one sits under (e.g. a place within an environment). */
+  parentId: zId.nullable().optional(),
   aliases: z.array(zText(200)).max(30).optional(),
   chronology: zChronology.nullable().optional(),
   mediaIds: zIdList.optional(),
 });
 
-export const CAMPAIGN_FORMATS = ["ongoing", "one_shot"] as const;
-export const zCampaign = z.strictObject({
+/** Ongoing campaigns, one-shots, novels and short fiction. */
+export const STORY_FORMATS = ["campaign", "one_shot", "novel", "short_fiction"] as const;
+/** Whether story content is approved shared canon or continuity specific to this story. */
+export const CONTINUITY = ["shared_canon", "story_specific", "unknown"] as const;
+export const DRAFT_STATUSES = ["idea", "outlining", "drafting", "revising", "complete", "on_hold"] as const;
+
+export const zStory = z.strictObject({
   ...baseFields,
-  type: z.literal("campaign"),
-  format: z.enum(CAMPAIGN_FORMATS),
+  type: z.literal("story"),
+  format: z.enum(STORY_FORMATS),
+  continuity: z.enum(CONTINUITY).default("unknown"),
+  /** Null when not supplied. */
+  draftStatus: z.enum(DRAFT_STATUSES).nullable().optional(),
+  viewpointIds: zIdList.optional(),
+  relatedIds: zIdList.optional(),
+});
+
+/** Outlines, chapters and scenes of a novel or short story (or any story). */
+export const STORY_PART_TYPES = ["outline", "chapter", "scene", "other"] as const;
+export const zStoryPart = z.strictObject({
+  ...baseFields,
+  type: z.literal("story_part"),
+  storyId: zId,
+  partType: z.enum(STORY_PART_TYPES),
+  sequence: z.number().int().min(0).max(100_000).nullable().optional(),
+  draftStatus: z.enum(DRAFT_STATUSES).nullable().optional(),
+  continuity: z.enum(CONTINUITY).default("unknown"),
+  viewpointIds: zIdList.optional(),
   relatedIds: zIdList.optional(),
 });
 
 export const zSession = z.strictObject({
   ...baseFields,
   type: z.literal("session"),
-  campaignId: zId,
-  /** Display order within the campaign only. */
+  /** Stable ID of a story whose format is campaign or one_shot. */
+  storyId: zId,
+  /** Display order within the story only. */
   sequence: z.number().int().min(0).max(100_000).nullable().optional(),
   /** Published preparation material (authored in Pages). */
   prep: zMarkdown,
@@ -160,7 +200,19 @@ export const zRelationship = z.strictObject({
   conflicts: z.array(zConflict).max(20).optional(),
 });
 
-export const MEDIA_TYPES = ["music", "image", "video", "document", "map", "other"] as const;
+/** The Studio: music, artwork, artistic elements, aesthetics, branding and design. */
+export const MEDIA_TYPES = [
+  "music",
+  "artwork",
+  "artistic_element",
+  "aesthetic",
+  "branding",
+  "design",
+  "document",
+  "other",
+] as const;
+/** Keeps inspiration, drafts, approved visual canon and final assets distinct. */
+export const MEDIA_STAGES = ["inspiration", "draft", "approved", "final"] as const;
 export const zAssetRef = z.strictObject({
   /** Private storage bucket. Signed URLs are issued per request and never stored. */
   bucket: z.string().regex(/^[a-z0-9][a-z0-9-]{1,62}$/),
@@ -176,6 +228,7 @@ export const zMedia = z.strictObject({
   ...baseFields,
   type: z.literal("media"),
   mediaType: z.enum(MEDIA_TYPES),
+  stage: z.enum(MEDIA_STAGES),
   url: zUrl.nullable().optional(),
   asset: zAssetRef.nullable().optional(),
   attribution: z
@@ -220,7 +273,8 @@ export const zOpenQuestion = z.strictObject({
 
 export const zPublishedRecord = z.discriminatedUnion("type", [
   zEntity,
-  zCampaign,
+  zStory,
+  zStoryPart,
   zSession,
   zRelationship,
   zMedia,
@@ -230,7 +284,8 @@ export const zPublishedRecord = z.discriminatedUnion("type", [
 
 export const RECORD_TYPES = [
   "entity",
-  "campaign",
+  "story",
+  "story_part",
   "session",
   "relationship",
   "media",
@@ -287,13 +342,17 @@ export type Operation = z.infer<typeof zOperation>;
 export type PublishedRecord = z.infer<typeof zPublishedRecord>;
 export type RecordType = PublishedRecord["type"];
 export type EntityRecord = z.infer<typeof zEntity>;
-export type CampaignRecord = z.infer<typeof zCampaign>;
+export type StoryRecord = z.infer<typeof zStory>;
+export type StoryPartRecord = z.infer<typeof zStoryPart>;
 export type SessionRecord = z.infer<typeof zSession>;
 export type RelationshipRecord = z.infer<typeof zRelationship>;
 export type MediaRecord = z.infer<typeof zMedia>;
 export type SourceRecord = z.infer<typeof zSource>;
 export type OpenQuestionRecord = z.infer<typeof zOpenQuestion>;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
+export type StoryFormat = (typeof STORY_FORMATS)[number];
+export type MediaType = (typeof MEDIA_TYPES)[number];
+export type MediaStage = (typeof MEDIA_STAGES)[number];
 export type Visibility = (typeof VISIBILITIES)[number];
 export type CanonStatus = (typeof CANON_STATUSES)[number];
 export type SourceRef = z.infer<typeof zSourceRef>;

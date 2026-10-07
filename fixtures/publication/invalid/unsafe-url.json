@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "tide.publication.v1",
+  "projectId": "333ea628-f6a1-4f3a-8b83-ce98d12f2565",
+  "releaseId": "1231f2e2-7978-439f-b989-988eba8c13b8",
+  "baseReleaseId": "8a7664ed-9363-46fe-b355-9cd87e505be6",
+  "createdAt": "2026-10-07T12:00:00Z",
+  "title": "Example: rename, add and archive (demo records only)",
+  "notes": "Minimal example for authors. Renaming keeps the same ID, so live work stays linked.",
+  "operations": [
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "bc36e0e2-e4f0-465d-878b-457bc9fa22ee",
+        "title": "Demo faction (renamed)",
+        "kind": "faction",
+        "summary": "Demonstration faction.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "entity",
+        "id": "c8b7dacc-3545-42b7-a6f9-382eb155d259",
+        "title": "Demo relic",
+        "kind": "relic",
+        "summary": "Demonstration relic added by the example bundle.",
+        "body": "Demonstration placeholder. This is not canon; real content is authored in Space Pages and published here.",
+        "tags": [
+          "demo"
+        ],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    },
+    {
+      "op": "archive",
+      "targetId": "9c2f2a78-7e00-48e2-b0dc-f2dd8d076d4f",
+      "reason": "Example archive; identity is preserved."
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "type": "media",
+        "id": "2ae43a0d-bfbb-47e9-b3cf-18570f65b12e",
+        "title": "Demo bad link",
+        "mediaType": "music",
+        "stage": "inspiration",
+        "url": "javascript:alert(1)",
+        "tags": [],
+        "visibility": "gm_only",
+        "canonStatus": "non_canon",
+        "demo": true
+      }
+    }
+  ]
+}

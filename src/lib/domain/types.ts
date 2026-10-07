@@ -116,7 +116,7 @@ export interface SessionState {
 export interface ChecklistItem {
   id: string;
   projectId: string;
-  /** Stable ID of a session or campaign. */
+  /** Stable ID of a session or story. */
   subjectId: string;
   label: string;
   done: boolean;
@@ -204,4 +204,45 @@ export interface ActivityEvent {
   subjectId: string | null;
   actorLabel: string;
   demo: boolean;
+}
+
+// ------------------------------------------------- Workshop build records (live)
+
+export const BUILD_CATEGORIES = ["physical", "code", "logic", "dashboard", "other"] as const;
+export type BuildCategory = (typeof BUILD_CATEGORIES)[number];
+export const BUILD_STATUSES = ["idea", "planned", "in_progress", "paused", "done", "abandoned"] as const;
+export type BuildStatus = (typeof BUILD_STATUSES)[number];
+
+export interface BuildLink {
+  label: string;
+  url: string;
+}
+
+export interface BuildVersion {
+  id: string;
+  label: string;
+  note: string | null;
+  url: string | null;
+  recordedAt: string;
+}
+
+/**
+ * A practical Workshop record for physical creations, code, logic or dashboard work.
+ * Live-owned: created and edited in the dashboard, never written by the publisher.
+ */
+export interface BuildRecord {
+  id: string;
+  projectId: string;
+  title: string;
+  category: BuildCategory;
+  purpose: string | null;
+  status: BuildStatus;
+  links: BuildLink[];
+  versions: BuildVersion[];
+  notes: string | null;
+  linkedRecordIds: string[];
+  revision: number;
+  demo: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
