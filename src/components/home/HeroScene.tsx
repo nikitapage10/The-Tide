@@ -84,16 +84,16 @@ vec2 stormTwist(vec2 sph, out float bonus, out float eye) {
     float grow = smoothstep(0.0, 1.0, sa) * (1.0 - smoothstep(4.5, 7.5, sa));
     vec2 c = uStorm[k].xy;
     vec2 d = q - c;
-    float r = length(d) / 0.12;
+    float r = length(d) / 0.05;
     if (r > 2.6) continue;
-    float spinA = (2.4 * sa - 0.15 * sa * sa + 1.5) * grow;
-    float a = spinA * exp(-r * r * 0.7);
+    float spinA = (1.4 * sa - 0.09 * sa * sa + 1.0) * grow;
+    float a = spinA * exp(-r * r * 0.9);
     float cs = cos(a), sn = sin(a);
     q = c + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
     float th = atan(d.y, d.x) + a;
     float bands = 0.55 + 0.45 * sin(2.0 * th + 3.0 * log(r + 0.1) + uStorm[k].w * 6.0);
     bonus = max(bonus, grow * smoothstep(1.9, 0.6, r) * bands);
-    eye = max(eye, grow * exp(-r * r * 9.0));
+    eye = max(eye, grow * exp(-r * r * 14.0));
   }
   return q;
 }
@@ -103,7 +103,7 @@ float cloudBase(vec2 sph) {
   vec2 p = cloudCoords(tw);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
   float base = fbm5(p * 1.7 + 0.45 * w);
-  return base + bonus * (0.12 + 0.3 * base) - eye * 0.45;
+  return base + bonus * (0.06 + 0.22 * base) - eye * 0.3;
 }
 // Cloud displacement field (simulated on the GPU, 256² over the disc): how far
 // the cloud at each point has been carried from where the weather put it, in
@@ -377,12 +377,19 @@ vec3 planetWithLimb(vec2 uv) {
     vec2 pw = cloudCoords(sph);
     vec2 sunStepS = normalize(sunDir.xy) * 0.012;
     // Where the cloud now here came from (carried by the air you stirred).
-    // (Less displacement toward the limb, where foreshortening would make any
-    // shift look like the horizon itself bending.)
-    vec2 srcH = sph - cloudOffAt(uClouds, sph * 0.5 + 0.5) * smoothstep(0.05, 0.45, z);
+    // (Displacement fades strongly toward the limb, where foreshortening would
+    // make any shift look like the horizon itself bending.)
+    vec2 offH = cloudOffAt(uClouds, sph * 0.5 + 0.5) * z * z;
+    // Clouds break apart rather than smear: each puff (cloud-scale noise in the
+    // cloud's own coordinates, so it travels with it) is carried a different
+    // amount, so clumps separate and gaps open; weaker puffs thin out as they go.
+    float moved = length(offH);
+    float clumpN = moved > 0.0005 ? fbm(cloudCoords(sph - offH) * 2.6 + 7.0) : 0.5;
+    vec2 srcH = sph - offH * (0.25 + 1.5 * clumpN);
     srcH *= min(1.0, 0.985 / max(length(srcH), 1e-4));
     vec2 srcS = srcH + sunStepS;
-    float coverH = 1.0, coverS = 1.0;
+    float coverH = 1.0 - 0.7 * smoothstep(0.004, 0.03, moved) * smoothstep(0.62, 0.3, clumpN);
+    float coverS = coverH;
     float baseHere = cloudBase(srcH);
     float baseSun = cloudBase(srcS);
     float sbH, seH;
@@ -838,10 +845,19 @@ void main() {
     col += vec3(0.85, 0.92, 1.0) * ghosts * e * pointerInSpace;
     // A small soft flare at the cursor in space: a glow and a faint horizontal
     // streak (cropped by the planet, like everything of the lens).
+    // It is alive: the streak stretches along the cursor's motion (longer when
+    // faster), thin rays turn slowly and shimmer, and the glow breathes.
     vec2 dmF = sp - uM;
-    float coreF = exp(-dot(dmF, dmF) / (R * R * 0.012));
-    float streakF = exp(-dmF.y * dmF.y / (R * R * 0.0005)) * exp(-abs(dmF.x) / (R * 0.8));
-    col += vec3(0.75, 0.84, 0.98) * (coreF * 0.1 + streakF * 0.07) * e * pointerInSpace;
+    float spd = clamp(length(uV) / 12.0, 0.0, 1.0);
+    vec2 sdir = length(uV) > 0.01 ? normalize(uV) : vec2(1.0, 0.0);
+    float along = dot(dmF, sdir), acrossF = dot(dmF, vec2(-sdir.y, sdir.x));
+    float coreF = exp(-dot(dmF, dmF) / (R * R * (0.01 + 0.004 * sin(uT * 2.1))));
+    float streakF = exp(-acrossF * acrossF / (R * R * 0.0004)) * exp(-abs(along) / (R * (0.35 + 1.2 * spd)));
+    float angF = atan(dmF.y, dmF.x) + uT * 0.25;
+    float rays = pow(max(0.0, cos(angF * 3.0)), 30.0) * (0.6 + 0.4 * vnoise(vec2(angF * 4.0, uT * 3.0)));
+    rays *= exp(-length(dmF) / (R * 0.35));
+    vec3 tintF = mix(vec3(0.72, 0.82, 0.98), vec3(0.92, 0.86, 0.95), 0.5 + 0.5 * sin(uT * 0.7));
+    col += tintF * (coreF * 0.1 + streakF * (0.05 + 0.08 * spd) + rays * 0.06) * e * pointerInSpace;
     // Strands of energy drawn off the planet toward the cursor: a few curved
     // filaments leave the limb nearest the pointer, bending and swaying as if
     // stretched and pulled, with light flowing outward along them. Mild, cool
@@ -889,7 +905,7 @@ void main() {
       }
       // Half-width of the fan at this point: wide at the planet, pinching to the tip.
       float spreadC = length(uStrandA[3].zw - uStrandA[0].zw);
-      float halfW = spreadC * 0.75 * 4.0 * tC * (1.0 - tC) + 4.0;
+      float halfW = length(A3 - A0) * 0.5 * (1.0 - tC) * (1.0 - tC) + spreadC * 0.6 * 4.0 * tC * (1.0 - tC) + 4.0;
       float across = bestC / halfW;
       // Made of many faint filaments (not a flat fill), so the strands dissolve into it.
       float fil = vnoise(vec2(across * 12.0 + 0.6 * sin(tC * 6.0 + uT * 0.4), tC * 4.0 - uT * 1.1));
@@ -899,7 +915,7 @@ void main() {
       // Fade out well inside the region it is drawn in (no visible mask edges).
       vec2 e2 = min(sp - uStrandBox.xy, uStrandBox.zw - sp);
       float edgeFade = smoothstep(0.0, 50.0, min(e2.x, e2.y));
-      col += vec3(0.6, 0.7, 0.84) * (sc3 * 0.34 + sheet * sheetStr * 0.16) * pointerInSpace * edgeFade;
+      col += vec3(0.78, 0.82, 0.88) * (sc3 * 0.34 + sheet * sheetStr * 0.16) * pointerInSpace * edgeFade;
     }
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
@@ -1233,15 +1249,25 @@ export function HeroScene({
             const px = -uy, py = ux;
             let x0 = Math.min(head.x, ax), y0 = Math.min(head.y, ay);
             let x1 = Math.max(head.x, ax), y1 = Math.max(head.y, ay);
+            // Roots spread across the middle of the limb (fixed points, like the
+            // streams in the artwork); each leaves along the streams and bends
+            // toward the cursor, where they gather.
+            const baseAng = Math.atan2(ay - pcy, ax - pcx);
             for (let k = 0; k < 4; k++) {
               const s = k - 1.5;
-              // Bend: leave along the streams, curving toward the cursor; the
-              // strands fan slightly apart in the middle and meet again at the tip.
-              const cxp = ax + tx0 * reach * 0.5 + px * s * reach * 0.07;
-              const cyp = ay + ty0 * reach * 0.5 + py * s * reach * 0.07;
+              const ra = baseAng + s * 0.11;
+              const rx = pcx + Math.cos(ra) * (pr - 14);
+              const ry = pcy + Math.sin(ra) * (pr - 14);
+              const reachK = Math.hypot(head.x - rx, head.y - ry);
+              const cxp = rx + tx0 * reachK * 0.5 + px * s * reachK * 0.05;
+              const cyp = ry + ty0 * reachK * 0.5 + py * s * reachK * 0.05;
               const tx = head.x + px * s * 3;
               const ty = head.y + py * s * 3;
-              strandA.set([ax, ay, cxp, cyp], k * 4);
+              x0 = Math.min(x0, rx);
+              y0 = Math.min(y0, ry);
+              x1 = Math.max(x1, rx);
+              y1 = Math.max(y1, ry);
+              strandA.set([rx, ry, cxp, cyp], k * 4);
               strandT.set([tx, ty, 1.6 + 0.6 * (k % 2), strand.on * (k === 1 || k === 2 ? 1 : 0.7) * (1 - 0.5 * Math.min(1, reach / (pr * 1.3)))], k * 4);
               x0 = Math.min(x0, cxp);
               y0 = Math.min(y0, cyp);
