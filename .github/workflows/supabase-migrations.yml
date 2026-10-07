@@ -44,6 +44,9 @@ jobs:
           if [ -z "$SUPABASE_DB_URL" ]; then
             echo "::warning::SUPABASE_DB_URL secret is not set; skipping. See the comment at the top of this workflow."
             echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif echo "$SUPABASE_DB_URL" | grep -Eq '@db\.[a-z0-9]+\.supabase\.co'; then
+            echo "::error::SUPABASE_DB_URL is the 'Direct connection' string (IPv6 only), which GitHub runners cannot reach. In Supabase click Connect, choose 'Session pooler', copy that URI (host ends in pooler.supabase.com), fill in your password and update the secret."
+            exit 1
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
