@@ -38,13 +38,18 @@ export interface HeroObservation {
 export interface HeroProps {
   callouts: HeroCallout[];
   observations: HeroObservation[];
+  /** Notes that pop up out in space (around the streams). */
+  spaceNotes: HeroObservation[];
   /** Short machine-style readout under the glyph panel (real data, e.g. release). */
   code: string;
 }
 
+/** From the GM's intro ("The Tide - Intro"). */
+const HAIKU = ["Waves crash upon shores,", "As the Tide's eternal song,", "Echoes through the void."];
+
 const pin = (x: number, y: number) => ({ "--x": `${x}%`, "--y": `${y}%` }) as React.CSSProperties;
 
-export function HomeHero({ callouts, observations, code }: HeroProps) {
+export function HomeHero({ callouts, observations, spaceNotes, code }: HeroProps) {
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
@@ -150,6 +155,7 @@ export function HomeHero({ callouts, observations, code }: HeroProps) {
               </div>
             ))}
             <Observations items={observations} active={revealed} />
+            <Observations items={spaceNotes} active={revealed} startDelay={4800} />
           </div>
           {/* Glyph panel, bottom right (decorative script, no meaning). */}
           <div aria-hidden="true" className="absolute bottom-24 right-4 font-[family-name:var(--font-mono)] text-white/70 sm:right-10">
@@ -194,21 +200,27 @@ export function HomeHero({ callouts, observations, code }: HeroProps) {
 
         {/* Title: in front of the DOM fallback meteors; behind the WebGL meteors. */}
         <div className="page-x pointer-events-none absolute inset-x-0 top-0 z-[6] pt-[calc(var(--header-h)+2.5rem)]">
-          <div className="hero-title max-w-xl">
+          <div className="hero-title">
             <p className="tracked flex items-center gap-3 text-faint">
               <span>01 / Home</span>
               <span aria-hidden="true" className="h-px w-20 bg-white/25" />
             </p>
-            <h1 id="hero-title" className="mt-8 font-[family-name:var(--font-display)] text-4xl font-light uppercase tracking-[0.3em] text-white sm:text-7xl sm:tracking-[0.42em]">
+            <h1 id="hero-title" className="mt-8 whitespace-nowrap font-[family-name:var(--font-display)] text-[clamp(2.6rem,7.4vw,9rem)] font-light uppercase leading-none tracking-[0.32em] text-white sm:tracking-[0.42em]">
               The Tide
             </h1>
-            <p className="tracked mt-5 text-muted">Worlds in equilibrium</p>
-            <p className="tracked mt-8 leading-8 text-faint">
-              <span className="block">Gravity writes.</span>
-              <span className="block">Worlds respond.</span>
-              <span className="block">We listen.</span>
-            </p>
+            <p className="tracked mt-7 text-[clamp(0.8rem,0.55rem+0.55vw,1.2rem)] text-muted">Worlds in equilibrium</p>
           </div>
+        </div>
+
+        {/* The haiku from the GM's intro, set low along the streams of light. */}
+        <div className="page-x pointer-events-none absolute inset-x-0 bottom-[16%] z-[6] hidden sm:block">
+          <p className="hero-haiku max-w-sm font-[family-name:var(--font-display)] text-[clamp(1rem,0.8rem+0.5vw,1.45rem)] italic leading-relaxed text-white/70">
+            {HAIKU.map((line, i) => (
+              <span key={line} className="block">
+                <Typed text={line} active={revealed} delay={600 + i * 1100} speed={45} />
+              </span>
+            ))}
+          </p>
         </div>
       </div>
 
@@ -267,7 +279,7 @@ function Typed({ text, active, delay = 0, speed = 28 }: { text: string; active: 
 }
 
 /** One note at a time, cycling through the list at different spots on the planet. */
-function Observations({ items, active }: { items: HeroObservation[]; active: boolean }) {
+function Observations({ items, active, startDelay = 1600 }: { items: HeroObservation[]; active: boolean; startDelay?: number }) {
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -284,7 +296,7 @@ function Observations({ items, active }: { items: HeroObservation[]; active: boo
         t2 = window.setTimeout(() => alive && cycle((i + 1) % items.length), 900);
       }, 6200);
     };
-    const t0 = window.setTimeout(() => cycle(index), 1600);
+    const t0 = window.setTimeout(() => cycle(index), startDelay);
     return () => {
       alive = false;
       window.clearTimeout(t0);
@@ -293,7 +305,7 @@ function Observations({ items, active }: { items: HeroObservation[]; active: boo
     };
     // Restart the cycle only when revealed/hidden; index continues where it was.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, items.length]);
+  }, [active, items.length, startDelay]);
   const o = items[index];
   if (!o) return null;
   const on = active && shown;

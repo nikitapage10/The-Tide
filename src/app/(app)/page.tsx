@@ -16,6 +16,15 @@ const OBSERVATIONS: HeroObservation[] = [
   { x: 78, y: 30, side: "left", title: "Age of the Veil", line: "Records scarce" },
   { x: 70, y: 12, side: "right", title: "Era of Verdancy", line: "Present, for now" },
 ];
+
+/** Notes out in space: they describe what is visible there, not lore. */
+const SPACE_NOTES: HeroObservation[] = [
+  { x: 44, y: 49, side: "right", title: "Gravitic stream", line: "Flowing in · flowing out" },
+  { x: 30, y: 58, side: "right", title: "Debris field", line: "Drifting, slowly" },
+  { x: 55, y: 64, side: "left", title: "Light bending", line: "Source unknown" },
+  { x: 50, y: 40, side: "right", title: "Unlisted object", line: "Last seen here" },
+  { x: 36, y: 70, side: "right", title: "Signal", line: "Faint · repeating" },
+];
 import { PrintCard } from "@/components/live/PrintCard";
 import { Badge, DemoBadge } from "@/components/ui/Badge";
 import { Card, SectionHeading } from "@/components/ui/Card";
@@ -65,7 +74,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <HomeHero callouts={callouts} observations={OBSERVATIONS} code={latest ? `Archive · release v${latest.version}` : "Archive · no release yet"} />
+      <HomeHero callouts={callouts} observations={OBSERVATIONS} spaceNotes={SPACE_NOTES} code={latest ? `Archive · release v${latest.version}` : "Archive · no release yet"} />
       <div className="space-y-12 pt-14">
       <section aria-labelledby="observatory">
         <p className="tracked flex items-center gap-3 text-faint">

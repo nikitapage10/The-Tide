@@ -265,3 +265,6 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
    instead of sitting in a centred column. */
 .page-x { padding-inline: clamp(16px, 3.2vw, 96px); }
 .page-mx { margin-inline: clamp(16px, 3.2vw, 96px); }
+
+/* The haiku arrives with the interface, a little after the callouts. */
+.hero-haiku { opacity: clamp(0, calc((var(--p) - 0.5) * 4), 1); }

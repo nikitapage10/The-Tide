@@ -7,10 +7,9 @@
  *   coupling between neighbours, so rocks drift away together and float back.
  *   The shader moves each rock rigidly by the field at the rock's centre.
  * - FlowSim: a 64×64 "stable fluids" grid over the planet's disc. The pointer
- *   stirs the air; the flow carries cloud particles, and a "cleared" channel
- *   thins the cloud deck where you brush through (it slowly fills back in).
- * - CloudParticles: puffs of cloud broken off by the pointer, carried by the
- *   flow, swelling and fading as they dissipate.
+ *   stirs the air (and planted storms set it turning); the GPU cloud
+ *   simulation is carried by this air, and a "cleared" channel thins the haze
+ *   where you brush through (it slowly fills back in).
  */
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
@@ -50,12 +49,13 @@ export class GravityField {
   step(mx: number, my: number, enabled: boolean, release: boolean, dt: number) {
     const { gw, gh, dx, dy, vx, vy } = this;
     const on = enabled && Number.isFinite(mx) && Number.isFinite(my);
-    this.presence += ((on ? 1 : 0) - this.presence) * Math.min(1, 0.03 * dt);
+    this.presence += ((on ? 1 : 0) - this.presence) * Math.min(1, 0.015 * dt);
     if (!this.awake && this.presence < 0.001) return;
     const R = this.reach;
     const G = this.strength * this.presence;
-    const k = release ? 0.06 : 0.01;
-    const c = release ? 0.3 : 0.075;
+    // Overdamped: rocks glide out and settle back without bouncing.
+    const k = release ? 0.05 : 0.005;
+    const c = release ? 0.35 : 0.16;
     let live = 0;
     for (let j = 0; j < gh; j++)
       for (let i = 0; i < gw; i++) {
@@ -100,8 +100,8 @@ export class GravityField {
         const cy = cnt ? ay / cnt - vy[q]! : 0;
         vx[q] = vx[q]! + (fx - k * dx[q]! - c * vx[q]! + 0.15 * cx) * dt;
         vy[q] = vy[q]! + (fy - k * dy[q]! - c * vy[q]! + 0.15 * cy) * dt;
-        dx[q] = clamp(dx[q]! + vx[q]! * dt, -120, 120);
-        dy[q] = clamp(dy[q]! + vy[q]! * dt, -120, 120);
+        dx[q] = clamp(dx[q]! + vx[q]! * dt, -60, 60);
+        dy[q] = clamp(dy[q]! + vy[q]! * dt, -60, 60);
         live = Math.max(live, Math.abs(dx[q]!), Math.abs(dy[q]!), Math.abs(vx[q]!) * 10);
       }
     this.awake = live > 0.05 || this.presence > 0.001;
@@ -161,6 +161,24 @@ export class FlowSim {
     return [this.sample(this.u, gx, gy) * s, this.sample(this.v, gx, gy) * s];
   }
 
+  /** A storm you planted: the air starts turning around the point. */
+  vortex(mx: number, my: number) {
+    const n = this.n;
+    const gx = ((mx + 1) / 2) * n - 0.5;
+    const gy = ((my + 1) / 2) * n - 0.5;
+    const r = 3.5;
+    for (let j = Math.max(0, (gy - 3 * r) | 0); j < Math.min(n, gy + 3 * r); j++)
+      for (let i = Math.max(0, (gx - 3 * r) | 0); i < Math.min(n, gx + 3 * r); i++) {
+        const ex = i - gx;
+        const ey = j - gy;
+        const w = Math.exp(-(ex * ex + ey * ey) / (r * r));
+        const k = j * n + i;
+        this.u[k] = this.u[k]! - ey * w * 0.25;
+        this.v[k] = this.v[k]! + ex * w * 0.25;
+      }
+    this.awake = true;
+  }
+
   /** Pointer in disc units (-1..1) and its motion this frame in the same units. */
   step(mx: number, my: number, mvx: number, mvy: number) {
     const n = this.n;
@@ -178,8 +196,8 @@ export class FlowSim {
         for (let i = Math.max(0, (gx - 3 * r) | 0); i < Math.min(n, gx + 3 * r); i++) {
           const w = Math.exp(-((i - gx) ** 2 + (j - gy) ** 2) / (r * r));
           const k = j * n + i;
-          u[k] = u[k]! + fx * w * 0.35;
-          v[k] = v[k]! + fy * w * 0.35;
+          u[k] = u[k]! + fx * w * 0.6;
+          v[k] = v[k]! + fy * w * 0.6;
           clr[k] = Math.min(0.85, clr[k]! + w * Math.min(0.05, speed * 1.2));
         }
       this.awake = true;
@@ -232,64 +250,11 @@ export class FlowSim {
   private pack() {
     const { clr, data } = this;
     for (let k = 0; k < clr.length; k++) {
-      data[k * 4] = 128;
-      data[k * 4 + 1] = 128;
+      // Velocity in grid cells per frame (±2), then the cleared amount.
+      data[k * 4] = clamp(Math.round((this.u[k]! / 4 + 0.5) * 255), 0, 255);
+      data[k * 4 + 1] = clamp(Math.round((this.v[k]! / 4 + 0.5) * 255), 0, 255);
       data[k * 4 + 2] = clamp(Math.round(clr[k]! * 255), 0, 255);
       data[k * 4 + 3] = 255;
-    }
-  }
-}
-
-/** Cloud puffs broken off by the pointer: carried by the air, swelling as they fade. */
-export class CloudParticles {
-  readonly max = 1400;
-  /** Per particle: x, y (disc), age 0..1, seed. */
-  readonly attrs = new Float32Array(1400 * 4);
-  private vx = new Float32Array(1400);
-  private vy = new Float32Array(1400);
-  private life = new Float32Array(1400);
-  count = 0;
-
-  spawn(mx: number, my: number, mvx: number, mvy: number) {
-    const speed = Math.hypot(mvx, mvy);
-    if (speed < 0.0006 || mx * mx + my * my > 0.95) return;
-    const n = Math.min(6, 1 + Math.floor(speed * 300));
-    for (let s = 0; s < n; s++) {
-      if (this.count >= this.max) this.remove(0);
-      const i = this.count++;
-      const a = Math.random() * Math.PI * 2;
-      const r = Math.sqrt(Math.random()) * 0.045;
-      this.attrs.set([mx + Math.cos(a) * r, my + Math.sin(a) * r, 0, Math.random()], i * 4);
-      // Thrown along the stroke, with a little sideways scatter.
-      this.vx[i] = clamp(mvx, -0.03, 0.03) * (0.35 + Math.random() * 0.35) + (Math.random() - 0.5) * 0.0012;
-      this.vy[i] = clamp(mvy, -0.03, 0.03) * (0.35 + Math.random() * 0.35) + (Math.random() - 0.5) * 0.0012;
-      this.life[i] = 110 + Math.random() * 150;
-    }
-  }
-
-  private remove(i: number) {
-    const last = --this.count;
-    if (i !== last) {
-      this.attrs.copyWithin(i * 4, last * 4, last * 4 + 4);
-      this.vx[i] = this.vx[last]!;
-      this.vy[i] = this.vy[last]!;
-      this.life[i] = this.life[last]!;
-    }
-  }
-
-  step(flow: FlowSim, dt: number) {
-    for (let i = this.count - 1; i >= 0; i--) {
-      const o = i * 4;
-      const x = this.attrs[o]!;
-      const y = this.attrs[o + 1]!;
-      const [ax, ay] = flow.velocityAt(x, y);
-      // Drag toward the local air, so puffs curl with the swirl.
-      this.vx[i] = this.vx[i]! + (ax - this.vx[i]!) * 0.06 * dt;
-      this.vy[i] = this.vy[i]! + (ay - this.vy[i]!) * 0.06 * dt;
-      this.attrs[o] = x + this.vx[i]! * dt;
-      this.attrs[o + 1] = y + this.vy[i]! * dt;
-      this.attrs[o + 2] = this.attrs[o + 2]! + dt / this.life[i]!;
-      if (this.attrs[o + 2]! >= 1) this.remove(i);
     }
   }
 }
