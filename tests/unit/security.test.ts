@@ -15,6 +15,9 @@ import { ID, setup } from "./helpers";
 const env = (o: Record<string, string>) => ({ NODE_ENV: "development", ...o }) as unknown as NodeJS.ProcessEnv;
 
 describe("mode resolution fails closed", () => {
+  it("accepts the server-side variable names used by the Vercel integration", () => {
+    expect(resolveMode(env({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon" })).mode).toBe("supabase");
+  });
   it("requires explicit configuration", () => {
     expect(resolveMode(env({})).mode).toBe("setup-required");
     expect(resolveMode(env({ TIDE_DATA_MODE: "prod" })).mode).toBe("setup-required");

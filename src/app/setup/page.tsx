@@ -21,15 +21,16 @@ export default function SetupPage() {
           </ul>
         </div>
       ) : null}
-      <p>The dashboard refuses to show data until it is configured. It does not fall back to demo data.</p>
-      <ul className="list-disc space-y-1 pl-6">
+      <p>The dashboard stays closed until it can reach its database. It never falls back to demo data.</p>
+      <ol className="list-decimal space-y-1 pl-6">
         <li>
-          Try it locally with seeded demo data: <code className="text-text">npm run demo</code>
+          In Vercel, open this project → Settings → Environment Variables and check that the Supabase variables exist for the environment you are viewing (Production or Preview). The Vercel ↔ Supabase integration adds them for you.
         </li>
+        <li>Redeploy. Variables are only picked up by a new deployment.</li>
         <li>
-          Connect Supabase: set <code className="text-text">TIDE_DATA_MODE=supabase</code> plus the variables in <code className="text-text">.env.example</code>, then follow <code className="text-text">docs/SUPABASE_SETUP.md</code>.
+          Run the database setup once (GitHub Action “Supabase migrations”, or <code className="text-text">docs/SUPABASE_SETUP.md</code>).
         </li>
-      </ul>
+      </ol>
     </Plain>
   );
 }

@@ -19,7 +19,7 @@ export function resolveMode(env: NodeJS.ProcessEnv = process.env): ModeInfo {
   // When TIDE_DATA_MODE is unset but Supabase is configured (e.g. by the Vercel ↔ Supabase
   // integration), use Supabase. Sign-in and GM membership are still required; there is
   // never a fallback to demo data.
-  const hasSupabase = Boolean(env.NEXT_PUBLIC_SUPABASE_URL && (env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
+  const hasSupabase = Boolean(supabaseUrlFrom(env) && supabaseKeyFrom(env));
   const requested = env.TIDE_DATA_MODE?.trim() || (hasSupabase ? "supabase" : undefined);
   if (requested === "demo") {
     if (env.VERCEL || env.VERCEL_ENV) {
@@ -35,8 +35,8 @@ export function resolveMode(env: NodeJS.ProcessEnv = process.env): ModeInfo {
     return { mode: "demo", projectId: demoProjectId(), reason: null };
   }
   if (requested === "supabase") {
-    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
-    const supabaseKey = (env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
+    const supabaseUrl = supabaseUrlFrom(env);
+    const supabaseKey = supabaseKeyFrom(env);
     // Defaults to the project row created by supabase/seed.sql.
     const projectId = env.TIDE_PROJECT_ID?.trim() || DEMO_PROJECT_ID_CONST;
     const missing: string[] = [];
@@ -46,11 +46,30 @@ export function resolveMode(env: NodeJS.ProcessEnv = process.env): ModeInfo {
     if (missing.length) return { mode: "setup-required", reason: "Supabase mode is selected but not fully configured.", missing };
     return { mode: "supabase", projectId, supabaseUrl, supabaseKey, reason: null };
   }
+  if (requested) {
+    return { mode: "setup-required", reason: `Unknown TIDE_DATA_MODE "${requested}". Use "supabase" (or "demo" locally).`, missing: [] };
+  }
   return {
     mode: "setup-required",
-    reason: requested ? `Unknown TIDE_DATA_MODE "${requested}". Use "demo" (local) or "supabase".` : "TIDE_DATA_MODE is not set.",
-    missing: requested ? [] : ["TIDE_DATA_MODE"],
+    reason: "No Supabase connection was found on the server.",
+    missing: [!supabaseUrlFrom(env) && "NEXT_PUBLIC_SUPABASE_URL", !supabaseKeyFrom(env) && "NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)"].filter(
+      (m): m is string => Boolean(m),
+    ),
   };
+}
+
+/** Accepts the public names and the server-side names the Vercel ↔ Supabase integration may set. */
+export function supabaseUrlFrom(env: NodeJS.ProcessEnv): string {
+  return (env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL || "").trim();
+}
+export function supabaseKeyFrom(env: NodeJS.ProcessEnv): string {
+  return (
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    env.SUPABASE_PUBLISHABLE_KEY ||
+    env.SUPABASE_ANON_KEY ||
+    ""
+  ).trim();
 }
 
 // Kept in sync with fixtures/ids.json and supabase/seed.sql (asserted by tests).
@@ -66,8 +85,8 @@ export function configSummary(env: NodeJS.ProcessEnv = process.env) {
     mode: info.mode,
     reason: info.reason,
     missing: info.mode === "setup-required" ? info.missing : [],
-    supabaseUrlSet: Boolean(env.NEXT_PUBLIC_SUPABASE_URL),
-    publishableKeySet: Boolean(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    supabaseUrlSet: Boolean(supabaseUrlFrom(env)),
+    publishableKeySet: Boolean(supabaseKeyFrom(env)),
     projectIdSet: Boolean(env.TIDE_PROJECT_ID),
     serviceKeySet: Boolean(env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY),
     machinePublisherConfigured: Boolean(env.TIDE_PUBLISHER_TOKEN_SHA256),

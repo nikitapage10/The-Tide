@@ -8,6 +8,10 @@ Create a Supabase project. Note the **Project URL** and the **publishable key** 
 
 ## 2. Apply the migrations
 
+**Automatic (recommended):** add the repository secret `SUPABASE_DB_URL` (Supabase → Connect → *Session pooler* connection string with your password) under GitHub → Settings → Secrets and variables → Actions. The **Supabase migrations** workflow (`.github/workflows/supabase-migrations.yml`) then applies new migrations and the idempotent `seed.sql` on every push to the default branch that changes `supabase/`, and can be run by hand from the Actions tab. Optionally add `TIDE_GM_EMAIL` and the same workflow makes you GM after your first sign-in.
+
+**By hand:**
+
 Option A, with the Supabase CLI:
 
 ```bash

@@ -2,6 +2,8 @@
 
 ## Implemented
 
+- **GitHub Actions:** `CI` (lint, types, unit, SQL/RLS, build, bundle scan, e2e) on every push/PR; `Supabase migrations` applies migrations + seed to the hosted database from the default branch (needs the `SUPABASE_DB_URL` secret; optional `TIDE_GM_EMAIL` grants GM).
+
 - **Visual direction (v2, from the GM's mockup):** monochrome observatory look; full-screen home hero where you land among meteors, scrolling pulls the camera back (meteors fly outward, the planet is revealed, callouts and glyphs fade in behind the meteors); a minimal gravity-lens flare that appears only while the pointer moves; transparent header with World / People / Stories / Studio / Workshop; hero artwork in `public/brand/` (supplied by the GM), reference mockup in `docs/design/`.
 
 - **Five sections plus Home** with shared navigation, nested subpages, global search and contextual cross-links:
@@ -26,7 +28,6 @@
 - Graph visualization of relationships (an accessible list is provided); maps of any kind.
 - Membership management UI (SQL only), multi-project switching, billing.
 - Light theme (tokens make it a small change), Content-Security-Policy header, rate limiting.
-- CI workflow (not added, to avoid triggering external runs; all commands are in the README).
 - Virtual tabletop, combat, character builder, slicer or printer control (out of scope by design).
 
 ## Known issues and limitations
