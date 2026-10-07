@@ -59,12 +59,13 @@ vec2 cloudCoords(vec2 sph) {
   vec2 ps = sph;
   for (int k = 0; k < 3; k++) {
     vec2 d = ps - eyes[k];
-    float fall = exp(-dot(d, d) / 0.02);
-    float a = fall * (k == 1 ? -2.6 : 2.6);
+    float fall = exp(-dot(d, d) / 0.012);
+    float a = fall * (k == 1 ? -2.0 : 2.0);
     float cs = cos(a), sn = sin(a);
     ps = eyes[k] + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
   }
-  return ps / (0.35 + z) * 3.0 + vec2(uT * 0.03, uT * 0.007);
+  // Mild foreshortening toward the limb (strong stretching made the clouds stringy).
+  return ps / (0.65 + 0.35 * z) * 3.0 + vec2(uT * 0.03, uT * 0.007);
 }
 float stormAmount(vec2 sph) {
   float st = 0.0;
@@ -85,13 +86,14 @@ float stormAmount(vec2 sph) {
 float cloudBase(vec2 sph) {
   vec2 p = cloudCoords(sph);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
-  float base = fbm5(p * 1.9 + 1.1 * w);
+  float base = fbm5(p * 1.7 + 0.45 * w);
   return max(base, 0.42 + 0.42 * stormAmount(sph));
 }
 // Final cloud density from the (simulated) base amount plus fine detail.
 float cloudDetail(float base, vec2 pw) {
-  float detail = fbm5(pw * 8.0 + vec2(uT * 0.04, 0.0));
-  return smoothstep(0.42, 0.72, base + (detail - 0.5) * 0.5);
+  // Soft, rounded detail (coarser than before, so no fine streaks).
+  float detail = fbm5(pw * 5.0 + vec2(uT * 0.04, 0.0));
+  return smoothstep(0.47, 0.74, base + (detail - 0.5) * 0.4);
 }
 `;
 
@@ -177,9 +179,12 @@ float cloudAt(vec2 sph, out vec2 disp, out float cover) {
   }
   vec4 a = texture2D(uPart, tuv);
   float ws = max(a.a, 0.002);
-  disp = (a.gb / ws - 0.5) * 0.5;
-  cover = a.a / 0.5;
-  return a.r / ws;
+  // Where the pieces thin out, fall back smoothly to the undisturbed cloud
+  // (dividing by a tiny weight would draw quantisation rings).
+  float trust = smoothstep(0.06, 0.25, a.a);
+  disp = (a.gb / ws - 0.5) * 0.125 * trust;
+  cover = mix(1.0, min(a.a / 0.5, 1.0), 0.6);
+  return mix(texture2D(uClouds, tuv).r, a.r / ws, trust);
 }
 
 // Planted storms knock out the power grid light by light: each light near the
@@ -336,6 +341,14 @@ vec3 planetWithLimb(vec2 uv) {
     col = mix(col, soft, 0.55 * hazeD * (1.0 - smoothstep(-28.0, -6.0, dl)));
     col = mix(col, skyCol * (0.25 + 0.75 * light), 0.22 * hazeD * (0.5 + 0.5 * light));
 
+    // Mid layer: a thin veil between the ground and the clouds, stretched into
+    // soft streaks and drifting slowly the other way. Not interactive.
+    vec2 vq = vec2(sph.x / (0.35 + z), sph.y * 1.0) * vec2(1.4, 4.0) + vec2(-uT * 0.006, uT * 0.002);
+    float veil = smoothstep(0.42, 0.8, fbm5(vq + 0.6 * vec2(fbm(vq * 0.7), fbm(vq * 0.7 + 4.0))));
+    float veilA = veil * 0.26 * (0.45 + 0.55 * light) * smoothstep(0.0, 0.2, z);
+    col *= 1.0 - 0.18 * veil;                                   // its faint shadow
+    col = mix(col, skyCol * (0.55 + 0.45 * light), veilA);
+
     // Clouds: the large-scale amount comes from the simulation (the air carries
     // it, so pushing moves real cloud); fine detail is added here, crisp.
     vec2 pw = cloudCoords(sph);
@@ -344,9 +357,10 @@ vec3 planetWithLimb(vec2 uv) {
     float coverH, coverS;
     float baseHere = cloudAt(sph, dispH, coverH);
     float baseSun = cloudAt(sph + sunStepS, dispS, coverS);
-    // Fine detail travels with its particle; torn-apart cloud thins out.
-    float dens = clamp(cloudDetail(baseHere, cloudCoords(sph - dispH)) * coverH, 0.0, 1.0);
-    float densSun = clamp(cloudDetail(baseSun, cloudCoords(sph + sunStepS - dispS) + normalize(sunDir.xy) * 0.035) * coverS, 0.0, 1.0);
+    // The cloud amount drifts with the particles; the fine texture stays put
+    // (moving it made the clouds shimmer while they settled).
+    float dens = clamp(cloudDetail(baseHere, pw) * coverH, 0.0, 1.0);
+    float densSun = clamp(cloudDetail(baseSun, pw + normalize(sunDir.xy) * 0.035) * coverS, 0.0, 1.0);
     cleared = max(cleared, clamp(1.0 - coverH, 0.0, 1.0));
     vec2 eyes[3];
     eyes[0] = vec2(-0.4127, -0.0255);
@@ -358,7 +372,7 @@ vec3 planetWithLimb(vec2 uv) {
     float shade = clamp(0.8 - (densSun - dens) * 1.4, 0.35, 1.0);
     float bright = (0.28 + 0.62 * light) * shade * (0.72 + 0.4 * tops);
     vec3 cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
-    float alpha = pow(dens, 1.3) * 0.88 * smoothstep(0.0, 0.15, z);
+    float alpha = pow(dens, 1.3) * 0.8 * smoothstep(0.0, 0.15, z);
     col = mix(col, cloudCol, inside * alpha);
 
     // Lightning inside the storms: now and then (rarely) a flash lights a cloud
@@ -367,9 +381,9 @@ vec3 planetWithLimb(vec2 uv) {
     for (int k = 0; k < 5; k++) {
       float fk = float(k);
       vec2 cell = k < 3 ? eyes[k] + vec2(0.06, -0.04) : vec2(hash(vec2(fk, floor(uT * 0.05))) * 1.4 - 0.7, hash(vec2(floor(uT * 0.05), fk)) * 1.4 - 0.7);
-      // Rare: on average one flash somewhere every ~10 s.
+      // Now and then: on average a flash somewhere every ~3–4 s.
       float slot = floor(uT * 1.2 + fk * 3.1);
-      float on = step(0.975, hash(vec2(slot, fk * 7.3)));
+      float on = step(0.94, hash(vec2(slot, fk * 7.3)));
       float ph = fract(uT * 1.2 + fk * 3.1);
       float strobe = on * exp(-ph * 9.0) * (0.6 + 0.4 * step(0.5, fract(ph * 6.0)));
       vec2 dc = sph - flowD - cell - (vec2(hash(vec2(slot, 1.0)), hash(vec2(slot, 2.0))) - 0.5) * 0.12;
@@ -405,7 +419,7 @@ vec3 planetWithLimb(vec2 uv) {
       float lon = atan(sph.x, z);
       vec2 sc = vec2(lon * cos(lat), lat);
       // A post-ravage world: settled pockets here and there, dark between them.
-      float region = smoothstep(0.58, 0.8, fbm(sc * 4.0 + 3.0));
+      float region = smoothstep(0.52, 0.66, fbm(sc * 4.0 + 3.0));
       if (region < 0.01) { landHere = 0.0; }
       vec3 warm = vec3(1.0, 0.87, 0.68);
       vec3 cool = vec3(0.93, 0.95, 1.0);
@@ -419,7 +433,7 @@ vec3 planetWithLimb(vec2 uv) {
           float h0 = hash(c0 + 17.0);
           if (h0 < 0.55) continue;
           vec2 p0 = c0 + 0.2 + 0.6 * vec2(hash(c0 + 5.0), hash(c0 + 6.0));
-          float pop = pow(hash(c0 + 9.0), 3.0) * region;
+          float pop = pow(hash(c0 + 9.0), 2.0);
           float out0 = gridOutage(c0, sph);
           float d0 = length(cg - p0);
           float rc = 0.05 + 0.16 * pop;
@@ -459,7 +473,7 @@ vec3 planetWithLimb(vec2 uv) {
       float beads = 0.5 + 0.5 * step(0.5, fract(dot(sc, dirA) * 260.0));
       lights += cool * exp(-lane * lane * 9000.0) * seg * beads * 0.35;
       float twinkle = 0.9 + 0.1 * sin(uT * 2.3 + hash(cb) * 30.0);
-      float shown = mix(0.16, 1.0, nightSide);
+      float shown = mix(0.55, 1.2, nightSide);
       col += lights * landHere * shown * twinkle * (1.0 - 0.85 * dens) * inside;
     }
 
@@ -824,7 +838,7 @@ void main() {
   vec2 d = (f - vPos) / (2.0 / 96.0);
   float w = max(0.0, 1.0 - abs(d.x)) * max(0.0, 1.0 - abs(d.y));
   float amount = texture2D(uClouds, clamp((f - vOff) * 0.5 + 0.5, 0.0, 1.0)).r;
-  gl_FragColor = vec4(amount, clamp(vOff * 2.0 + 0.5, 0.0, 1.0), 1.0) * w * 0.5;
+  gl_FragColor = vec4(amount, clamp(vOff * 8.0 + 0.5, 0.0, 1.0), 1.0) * w * 0.5;
 }
 `;
 

@@ -197,9 +197,9 @@ export class RockBodies {
 
 /**
  * Clouds as particles: a grid of small pieces of the cloud deck. Undisturbed,
- * they tile the deck exactly; the pointer flies through them like a bird,
- * throwing pieces along its path and tearing them apart (each piece responds a
- * little differently), and they drift slowly back together.
+ * they tile the deck exactly; the pointer moves through them like a breeze,
+ * nudging pieces a little along its path (each slightly differently) so the
+ * cloud softens and shifts, then settles back.
  */
 export class CloudParticles {
   readonly g = 96;
@@ -253,21 +253,22 @@ export class CloudParticles {
           const d = Math.sqrt(d2) || 1e-4;
           const w = (1 - d / R) ** 2;
           const r = this.rnd[k]!;
-          // Thrown along the flight path and parted to the sides, unevenly.
-          vx += (mvx * (0.25 + 0.6 * r) + (rx / d) * speed * (0.15 + 0.35 * (1 - r))) * w;
-          vy += (mvy * (0.25 + 0.6 * r) + (ry / d) * speed * (0.15 + 0.35 * (1 - r))) * w;
+          // A breeze: nudged a little along the pointer's path, slightly unevenly.
+          vx += (mvx * (0.04 + 0.05 * r) + (rx / d) * speed * 0.015) * w;
+          vy += (mvy * (0.04 + 0.05 * r) + (ry / d) * speed * 0.015) * w;
         }
       }
       // Drift on, slowing gently, and slowly gather back home.
-      vx = (vx - this.attrs[o + 2]! * 0.0009 * dt) * Math.pow(0.965, dt);
-      vy = (vy - this.attrs[o + 3]! * 0.0009 * dt) * Math.pow(0.965, dt);
+      vx = (vx - this.attrs[o + 2]! * 0.0025 * dt) * Math.pow(0.94, dt);
+      vy = (vy - this.attrs[o + 3]! * 0.0025 * dt) * Math.pow(0.94, dt);
       this.vx[k] = vx;
       this.vy[k] = vy;
-      this.attrs[o + 2] = clamp(this.attrs[o + 2]! + vx * dt, -0.24, 0.24);
-      this.attrs[o + 3] = clamp(this.attrs[o + 3]! + vy * dt, -0.24, 0.24);
+      // Small drifts only (a few dozen pixels at most).
+      this.attrs[o + 2] = clamp(this.attrs[o + 2]! + vx * dt, -0.035, 0.035);
+      this.attrs[o + 3] = clamp(this.attrs[o + 3]! + vy * dt, -0.035, 0.035);
       live = Math.max(live, Math.abs(this.attrs[o + 2]!), Math.abs(this.attrs[o + 3]!));
     }
-    this.awake = live > 0.0008 || stirring;
+    this.awake = live > 0.0002 || stirring;
     if (!this.awake)
       for (let k = 0; k < this.count; k++) {
         this.attrs[k * 4 + 2] = 0;
