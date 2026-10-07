@@ -5,6 +5,7 @@ import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "./globals.css";
+import { GlyphTrail } from "@/components/home/GlyphTrail";
 
 export const metadata: Metadata = {
   title: { default: "The Tide", template: "%s · The Tide" },
@@ -18,7 +19,12 @@ export const viewport: Viewport = { themeColor: "#050506", colorScheme: "dark" }
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Site-wide, decorative, never takes input: pointer glyphs and a fine film grain. */}
+        <GlyphTrail className="pointer-events-none fixed inset-0 z-[70] h-screen w-screen" />
+        <div aria-hidden="true" className="film-grain" />
+      </body>
     </html>
   );
 }

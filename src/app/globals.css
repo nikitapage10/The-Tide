@@ -149,6 +149,9 @@ body { overflow-x: clip; }
 main:has(> .hero-track) { padding-top: 0; }
 .hero-track { position: relative; height: 280vh; width: 100vw; margin-left: calc(50% - 50vw); }
 .hero-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #000; --p: 0; }
+/* Meteors above the header (z-40): sticks with the stage, never takes input. */
+.hero-overlay { position: sticky; top: 0; height: 100svh; margin-top: -100svh; z-index: 50; pointer-events: none; overflow: hidden; }
+.hero-stage[data-gl="off"] ~ .hero-overlay { display: none; }
 /* A box with the artwork's aspect ratio that always covers the stage, so callouts stay pinned to the art. */
 /* Must match frameGeometry() in HeroScene.tsx. Shifted right; wide enough to still cover the left edge. */
 .hero-frame { position: absolute; left: calc(50% + 6vw); top: 50%; width: max(112vw, 177.6svh); aspect-ratio: 2000 / 1126; translate: -50% -50%; }
@@ -204,4 +207,16 @@ body:has(.hero-track):not([data-past-hero="true"]) header::before {
 
 @media (forced-colors: active) {
   :focus-visible { outline: 2px solid CanvasText; }
+}
+
+/* Cinematic film grain over the whole site (after the GM's reference): fine,
+   monochrome, near-static specks that read over the darks too. Not a blur. */
+.film-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0.075;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncR type='linear' slope='2.4' intercept='-0.7'/><feFuncG type='linear' slope='2.4' intercept='-0.7'/><feFuncB type='linear' slope='2.4' intercept='-0.7'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 256px 256px;
 }

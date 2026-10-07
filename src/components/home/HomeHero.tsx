@@ -9,7 +9,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
-import { GlyphTrail } from "./GlyphTrail";
+import { GLYPH_PRESENCE_DEFAULT, glyphPresence } from "./GlyphTrail";
 import { HeroScene } from "./HeroScene";
 
 export interface HeroCallout {
@@ -38,6 +38,8 @@ export function HomeHero({ callouts, code }: HeroProps) {
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
+  // One intro clock shared by both scene layers so they fade in in sequence.
+  const clock = useRef(0);
   const onSceneReady = useCallback(() => stage.current?.setAttribute("data-gl", "on"), []);
   // Without WebGL, fall back to the plain image layers.
   const onSceneFail = useCallback(() => stage.current?.setAttribute("data-gl", "off"), []);
@@ -60,6 +62,8 @@ export function HomeHero({ callouts, code }: HeroProps) {
       const p = Math.min(1, Math.max(0, -rect.top / span));
       s.style.setProperty("--p", p.toFixed(4));
       progress.current = p;
+      // Sparse glyphs before you scroll, more present as you scroll in.
+      glyphPresence.current = 0.15 + 0.85 * p;
       ui.current?.setAttribute("data-hidden", p < 0.45 ? "true" : "false");
       // The header gets its backdrop back once the hero has scrolled away.
       document.body.dataset.pastHero = rect.bottom <= 64 ? "true" : "false";
@@ -75,6 +79,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
       window.removeEventListener("resize", onScroll);
       if (raf) cancelAnimationFrame(raf);
       delete document.body.dataset.pastHero;
+      glyphPresence.current = GLYPH_PRESENCE_DEFAULT;
     };
   }, [progress]);
 
@@ -92,8 +97,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
         </div>
 
         {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
-        <HeroScene progress={progress} onReady={onSceneReady} onFail={onSceneFail} className="hero-layer z-[1] h-full w-full" />
-        <GlyphTrail progress={progress} className="hero-layer z-[2] h-full w-full" />
+        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} className="hero-layer z-[1] h-full w-full" />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
         <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
@@ -166,7 +170,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
         </div>
         <div className="hero-vignette pointer-events-none absolute inset-0 z-[5]" />
 
-        {/* Title: the only element in front of the meteors. */}
+        {/* Title: in front of the DOM fallback meteors; behind the WebGL meteors. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[6] mx-auto max-w-[96rem] px-4 pt-[calc(var(--header-h)+2.5rem)] sm:px-10">
           <div className="hero-title max-w-xl">
             <p className="tracked flex items-center gap-3 text-faint">
@@ -185,6 +189,13 @@ export function HomeHero({ callouts, code }: HeroProps) {
             <span aria-hidden="true" className="mt-6 block h-px w-8 bg-white/50" />
           </div>
         </div>
+      </div>
+
+      {/* WebGL meteors over everything, the header and title included. A separate
+          sticky layer (the stage's own stacking context sits under the header): as you
+          scroll in, the near rocks rise past the text and leave the frame by the end. */}
+      <div className="hero-overlay" aria-hidden="true">
+        <HeroScene layer="meteors" progress={progress} clock={clock} onFail={onSceneFail} className="h-full w-full" />
       </div>
     </section>
   );
