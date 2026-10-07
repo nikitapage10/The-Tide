@@ -84,22 +84,25 @@ vec2 stormTwist(vec2 sph, out float bonus, out float eye) {
     float grow = smoothstep(0.0, 1.0, sa) * (1.0 - smoothstep(4.5, 7.5, sa));
     vec2 c = uStorm[k].xy;
     vec2 d = q - c;
-    float r = length(d) / 0.05;
-    if (r > 2.6) continue;
+    float r = length(d) / 0.06;
+    if (r > 2.4) continue;
     // A gentle twist only draws nearby cloud in; the storm brings its own.
     float spinA = (0.6 * sa - 0.04 * sa * sa + 0.4) * grow;
     // (No twisting of the surrounding cloud: that read as stringy liquid.)
     spinA *= 0.0;
-    // Its own cloud, generated whether or not there was any here: two smooth
-    // logarithmic spiral arms that keep turning (slowing as it dies), softened
-    // by low-frequency noise so the edges are soft rather than jagged.
+    // Its own cloud, like a hurricane from orbit: a dense eyewall ringing a
+    // clear eye, and many feathered rain bands spiralling in (noise laid out
+    // along log-spirals, so the bands are broken and soft, not two clean arms).
+    // The whole system keeps turning, slowing as it dies.
     float th = atan(d.y, d.x);
-    float turn = 2.2 * sa - 0.14 * sa * sa;
-    float spiral = 0.5 + 0.5 * cos(2.0 * th - 3.2 * log(r + 0.12) - turn + uStorm[k].w * 6.0);
-    spiral = smoothstep(0.15, 0.95, spiral);
-    float soft = 0.7 + 0.3 * vnoise(vec2(th * 2.0 + uStorm[k].w * 9.0, r * 2.0));
-    bonus = max(bonus, grow * smoothstep(2.2, 0.55, r) * mix(0.35, 1.0, spiral) * soft);
-    eye = max(eye, grow * exp(-r * r * 14.0));
+    float turn = 1.8 * sa - 0.11 * sa * sa;
+    float sp = th + 1.9 * log(r + 0.05) - turn + uStorm[k].w * 6.0;
+    vec2 bq = vec2(cos(sp), sin(sp)) * (1.2 + 0.4 * r) + vec2(r * 2.2, uStorm[k].w * 9.0);
+    float bandsN = fbm(bq * 1.6) * 0.65 + fbm(bq * 4.2 + 3.0) * 0.35;
+    float bands = smoothstep(0.35, 0.75, bandsN) * smoothstep(1.9, 0.5, r);
+    float eyewall = exp(-pow((r - 0.42) / 0.22, 2.0));
+    bonus = max(bonus, grow * clamp(eyewall + bands * 0.85, 0.0, 1.0));
+    eye = max(eye, grow * (1.0 - smoothstep(0.16, 0.3, r)));
   }
   return q;
 }
@@ -109,7 +112,7 @@ float cloudBase(vec2 sph) {
   vec2 p = cloudCoords(tw);
   vec2 w = vec2(fbm(p * 0.8 + vec2(0.0, uT * 0.02)), fbm(p * 0.8 + vec2(5.2, 1.3 - uT * 0.017)));
   float base = fbm5(p * 1.7 + 0.45 * w);
-  return max(base, 0.4 + 0.38 * bonus) - eye * 0.3;
+  return max(base, 0.4 + 0.38 * bonus) - eye * 0.6;
 }
 // Final cloud density from the (simulated) base amount plus fine detail.
 float cloudDetail(float base, vec2 pw) {
@@ -370,7 +373,7 @@ vec3 planetWithLimb(vec2 uv) {
     float baseSun = cloudBase(srcS);
     float dens = clamp(cloudDetail(baseHere, pw) * coverH, 0.0, 1.0);
     // Smooth storm cloud (fine detail would break its arms into jagged bits).
-    dens = mix(dens, smoothstep(0.42, 0.72, baseHere) * coverH, sbH * 0.7);
+    dens = mix(dens, smoothstep(0.42, 0.72, baseHere) * coverH, sbH * 0.45);
     float densSun = clamp(cloudDetail(baseSun, cloudCoords(stormTwist(srcS, sbH, seH))) * coverS, 0.0, 1.0);
     vec2 eyes[3];
     eyes[0] = vec2(-0.4127, -0.0255);
@@ -1268,16 +1271,18 @@ export function HeroScene({
               // so they trail and settle like smoke rather than snapping.
               const st = flowState[k]!;
               // Frame-rate independent (≈ 0.025–0.06 per 60 Hz frame).
-              const ease = 1 - Math.pow(1 - (0.025 + 0.012 * k), strandDt);
               const wob = Math.sin(((now - clock.current) / 1000) * (0.35 + 0.07 * k) + k * 2.3);
-              const tgx = head.x + px * s * 6 + px * wob * 10;
-              const tgy = head.y + py * s * 6 + py * wob * 10;
+              // Tips stay with the cursor (a small bundle around it, never a single
+              // point); only the bend trails behind, which keeps them flowing.
+              const tgx = head.x + px * s * 7 + px * wob * 3;
+              const tgy = head.y + py * s * 7 + py * wob * 3;
               if (st.tx < -9000) {
-                st.tx = rx;
-                st.ty = ry;
+                st.tx = tgx;
+                st.ty = tgy;
               }
-              st.tx += (tgx - st.tx) * ease;
-              st.ty += (tgy - st.ty) * ease;
+              const tipEase = 1 - Math.pow(0.55, strandDt);
+              st.tx += (tgx - st.tx) * tipEase;
+              st.ty += (tgy - st.ty) * tipEase;
               const tx = st.tx, ty = st.ty;
               const reachK = Math.hypot(tx - rx, ty - ry);
               // Concave: bowing in toward the shared middle line, leaning along the streams.
