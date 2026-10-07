@@ -1,5 +1,20 @@
 import Link from "next/link";
-import { HomeHero, type HeroCallout } from "@/components/home/HomeHero";
+import { HomeHero, type HeroCallout, type HeroObservation } from "@/components/home/HomeHero";
+
+/**
+ * Rotating notes on the hero. Wording is taken from the GM's own documents
+ * ("The Tide - Intro" and "Tide 101"); positions are on the artwork (percent).
+ * "Storm cell" describes the animated weather, not lore.
+ */
+const OBSERVATIONS: HeroObservation[] = [
+  { x: 80, y: 62, side: "left", title: "Storm cell", line: "Atmosphere unstable" },
+  { x: 70, y: 22, side: "right", title: "The Drowning", line: "Coastlines lost beneath rising water" },
+  { x: 76, y: 40, side: "right", title: "The Divergence", line: "Latent abilities awakened" },
+  { x: 34, y: 60, side: "right", title: "The Drift", line: "Enclaves from other times" },
+  { x: 74, y: 52, side: "right", title: "The Undertow", line: "First cataclysm · c. 2102 B.U." },
+  { x: 78, y: 30, side: "left", title: "Age of the Veil", line: "Some seven centuries, scarcely recorded" },
+  { x: 70, y: 12, side: "right", title: "Era of Verdancy", line: "The present age" },
+];
 import { PrintCard } from "@/components/live/PrintCard";
 import { Badge, DemoBadge } from "@/components/ui/Badge";
 import { Card, SectionHeading } from "@/components/ui/Card";
@@ -49,7 +64,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <HomeHero callouts={callouts} code={latest ? `Archive · release v${latest.version}` : "Archive · no release yet"} />
+      <HomeHero callouts={callouts} observations={OBSERVATIONS} code={latest ? `Archive · release v${latest.version}` : "Archive · no release yet"} />
       <div className="space-y-12 pt-14">
       <section aria-labelledby="observatory">
         <p className="tracked flex items-center gap-3 text-faint">

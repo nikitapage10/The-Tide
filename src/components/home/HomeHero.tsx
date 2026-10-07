@@ -8,9 +8,10 @@
  */
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GLYPH_PRESENCE_DEFAULT, glyphPresence } from "./GlyphTrail";
 import { HeroScene } from "./HeroScene";
+import { SoundToggle } from "./SoundToggle";
 
 export interface HeroCallout {
   /** Position on the artwork, in percent of its width/height. */
@@ -25,20 +26,32 @@ export interface HeroCallout {
   code?: string;
 }
 
+/** A rotating note: pops up at a spot on the artwork, types out, then moves on. */
+export interface HeroObservation {
+  x: number;
+  y: number;
+  side: "left" | "right";
+  title: string;
+  line: string;
+}
+
 export interface HeroProps {
   callouts: HeroCallout[];
+  observations: HeroObservation[];
   /** Short machine-style readout under the glyph panel (real data, e.g. release). */
   code: string;
 }
 
 const pin = (x: number, y: number) => ({ "--x": `${x}%`, "--y": `${y}%` }) as React.CSSProperties;
 
-export function HomeHero({ callouts, code }: HeroProps) {
+export function HomeHero({ callouts, observations, code }: HeroProps) {
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
+  // The interface (callouts) is revealed late in the scroll; it types itself in.
+  const [revealed, setRevealed] = useState(false);
   // One intro clock shared by both scene layers so they fade in in sequence.
   const clock = useRef(0);
   const onSceneReady = useCallback(() => stage.current?.setAttribute("data-gl", "on"), []);
@@ -54,7 +67,8 @@ export function HomeHero({ callouts, code }: HeroProps) {
       overlay.current?.style.setProperty("--p", "1");
       progress.current = 1;
       ui.current?.setAttribute("data-hidden", "false");
-      return;
+      const id = requestAnimationFrame(() => setRevealed(true));
+      return () => cancelAnimationFrame(id);
     }
     let raf = 0;
     const update = () => {
@@ -71,6 +85,7 @@ export function HomeHero({ callouts, code }: HeroProps) {
       // Sparse glyphs before you scroll, more present as you scroll in.
       glyphPresence.current = 0.15 + 0.85 * p;
       ui.current?.setAttribute("data-hidden", p < 0.45 ? "true" : "false");
+      setRevealed(p >= 0.5);
       // The header gets its backdrop back once the hero has scrolled away.
       document.body.dataset.pastHero = rect.bottom <= 64 ? "true" : "false";
     };
@@ -129,11 +144,12 @@ export function HomeHero({ callouts, code }: HeroProps) {
                 +
               </span>
             ))}
-            {callouts.map((c) => (
+            {callouts.map((c, i) => (
               <div key={c.title} className="hero-pin" style={pin(c.x, c.y)}>
-                <Callout c={c} />
+                <Callout c={c} active={revealed} delay={i * 450} />
               </div>
             ))}
+            <Observations items={observations} active={revealed} />
           </div>
           {/* Glyph panel, bottom right (decorative script, no meaning). */}
           <div aria-hidden="true" className="absolute bottom-24 right-4 font-[family-name:var(--font-mono)] text-white/70 sm:right-10">
@@ -192,7 +208,6 @@ export function HomeHero({ callouts, code }: HeroProps) {
               <span className="block">Worlds respond.</span>
               <span className="block">We listen.</span>
             </p>
-            <span aria-hidden="true" className="mt-6 block h-px w-8 bg-white/50" />
           </div>
         </div>
       </div>
@@ -200,25 +215,114 @@ export function HomeHero({ callouts, code }: HeroProps) {
       {/* WebGL meteors over everything, the header and title included. A separate
           sticky layer (the stage's own stacking context sits under the header): as you
           scroll in, the near rocks rise past the text and leave the frame by the end. */}
-      <div ref={overlay} className="hero-overlay" aria-hidden="true">
+      <div ref={overlay} className="hero-overlay">
         <HeroScene layer="meteors" progress={progress} clock={clock} onFail={onSceneFail} className="h-full w-full" />
         {/* Scroll cue: arrives after the intro, gone as soon as you start scrolling. */}
-        <div className="hero-cue tracked absolute inset-x-0 bottom-7 flex flex-col items-center gap-3 text-[0.62rem] text-white/60">
+        <div aria-hidden="true" className="hero-cue tracked absolute inset-x-0 bottom-7 flex flex-col items-center gap-3 text-[0.62rem] text-white/60">
           <span>Scroll</span>
           <span className="hero-cue-line block h-9 w-px overflow-hidden bg-white/15" />
         </div>
+        <SoundToggle className="tracked pointer-events-auto absolute bottom-7 right-4 flex min-h-10 items-center gap-2 px-2 text-[0.6rem] text-white/60 hover:text-white sm:right-10" />
       </div>
     </section>
   );
 }
 
-function Callout({ c }: { c: HeroCallout }) {
+/** Text that types itself out while `active` (instantly under reduced motion). */
+function Typed({ text, active, delay = 0, speed = 28 }: { text: string; active: boolean; delay?: number; speed?: number }) {
+  const [typed, setN] = useState(0);
+  let n = typed;
+  useEffect(() => {
+    if (!active) return;
+    const instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let i = 0;
+    let timer = 0;
+    const start = window.setTimeout(() => {
+      setN(instant ? text.length : 0);
+      if (instant) return;
+      timer = window.setInterval(() => {
+        i += 1;
+        setN(i);
+        if (i >= text.length) window.clearInterval(timer);
+      }, speed);
+    }, delay);
+    return () => {
+      window.clearTimeout(start);
+      window.clearInterval(timer);
+    };
+  }, [active, text, delay, speed]);
+  // Hidden: nothing typed (derived, so no state reset is needed).
+  if (!active) n = 0;
+  const done = n >= text.length;
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {text.slice(0, n)}
+        {active && !done ? <span className="typed-caret">▍</span> : null}
+        <span className="invisible">{text.slice(n)}</span>
+      </span>
+    </>
+  );
+}
+
+/** One note at a time, cycling through the list at different spots on the planet. */
+function Observations({ items, active }: { items: HeroObservation[]; active: boolean }) {
+  const [index, setIndex] = useState(0);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!active || items.length === 0) return;
+    let alive = true;
+    let t1 = 0;
+    let t2 = 0;
+    const cycle = (i: number) => {
+      setIndex(i);
+      setShown(true);
+      t1 = window.setTimeout(() => {
+        if (!alive) return;
+        setShown(false);
+        t2 = window.setTimeout(() => alive && cycle((i + 1) % items.length), 900);
+      }, 6200);
+    };
+    const t0 = window.setTimeout(() => cycle(index), 1600);
+    return () => {
+      alive = false;
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+    // Restart the cycle only when revealed/hidden; index continues where it was.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, items.length]);
+  const o = items[index];
+  if (!o) return null;
+  const on = active && shown;
+  return (
+    <div aria-hidden="true" className={`hero-pin obs ${on ? "obs-on" : ""}`} style={pin(o.x, o.y)}>
+      <span className="obs-ping absolute -left-2 -top-2 h-4 w-4 rounded-full border border-white/70" />
+      <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />
+      <span className={`obs-line absolute top-0 h-px bg-white/50 ${o.side === "right" ? "left-2 origin-left" : "right-2 origin-right"}`} />
+      <div className={`absolute -top-2.5 w-max max-w-[16rem] ${o.side === "right" ? "left-[4.5rem]" : "right-[4.5rem] text-right"}`}>
+        <span className="tracked block text-white">
+          <Typed key={`t${index}`} text={o.title} active={on} delay={250} />
+        </span>
+        <span className="tracked block text-[0.68rem] leading-5 text-muted">
+          <Typed key={`l${index}`} text={o.line} active={on} delay={250 + o.title.length * 28 + 150} speed={18} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Callout({ c, active, delay }: { c: HeroCallout; active: boolean; delay: number }) {
   const body = (
     <>
-      <span className="tracked block text-white">{c.title}</span>
+      <span className="tracked block text-white">
+        <Typed text={c.title} active={active} delay={delay} />
+      </span>
       {c.lines.map((l) => (
         <span key={l} className="tracked block text-[0.68rem] leading-5 text-muted">
-          {l}
+          <Typed text={l} active={active} delay={delay + c.title.length * 28 + 120} speed={18} />
         </span>
       ))}
     </>

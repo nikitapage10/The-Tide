@@ -234,3 +234,26 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncR type='linear' slope='2.4' intercept='-0.7'/><feFuncG type='linear' slope='2.4' intercept='-0.7'/><feFuncB type='linear' slope='2.4' intercept='-0.7'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   background-size: 256px 256px;
 }
+
+/* Sound toggle: four thin bars that breathe while sound is on. */
+.sound-bar { height: 30%; }
+.sound-bar-on { height: 100%; }
+@media (prefers-reduced-motion: no-preference) {
+  .sound-bar-on { animation: sound-bar 1.1s ease-in-out infinite alternate; transform-origin: bottom; }
+}
+@keyframes sound-bar { from { transform: scaleY(0.3); } to { transform: scaleY(1); } }
+
+/* Typed callouts and rotating observations on the hero. */
+.typed-caret { display: inline-block; margin-left: 1px; opacity: .8; }
+@media (prefers-reduced-motion: no-preference) {
+  .typed-caret { animation: caret .7s steps(2) infinite; }
+}
+@keyframes caret { 50% { opacity: 0; } }
+.obs { opacity: 0; transition: opacity .6s ease; }
+.obs-on { opacity: 1; }
+.obs-line { width: 3.5rem; transform: scaleX(0); transition: transform .45s cubic-bezier(.2,.7,.1,1) .1s; }
+.obs-on .obs-line { transform: scaleX(1); }
+@media (prefers-reduced-motion: no-preference) {
+  .obs-on .obs-ping { animation: obs-ping 1.6s ease-out 1; }
+}
+@keyframes obs-ping { from { transform: scale(2.4); opacity: 0; } 40% { opacity: 1; } to { transform: scale(1); opacity: 1; } }

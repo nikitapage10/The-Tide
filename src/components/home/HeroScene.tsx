@@ -19,6 +19,8 @@
  * Geometry matches the CSS .hero-frame so DOM callouts stay pinned to the art.
  */
 import { useEffect, useRef } from "react";
+import { FlowSim, RockLayer } from "./heroPhysics";
+import { heroSignal } from "./heroSound";
 
 const VERT = `
 attribute vec2 a;
@@ -28,6 +30,14 @@ void main() { gl_Position = vec4(a, 0.0, 1.0); }
 const FRAG = `
 precision highp float;
 uniform sampler2D uPlanet, uFar, uNear;
+uniform sampler2D uFlow;          // planet: weather flow (xy displacement, z cleared)
+uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
+uniform vec3 uClick;              // planet: last click (disc x, y) and its age in seconds
+uniform int uFarN, uNearN;        // rocks currently moved
+uniform vec4 uFarR[12];           // id, dx, dy, angle (source px, radians)
+uniform vec2 uFarC[12];           // rock centre (source px)
+uniform vec4 uNearR[6];
+uniform vec2 uNearC[6];
 uniform int uLayer;       // 0 = planet (opaque), 1 = meteors (premultiplied alpha)
 uniform vec2 uRes;
 uniform vec2 uFrameC;
@@ -39,7 +49,6 @@ uniform vec2 uV;
 uniform float uE;
 uniform float uDpr;
 uniform float uS;         // smoothed scroll speed (progress per second, >= 0)
-uniform float uPush;      // how hard the pointer is shoving the rocks (0..1)
 uniform float uMenuH;     // header height (CSS px); rocks are kept off the menu at rest
 
 const vec2 SRC = vec2(2000.0, 1126.0);
@@ -69,7 +78,9 @@ vec3 sharpPlanet(vec2 uv) {
   float m = smoothstep(0.04, 0.25, l);
   vec3 c = c0 + (c0 - b1) * 1.6 * m + (c0 - b2) * 0.55 * m;
   // Gentle S-curve: deeper blacks between the strands, brighter cores.
-  c = max(c, 0.0);
+  // Never darken below the source (that leaves dark halos beside bright edges,
+  // e.g. a dark line just outside the horizon).
+  c = max(c, c0 * 0.97);
   c = mix(c, c * c * (3.0 - 2.0 * c), 0.35);
   return c;
 }
@@ -175,33 +186,45 @@ vec3 planetWithLimb(vec2 uv) {
   vec3 tint = vec3(0.86, 0.91, 1.0);
   col += tint * (ring1 * 0.2 * beam * knots + ring2 * 0.07 * beam * knots + halo * 0.04);
 
-  // Atmosphere and weather, wrapped onto the sphere (foreshortened at the limb).
-  // - Clouds: dense, eroded cloud systems with fine wisps at their edges, lit
-  //   from the bright limb side with soft self-shadowing; they drift around the
-  //   globe and wind into cyclones (one sits on the storm in the artwork).
-  // - Atmosphere: a lit scattering haze over the disc, thickening to a glowing
-  //   shell at the horizon and just beyond it.
-  // The pointer pushes through both: clouds and haze part around it and drift
-  // back together as the lens energy settles.
+  // Weather, wrapped onto the sphere (foreshortened at the limb), in layers:
+  //   surface → lower atmosphere (haze that softens the ground, with drifting
+  //   veils and banding) → cloud shadows → clouds → a thin upper haze over the
+  //   clouds, so they sit inside the atmosphere rather than on the picture.
+  // The pointer stirs a small fluid simulation (uFlow): its accumulated
+  // displacement carries clouds and haze along (swirls and wakes) and its
+  // "cleared" channel thins them where you brush through; both slowly relax.
   float inside = 1.0 - smoothstep(-6.0, 0.0, dl);
   vec2 sph = q / LIMB_R;
   float z = sqrt(max(0.0, 1.0 - dot(sph, sph)));
-  vec2 toM = gSp - uM;
-  float part = clamp(uE * 1.4 * exp(-dot(toM, toM) / (140.0 * 140.0)), 0.0, 1.0);
-  vec2 pushDir = normalize(toM + 1e-4);
+  vec4 fl = texture2D(uFlow, clamp(sph * 0.5 + 0.5, 0.0, 1.0));
+  vec2 flowD = (fl.xy - 0.5) * 0.6;
+  float cleared = fl.z;
   vec3 nrm3 = vec3(sph, z);
   vec3 sunDir = normalize(vec3(-0.85, -0.35, 0.4));
   float light = clamp(dot(nrm3, sunDir), 0.0, 1.0);
+  float fres = pow(1.0 - z, 2.2);
+  vec3 skyCol = vec3(0.78, 0.86, 0.96);
 
-  float alpha = 0.0;
-  vec3 cloudCol = vec3(0.0);
   if (dl < 0.0) {
-    // Cyclones: a fixed spiral warp around each eye.
+    // Lower atmosphere: soften the ground under a lit haze with drifting veils
+    // and faint latitude banding; carried by the flow at half strength.
+    vec2 hs = sph - flowD * 0.5;
+    vec2 t6 = vec2(6.0) / SRC;
+    vec3 soft = (tex(uPlanet, uv + vec2(t6.x, 0.0)).rgb + tex(uPlanet, uv - vec2(t6.x, 0.0)).rgb
+               + tex(uPlanet, uv + vec2(0.0, t6.y)).rgb + tex(uPlanet, uv - vec2(0.0, t6.y)).rgb) * 0.25;
+    float veils = fbm5(hs * 3.5 + vec2(uT * 0.015, 0.0));
+    float bands = fbm(vec2(hs.x * 2.0 + uT * 0.01, hs.y * 16.0 + 2.0 * veils));
+    float hazeD = clamp(0.18 + 0.5 * smoothstep(0.35, 0.8, veils) + 0.25 * bands + 0.9 * fres, 0.0, 1.0);
+    hazeD *= 1.0 - 0.6 * cleared;
+    col = mix(col, soft, 0.55 * hazeD);
+    col = mix(col, skyCol * (0.25 + 0.75 * light), 0.22 * hazeD * (0.5 + 0.5 * light));
+
+    // Clouds. Cyclones: a fixed spiral warp around each eye.
     vec2 eyes[3];
     eyes[0] = (vec2(0.83, 0.63) - LIMB_C) * SRC / LIMB_R;   // the storm in the artwork
     eyes[1] = vec2(-0.45, -0.55);
     eyes[2] = vec2(-0.2, 0.32);
-    vec2 ps = sph;
+    vec2 ps = sph - flowD;
     for (int k = 0; k < 3; k++) {
       vec2 d = ps - eyes[k];
       float fall = exp(-dot(d, d) / 0.02);
@@ -209,32 +232,66 @@ vec3 planetWithLimb(vec2 uv) {
       float cs = cos(a), sn = sin(a);
       ps = eyes[k] + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
     }
-    vec2 pw = ps / (0.35 + z) * 3.0 + vec2(uT * 0.03, uT * 0.007) + pushDir * part * 0.5;
+    vec2 pw = ps / (0.35 + z) * 3.0 + vec2(uT * 0.03, uT * 0.007);
     vec2 sunStep = normalize(sunDir.xy) * 0.035;
-    float dens = cloudDensity(pw);
-    float densSun = cloudDensity(pw + sunStep);
-    dens *= 1.0 - 0.85 * part;
-    // Shadows cast on the surface by cloud lying toward the sun.
-    col *= 1.0 - 0.45 * densSun * (1.0 - dens) * inside;
-    // Cloud tops: bumpy fine texture; sides facing away from the sun fall into
-    // soft shade; thin cloud stays translucent and slightly cooler.
+    float dens = cloudDensity(pw) * (1.0 - 0.85 * cleared);
+    float densSun = cloudDensity(pw + sunStep) * (1.0 - 0.85 * cleared);
+    // Shadows cast on the ground (through the haze) by cloud toward the sun.
+    col *= 1.0 - 0.4 * densSun * (1.0 - dens);
     float tops = fbm5(pw * 18.0 + vec2(uT * 0.05, 0.0));
     float shade = clamp(0.8 - (densSun - dens) * 1.4, 0.35, 1.0);
     float bright = (0.28 + 0.62 * light) * shade * (0.72 + 0.4 * tops);
-    cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
-    alpha = pow(dens, 1.3) * 0.88 * smoothstep(0.0, 0.15, z);
-  }
+    vec3 cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
+    float alpha = pow(dens, 1.3) * 0.88 * smoothstep(0.0, 0.15, z);
+    col = mix(col, cloudCol, inside * alpha);
 
-  // Scattering haze over the disc (lit side brighter), thickening at the horizon.
-  float hazeN = fbm(sph * 6.0 + vec2(uT * 0.02, 0.0) + pushDir * part * 0.6);
-  float fres = pow(1.0 - z, 2.2);
-  float hazeA = (0.07 + 0.05 * hazeN + 0.38 * fres) * (0.45 + 0.75 * light) * (1.0 - 0.7 * part);
-  vec3 skyCol = vec3(0.78, 0.86, 0.96);
-  col = mix(col, skyCol, inside * clamp(hazeA, 0.0, 0.6));
-  col = mix(col, cloudCol, inside * alpha);
+    // Lightning inside the storms: each eye (and a few roaming cells) flashes now
+    // and then, lighting the cloud from within.
+    float flash = 0.0;
+    for (int k = 0; k < 5; k++) {
+      float fk = float(k);
+      vec2 cell = k < 3 ? eyes[k] + vec2(0.06, -0.04) : vec2(hash(vec2(fk, floor(uT * 0.05))) * 1.4 - 0.7, hash(vec2(floor(uT * 0.05), fk)) * 1.4 - 0.7);
+      float slot = floor(uT * 1.7 + fk * 3.1);
+      float on = step(0.86, hash(vec2(slot, fk * 7.3)));
+      float ph = fract(uT * 1.7 + fk * 3.1);
+      float strobe = on * exp(-ph * 9.0) * (0.6 + 0.4 * step(0.5, fract(ph * 6.0)));
+      vec2 dc = sph - flowD - cell - (vec2(hash(vec2(slot, 1.0)), hash(vec2(slot, 2.0))) - 0.5) * 0.12;
+      flash += strobe * exp(-dot(dc, dc) / 0.004);
+    }
+    // Storm surge from a click: a ring of light running outward through the
+    // clouds and a burst of lightning around the point, over ~2.5 s.
+    float age = uClick.z;
+    if (age < 3.0) {
+      vec2 dcl = sph - uClick.xy;
+      float rr = length(dcl);
+      float ringR = 0.03 + age * 0.22;
+      float ring = exp(-pow((rr - ringR) / 0.025, 2.0)) * (1.0 - smoothstep(0.5, 2.5, age));
+      float burstOn = step(0.45, hash(vec2(floor(age * 14.0), 3.0))) * (1.0 - smoothstep(0.0, 1.6, age));
+      flash += ring * 0.9 + burstOn * exp(-dot(dcl, dcl) / 0.006) * 1.4;
+    }
+    col += vec3(0.82, 0.88, 1.0) * flash * (0.25 + 0.75 * dens) * inside;
+
+    // City lights on the night side: sparse points on land (bright parts of the
+    // artwork), flickering, dimmed under cloud.
+    float night = 1.0 - smoothstep(0.02, 0.22, light);
+    if (night > 0.01) {
+      vec2 cg = (sph - flowD * 0.2) * 140.0;
+      vec2 ci = floor(cg);
+      float h = hash(ci);
+      vec2 cp = ci + 0.3 + 0.4 * vec2(hash(ci + 1.3), hash(ci + 2.9));
+      float land = smoothstep(0.12, 0.35, dot(tex(uPlanet, uv).rgb, vec3(0.3333)));
+      float flick = 0.6 + 0.4 * sin(uT * (2.0 + 5.0 * h) + h * 50.0) * step(0.7, hash(ci + floor(uT * 0.7)));
+      float city = step(0.93, h) * land * exp(-dot(cg - cp, cg - cp) * 6.0) * flick;
+      col += vec3(1.0, 0.86, 0.62) * city * night * (1.0 - 0.8 * dens) * 0.9 * inside;
+    }
+
+    // Upper haze over the clouds, strongest toward the horizon.
+    float upper = (0.06 + 0.4 * fres) * (0.4 + 0.8 * light) * (1.0 - 0.4 * cleared);
+    col = mix(col, skyCol, inside * clamp(upper, 0.0, 0.55));
+  }
   // The atmosphere's shell just beyond the horizon, glowing on the lit side.
   float lit2 = clamp(dot(nrm, normalize(vec2(-0.9, -0.4))) * 0.5 + 0.5, 0.0, 1.0);
-  float shell = exp(-max(dl, 0.0) / 46.0) * outside * (0.3 + 0.7 * lit2) * (1.0 - 0.6 * part);
+  float shell = exp(-max(dl, 0.0) / 46.0) * outside * (0.3 + 0.7 * lit2);
   col += skyCol * shell * 0.2;
   return col;
 }
@@ -295,10 +352,47 @@ vec4 flyby(sampler2D s, vec2 uv, vec2 origin, float streak, float bright, float 
   return mix(base, vec4(acc / 6.0, aa / 6.0), w);
 }
 
+// Individually moved rocks (pointer physics, before scrolling). A rock's own
+// pixels leave their home spot (keep = 0 there) and are drawn at its new
+// position and angle instead.
+const vec2 ROCK_SZ = vec2(1672.0, 941.0);
+float rockId(sampler2D ids, vec2 uv) {
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
+  vec4 t = texture2D(ids, uv);
+  return floor(t.r * 255.0 + 0.5) + floor(t.g * 255.0 + 0.5) * 256.0;
+}
+vec2 rockLocal(vec2 uv, vec4 r, vec2 c) {
+  vec2 d = uv * ROCK_SZ - c - r.yz;
+  float cs = cos(-r.w), sn = sin(-r.w);
+  return (c + vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y)) / ROCK_SZ;
+}
+vec2 moveFar(vec2 uv, out float keep) {
+  keep = 1.0;
+  float id = rockId(uIdsFar, uv);
+  for (int k = 0; k < 12; k++) {
+    if (k >= uFarN) break;
+    vec2 l = rockLocal(uv, uFarR[k], uFarC[k]);
+    if (abs(rockId(uIdsFar, l) - uFarR[k].x) < 0.5) { keep = 1.0; return l; }
+    if (abs(id - uFarR[k].x) < 0.5) keep = 0.0;
+  }
+  return uv;
+}
+vec2 moveNear(vec2 uv, out float keep) {
+  keep = 1.0;
+  float id = rockId(uIdsNear, uv);
+  for (int k = 0; k < 6; k++) {
+    if (k >= uNearN) break;
+    vec2 l = rockLocal(uv, uNearR[k], uNearC[k]);
+    if (abs(rockId(uIdsNear, l) - uNearR[k].x) < 0.5) { keep = 1.0; return l; }
+    if (abs(id - uNearR[k].x) < 0.5) keep = 0.0;
+  }
+  return uv;
+}
+
 // Signed distance (source px) from the planet's horizon for a screen point.
 float planetDl(vec2 sp) {
   vec2 f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;
-  float sP = 1.25 - 0.25 * uP + 0.06 * (1.0 - intro(2.0, 3.8));
+  float sP = 1.25 - 0.25 * uP;
   vec2 oP = vec2(0.85, 0.58);
   vec2 puv = oP + (f - oP) / sP;
   return length((puv - LIMB_C) * SRC) - LIMB_R;
@@ -309,8 +403,7 @@ vec4 scene(vec2 sp) {
   vec2 f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;
   vec2 px = 1.0 / uFrameS;
   if (uLayer == 0) {
-    float iPlanet = intro(2.0, 3.8);
-    float sP = 1.25 - 0.25 * uP + 0.06 * (1.0 - iPlanet);
+    float sP = 1.25 - 0.25 * uP;
     vec2 oP = vec2(0.85, 0.58);
     vec2 puv = oP + (f - oP) / sP;
     vec3 col = planetWithLimb(puv);
@@ -318,15 +411,27 @@ vec4 scene(vec2 sp) {
     float dlS = length((puv - LIMB_C) * SRC) - LIMB_R;
     float empty = (1.0 - smoothstep(0.03, 0.14, dot(col, vec3(0.3333)))) * smoothstep(20.0, 80.0, dlS);
     col += stars(sp, empty);
+    // Fine star dust and a faint drifting nebula haze fill the empty dark,
+    // strongest on the left where the frame is emptiest. Very low contrast.
+    float leftBias = 1.0 - 0.6 * clamp(sp.x / max(1.0, uRes.x / uDpr), 0.0, 1.0);
+    vec2 dc = floor(sp / 9.0);
+    float dh = hash(dc + 11.0);
+    vec2 dp = (dc + 0.5 + 0.35 * (vec2(hash(dc + 4.0), hash(dc + 9.0)) - 0.5)) * 9.0;
+    float dust = step(0.82, dh) * exp(-dot(sp - dp, sp - dp) * 1.8) * (0.05 + 0.06 * hash(dc + 2.0));
+    dust *= 0.6 + 0.4 * sin(uT * (0.5 + dh) + dh * 30.0);
+    vec2 nq = sp * 0.0016 + vec2(uT * 0.004, -uT * 0.002);
+    float neb = fbm5(nq + 1.3 * vec2(fbm(nq * 1.7), fbm(nq * 1.7 + 5.0)));
+    float nebula = smoothstep(0.45, 0.85, neb) * 0.035;
+    col += (vec3(0.78, 0.84, 0.95) * (dust + nebula)) * empty * leftBias;
+    // Intro (no movement): the streams of light fade in first as a soft wipe from
+    // left to right, then the planet fades up out of black.
+    float sx = sp.x / max(1.0, uRes.x / uDpr);
+    float iStreams = smoothstep(0.0, 1.0, (uT - 1.7 - sx * 1.3) / 0.9);
+    float iDisc = intro(3.3, 5.0);
+    float iPlanet = mix(iStreams, iDisc, smoothstep(-30.0, 10.0, -dlS));
     col *= iPlanet * mix(0.07, 1.0, smoothstep(0.0, 1.0, uP));
     return vec4(col, 1.0);
   }
-  // Before you scroll, the pointer shoves nearby rocks aside; they drift back as
-  // the push settles. (Displacement d(r) = r·k·exp(-r²/s²), k < 1: no folding.)
-  vec2 dM = sp - uM;
-  float pushAmt = uPush * (1.0 - smoothstep(0.0, 0.12, uP));
-  sp -= dM * 0.85 * exp(-dot(dM, dM) / (160.0 * 160.0)) * pushAmt;
-  f = (sp - (uFrameC - 0.5 * uFrameS)) / uFrameS;
   float iNear = intro(0.6, 1.9);
   float iFar = intro(1.3, 2.7);
 
@@ -338,7 +443,10 @@ vec4 scene(vec2 sp) {
   // Middle rocks: darker, slightly soft, spread outward and thin to a faint frame.
   float sF = 1.0 + 0.9 * uP + 0.08 * (1.0 - iFar);
   vec2 oF = vec2(0.5);
-  vec4 far = flyby(uFar, oF + (f - oF) / sF, oF, 0.012 * depth + 0.02 * rush,
+  vec2 uvF = oF + (f - oF) / sF;
+  float keepF = 1.0;
+  if (uFarN > 0) uvF = moveFar(uvF, keepF);
+  vec4 far = keepF * flyby(uFar, uvF, oF, 0.012 * depth + 0.02 * rush,
                    mix(0.22, 0.4, uP), mix(0.22, 0.4, uP), px / sF, 1.6 + 3.5 * depth);
   // Stays solid through most of the scroll; gone by the last frame (only the planet remains).
   far *= iFar * (1.0 - smoothstep(0.78, 0.99, uP));
@@ -349,7 +457,9 @@ vec4 scene(vec2 sp) {
   vec2 oN = vec2(0.5, 0.95);
   vec2 uvN = oN + (f - oN) / sN;
   float glint = 0.35 + 0.5 * sin(3.14159 * clamp(uP * 1.4, 0.0, 1.0));
-  vec4 near = flyby(uNear, uvN, oN, 0.02 * depth + 0.035 * rush, 0.8, glint, px / sN, 7.0 * depth * depth);
+  float keepN = 1.0;
+  if (uNearN > 0) uvN = moveNear(uvN, keepN);
+  vec4 near = keepN * flyby(uNear, uvN, oN, 0.02 * depth + 0.035 * rush, 0.8, glint, px / sN, 7.0 * depth * depth);
   // Fully opaque until the very end of the scroll, then gone by the last frame.
   near *= iNear * (1.0 - smoothstep(0.84, 0.97, uP));
   return near + far * (1.0 - near.a);
@@ -445,7 +555,10 @@ export function frameGeometry(w: number, h: number) {
 
 const SOURCES = {
   planet: { files: ["/brand/planet-v2.webp"], uniforms: ["uPlanet"] },
-  meteors: { files: ["/brand/meteors-far.webp", "/brand/meteors-near.webp"], uniforms: ["uFar", "uNear"] },
+  meteors: {
+    files: ["/brand/meteors-far.webp", "/brand/meteors-near.webp", "/brand/meteors-far-ids.png", "/brand/meteors-near-ids.png"],
+    uniforms: ["uFar", "uNear", "uIdsFar", "uIdsNear"],
+  },
 } as const;
 
 export function HeroScene({
@@ -506,7 +619,7 @@ export function HeroScene({
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const u = (n: string) => gl.getUniformLocation(prog, n);
-    const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), push: u("uPush") };
+    const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), click: u("uClick"), farN: u("uFarN"), nearN: u("uNearN"), farR: u("uFarR"), farC: u("uFarC"), nearR: u("uNearR"), nearC: u("uNearC") };
     gl.uniform1i(u("uLayer"), transparent ? 1 : 0);
     gl.clearColor(0, 0, 0, 0);
 
@@ -514,14 +627,44 @@ export function HeroScene({
     // builds up / settles slowly over a couple of seconds.
     const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
     let dpr = 1;
-    // Rock push: responds quickly to movement, relaxes over a couple of seconds.
-    const push = { t: 0, e: 0 };
+    // Pointer-driven simulations: weather over the planet, rocks in the meteor layer.
+    const flow = layer === "planet" ? new FlowSim() : null;
+    const rocksFar = layer === "meteors" ? new RockLayer("far", 12) : null;
+    const rocksNear = layer === "meteors" ? new RockLayer("near", 6) : null;
+    let flowTex: WebGLTexture | null = null;
+    const prevSim = { far: [NaN, NaN], near: [NaN, NaN], disc: [NaN, NaN] };
+    // Last click on the planet: disc position and time (storm surge).
+    const click = { x: 0, y: 0, t: -1e6 };
+    // Adaptive quality: lower the planet's render scale if frames run long.
+    const quality = { scale: 1, ema: 16, last: 0, changed: 0 };
     const menuH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 84;
     // Scroll speed, smoothed, so streaks swell while you scroll and settle after.
     const scroll = { p: progress.current, t: 0, v: 0 };
 
+    const smooth = (a: number, b: number, x: number) => {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+    const uploadFlow = () => {
+      if (!flow) return;
+      gl.activeTexture(gl.TEXTURE1);
+      if (!flowTex) {
+        flowTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, flowTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, flow.n, flow.n, 0, gl.RGBA, gl.UNSIGNED_BYTE, flow.data);
+        gl.uniform1i(u("uFlow"), 1);
+      } else {
+        gl.bindTexture(gl.TEXTURE_2D, flowTex);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, flow.n, flow.n, gl.RGBA, gl.UNSIGNED_BYTE, flow.data);
+      }
+    };
+
     const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, 2) * quality.scale;
       const rect = canvas.getBoundingClientRect();
       canvas.width = Math.round(rect.width * dpr);
       canvas.height = Math.round(rect.height * dpr);
@@ -539,8 +682,6 @@ export function HeroScene({
       pointer.svy += (pointer.vy - pointer.svy) * 0.015;
       pointer.vx *= 0.96;
       pointer.vy *= 0.96;
-      push.t *= 0.975;
-      push.e += (push.t - push.e) * 0.06;
       gl.uniform2f(U.res, canvas.width, canvas.height);
       gl.uniform2f(U.fc, g.cx, g.cy);
       gl.uniform2f(U.fs, g.fw, g.fh);
@@ -559,14 +700,72 @@ export function HeroScene({
       scroll.t = now;
       gl.uniform1f(U.s, reduced ? 0 : scroll.v);
       gl.uniform1f(U.menu, menuH);
-      gl.uniform1f(U.push, reduced ? 0 : push.e);
+      const tSec = (now - clock.current) / 1000;
+      const p = progress.current;
+      const fx = (pointer.tx - (g.cx - g.fw / 2)) / g.fw;
+      const fy = (pointer.ty - (g.cy - g.fh / 2)) / g.fh;
+      const hasPointer = pointer.tx > -9000 && !reduced;
+      if (flow) {
+        const sP = 1.25 - 0.25 * p;
+        const mx = ((0.85 + (fx - 0.85) / sP - 1.0122) * 2000) / 883;
+        const my = ((0.58 + (fy - 0.58) / sP - 0.65) * 1126) / 883;
+        const [lx, ly] = prevSim.disc;
+        // The weather only responds once the planet is revealed (later in the scroll);
+        // before that, the rocks are the only thing the pointer moves.
+        const stir = hasPointer && p > 0.6;
+        flow.step(mx, my, stir && Number.isFinite(lx) ? mx - lx! : 0, stir && Number.isFinite(ly) ? my - ly! : 0);
+        prevSim.disc = [mx, my];
+        heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
+        if (flow.awake || !flowTex) uploadFlow();
+        gl.uniform3f(U.click, click.x, click.y, (now - click.t) / 1000);
+      }
+      if (rocksFar && rocksNear) {
+        const enabled = hasPointer && p < 0.08 && tSec > 1.5;
+        const release = p > 0.08;
+        const sF = 1 + 0.9 * p + 0.08 * (1 - smooth(1.3, 2.7, tSec));
+        const sN = 1.05 + 1.7 * p + 0.1 * (1 - smooth(0.6, 1.9, tSec));
+        const farX = (0.5 + (fx - 0.5) / sF) * rocksFar.w, farY = (0.5 + (fy - 0.5) / sF) * rocksFar.h;
+        const nearX = (0.5 + (fx - 0.5) / sN) * rocksNear.w, nearY = (0.95 + (fy - 0.95) / sN) * rocksNear.h;
+        const [pfx, pfy] = prevSim.far;
+        const [pnx, pny] = prevSim.near;
+        rocksFar.step(farX, farY, Number.isFinite(pfx) ? farX - pfx! : 0, Number.isFinite(pfy) ? farY - pfy! : 0, enabled, release);
+        rocksNear.step(nearX, nearY, Number.isFinite(pnx) ? nearX - pnx! : 0, Number.isFinite(pny) ? nearY - pny! : 0, enabled, release);
+        prevSim.far = [farX, farY];
+        prevSim.near = [nearX, nearY];
+        gl.uniform1i(U.farN, rocksFar.count);
+        gl.uniform1i(U.nearN, rocksNear.count);
+        if (rocksFar.count) {
+          gl.uniform4fv(U.farR, rocksFar.moved);
+          gl.uniform2fv(U.farC, rocksFar.centres);
+        }
+        if (rocksNear.count) {
+          gl.uniform4fv(U.nearR, rocksNear.moved);
+          gl.uniform2fv(U.nearC, rocksNear.centres);
+        }
+      }
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
     const loop = (now: number) => {
       if (disposed) return;
-      if (visible && !document.hidden) draw(now);
+      if (visible && !document.hidden) {
+        draw(now);
+        // Adaptive quality (planet only): if frames run long, render a little
+        // smaller; recover when there is headroom. At most one change per 2s.
+        if (layer === "planet" && quality.last) {
+          quality.ema += (Math.min(100, now - quality.last) - quality.ema) * 0.05;
+          if (now - quality.changed > 2000) {
+            const next = quality.ema > 24 ? Math.max(0.55, quality.scale - 0.15) : quality.ema < 15 ? Math.min(1, quality.scale + 0.1) : quality.scale;
+            if (next !== quality.scale) {
+              quality.scale = next;
+              quality.changed = now;
+              resize();
+            }
+          }
+        }
+        quality.last = now;
+      } else quality.last = 0;
       raf = requestAnimationFrame(loop);
     };
 
@@ -591,7 +790,6 @@ export function HeroScene({
       pointer.tx = x;
       pointer.ty = y;
       pointer.target = Math.min(1, pointer.target + Math.min(0.04, Math.hypot(vx, vy) / 400));
-      push.t = Math.min(1, push.t + Math.min(0.12, Math.hypot(vx, vy) / 160));
     };
 
     const src = SOURCES[layer];
@@ -602,13 +800,18 @@ export function HeroScene({
           const t = gl.createTexture();
           gl.activeTexture(gl.TEXTURE0 + i);
           gl.bindTexture(gl.TEXTURE_2D, t);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          // Rock id maps must be read exactly: nearest filtering, no colour conversion.
+          const ids = src.uniforms[i]!.startsWith("uIds");
+          const filter = ids ? gl.NEAREST : gl.LINEAR;
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, ids ? gl.NONE : gl.BROWSER_DEFAULT_WEBGL);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
           gl.uniform1i(u(src.uniforms[i]!), i);
         });
+        if (flow) uploadFlow();
         resize();
         if (!clock.current) clock.current = performance.now();
         onReady?.();
@@ -622,8 +825,27 @@ export function HeroScene({
       visible = entry?.isIntersecting ?? true;
     });
     io.observe(canvas);
+    // Clicking the planet sets off a storm surge there.
+    const onDown = (e: PointerEvent) => {
+      if (!flow || reduced || progress.current < 0.6) return;
+      const rect = canvas.getBoundingClientRect();
+      const g = frameGeometry(rect.width, rect.height);
+      const fx = (e.clientX - rect.left - (g.cx - g.fw / 2)) / g.fw;
+      const fy = (e.clientY - rect.top - (g.cy - g.fh / 2)) / g.fh;
+      const sP = 1.25 - 0.25 * progress.current;
+      const mx = ((0.85 + (fx - 0.85) / sP - 1.0122) * 2000) / 883;
+      const my = ((0.58 + (fy - 0.58) / sP - 0.65) * 1126) / 883;
+      if (mx * mx + my * my > 1) return;
+      click.x = mx;
+      click.y = my;
+      click.t = performance.now();
+      heroSignal.surgeAt = click.t;
+      flow.burst(mx, my);
+    };
     window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onDown, { passive: true });
     return () => {
+      window.removeEventListener("pointerdown", onDown);
       disposed = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
