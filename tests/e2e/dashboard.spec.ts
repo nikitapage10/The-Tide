@@ -34,6 +34,29 @@ test("home tells the story of the world; the workshop shows the bench and unreso
   await axe(page);
 });
 
+test("the Arrival can be heard: on the home story and on its Library page", async ({ page }) => {
+  await page.goto("/");
+  const listen = page.getByRole("button", { name: "Listen to the arrival, read aloud" });
+  await listen.scrollIntoViewIfNeeded();
+  await listen.click();
+  const bar = page.getByRole("region", { name: "Narration" });
+  await expect(bar).toBeVisible();
+  // The spoken line follows along.
+  await expect(bar.locator(".narration-line")).toContainText(/\w{3,}/, { timeout: 15_000 });
+  // The bar stays while the story scrolls on.
+  await page.mouse.wheel(0, 2400);
+  await expect(bar).toBeVisible();
+  await axe(page);
+  await bar.getByRole("button", { name: "Stop and close the narration" }).click();
+  await expect(bar).toHaveCount(0);
+
+  await page.goto("/stories");
+  await page.getByRole("link", { name: /Arrival/ }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Arrival" })).toBeVisible();
+  await page.getByRole("button", { name: "Listen to the arrival, read aloud" }).click();
+  await expect(page.getByRole("region", { name: "Narration" })).toBeVisible();
+});
+
 test("keyboard: skip link first, visible focus, search by Unicode-insensitive name", async ({ page }) => {
   await page.goto("/");
   await page.keyboard.press("Tab");

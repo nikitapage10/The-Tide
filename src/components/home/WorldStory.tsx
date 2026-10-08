@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Decode } from "@/components/glyphs/Decode";
 import { ConsequenceSigil } from "@/components/tide/ConsequenceSigil";
 import { WorldName } from "@/components/tide/WorldName";
+import { Narration } from "@/components/audio/Narration";
 
 export interface StoryPeople {
   id: string;
@@ -106,6 +107,9 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
           <p className="story-text">
             You have washed upon the shores of <WorldName />, adrift on currents far from your origin. A world that feels fundamentally wrong to your senses, yet strangely&hellip; resonant.
           </p>
+          <div className="mt-10">
+            <Narration />
+          </div>
           <span aria-hidden="true" className="story-dust" />
         </Chapter>
 

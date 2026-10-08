@@ -11,6 +11,7 @@
  *   release a soft, deep pulse, deeper and longer the stronger the charge.
  * - Under it all, quietly, the Tide's theme on a loop (streamed, fading in;
  *   it steps back while a well charges, so the effects carry).
+ * - Everything ducks while the Arrival narration plays (`tide:narration`).
  */
 
 /** Written by the hero scene each frame; read by the sound engine. */
@@ -306,6 +307,11 @@ export class HeroSound {
     src.connect(lp).connect(g).connect(this.master);
     src.start(t, Math.random());
     src.stop(t + 3.7);
+  }
+
+  /** Step back (or return) while the narration speaks. */
+  duck(on: boolean) {
+    this.master.gain.setTargetAtTime(on ? 0.1 : 0.42, this.ctx.currentTime, 0.6);
   }
 
   dispose() {

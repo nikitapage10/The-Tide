@@ -28,6 +28,13 @@ export function SoundToggle({ className }: { className?: string }) {
 
   useEffect(() => () => engine.current?.dispose(), []);
 
+  // Make room for the narration while it speaks.
+  useEffect(() => {
+    const onNarration = (e: Event) => engine.current?.duck((e as CustomEvent<{ playing: boolean }>).detail.playing);
+    window.addEventListener("tide:narration", onNarration);
+    return () => window.removeEventListener("tide:narration", onNarration);
+  }, []);
+
   const toggle = () => {
     const next = !on;
     if (next && !engine.current) engine.current = new HeroSound();

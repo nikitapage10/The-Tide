@@ -11,6 +11,7 @@ import { CanonMark } from "@/components/tide/CanonMark";
 import { WorldText } from "@/components/tide/WorldText";
 import { Badge } from "@/components/ui/Badge";
 import { Markdown } from "@/components/ui/Markdown";
+import { Narration } from "@/components/audio/Narration";
 import { EmptyState, Notice } from "@/components/ui/States";
 import { mediaFor, partsForStory, relationsFor, resolveRef, sessionsForStory } from "@/lib/domain/queries";
 import { renameWorld } from "@/lib/domain/world-name";
@@ -111,6 +112,13 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
             ))}
           </ol>
         </section>
+      ) : null}
+
+      {/* The Arrival can be heard as well as read. */}
+      {s.slug === "arrival" ? (
+        <div className="mx-auto mb-14 flex max-w-[64ch] justify-center">
+          <Narration />
+        </div>
       ) : null}
 
       {/* The text. */}

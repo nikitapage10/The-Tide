@@ -656,3 +656,24 @@ a.tracklist-row:hover { background: rgba(255,255,255,0.03); }
 .doc-sheet:hover { translate: 0 -0.6rem; rotate: 0deg; z-index: 2; }
 
 @media (prefers-reduced-motion: reduce) { .survey-sweep, .vitrine-light, .stratum, .circuit-pulse, .circuit-wire, .voyage-route, .meter > span { animation: none; } }
+
+/* The Arrival, read aloud (components/audio/Narration). */
+.narration-listen { display: inline-flex; align-items: center; gap: 1rem; color: var(--text); }
+.narration-ring { position: relative; display: grid; place-items: center; width: 3.25rem; height: 3.25rem; flex-shrink: 0; border-radius: 999px; border: 1px solid rgba(255,255,255,0.4); color: #fff; transition: border-color .3s ease, box-shadow .3s ease; }
+.narration-listen:hover .narration-ring, .narration-ring:hover { border-color: #fff; box-shadow: 0 0 24px rgba(255,255,255,0.18); }
+.narration-ring::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; border: 1px solid rgba(255,255,255,0.5); opacity: 0; pointer-events: none; }
+.narration-ring[data-playing]::after { animation: narration-breathe 2.6s ease-out infinite; }
+@keyframes narration-breathe { from { opacity: 0.7; transform: scale(1); } to { opacity: 0; transform: scale(1.6); } }
+.narration-ring-s { width: 2.5rem; height: 2.5rem; }
+.narration-bar { position: fixed; z-index: 45; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); translate: -50% 0; width: min(46rem, calc(100vw - 2rem)); display: flex; align-items: center; gap: 1rem; padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.14); border-radius: 1rem; background: rgba(5,5,6,0.78); backdrop-filter: blur(14px); box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+.narration-bar { animation: narration-in .5s cubic-bezier(.2,.7,.1,1) both; }
+@keyframes narration-in { from { opacity: 0; translate: -50% 16px; } }
+.narration-line { font-family: var(--font-display); font-size: clamp(0.95rem, 0.9rem + 0.2vw, 1.05rem); line-height: 1.4; color: #fff; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 1.4em; }
+.narration-seek { flex: 1; min-width: 0; height: 1rem; appearance: none; background: transparent; cursor: pointer; }
+.narration-seek::-webkit-slider-runnable-track { height: 1px; background: linear-gradient(90deg, #fff var(--p, 0%), rgba(255,255,255,0.18) var(--p, 0%)); }
+.narration-seek::-moz-range-track { height: 1px; background: linear-gradient(90deg, #fff var(--p, 0%), rgba(255,255,255,0.18) var(--p, 0%)); }
+.narration-seek::-webkit-slider-thumb { appearance: none; width: 9px; height: 9px; margin-top: -4px; border-radius: 999px; background: #fff; }
+.narration-seek::-moz-range-thumb { width: 9px; height: 9px; border: 0; border-radius: 999px; background: #fff; }
+.narration-close { display: grid; place-items: center; width: 2rem; height: 2rem; flex-shrink: 0; color: var(--faint); }
+.narration-close:hover { color: #fff; }
+@media (prefers-reduced-motion: reduce) { .narration-ring[data-playing]::after, .narration-bar { animation: none; } }
