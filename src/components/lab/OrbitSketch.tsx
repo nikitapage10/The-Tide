@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { frameGeometry } from "@/components/home/HeroScene";
-import { orbitPath } from "@/components/home/HeroDrifters";
+import { orbitAt, orbitPath } from "@/components/home/HeroDrifters";
 
 type Pt = [number, number];
 
@@ -23,7 +23,7 @@ export function OrbitSketch() {
   const [strokes, setStrokes] = useState<Pt[][]>([]);
   const drawing = useRef<Pt[] | null>(null);
   const [showCurrent, setShowCurrent] = useState(true);
-  const [current] = useState(() => Array.from({ length: 6 }, () => orbitPath()));
+  const [current] = useState(() => Array.from({ length: 8 }, () => orbitPath()));
   const [copied, setCopied] = useState(false);
 
   const paint = useCallback(() => {
@@ -46,11 +46,10 @@ export function OrbitSketch() {
       ctx.lineWidth = 1;
       for (const q of current) {
         ctx.beginPath();
-        for (let i = 0; i <= 40; i++) {
-          const v = i / 40;
-          const b0 = (1 - v) ** 3, b1 = 3 * (1 - v) ** 2 * v, b2 = 3 * (1 - v) * v * v, b3 = v ** 3;
-          const x = P.cx + P.r * (b0 * q[0]! + b1 * q[2]! + b2 * q[4]! + b3 * q[6]!);
-          const y = P.cy + P.r * (b0 * q[1]! + b1 * q[3]! + b2 * q[5]! + b3 * q[7]!);
+        for (let i = 0; i <= 60; i++) {
+          const [ox, oy] = orbitAt(q, i / 60);
+          const x = P.cx + P.r * ox;
+          const y = P.cy + P.r * oy;
           if (i === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }

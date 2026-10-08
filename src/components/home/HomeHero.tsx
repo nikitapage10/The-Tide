@@ -111,44 +111,61 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
     const id = Date.now();
     setStormNote({ id, x, y, left: x > window.innerWidth * 0.62, title, line });
     window.setTimeout(() => setStormNote((n) => (n && n.id === id ? null : n)), 5000);
-    // The strongest releases shake the whole scene for a moment (decaying).
-    if (strength > 0.6 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const amp = 2 + ((strength - 0.6) / 0.4) * 9;
-      const dur = 600 + 1400 * ((strength - 0.6) / 0.4);
-      const t0 = performance.now();
-      const els = [stage.current, overlay.current].filter((e): e is HTMLDivElement => !!e);
-      const shake = (now: number) => {
-        const u = (now - t0) / dur;
-        if (u >= 1) {
-          for (const e of els) e.style.translate = "";
-          return;
-        }
-        const a = amp * (1 - u) * (1 - u);
-        const t = (now - t0) / 1000;
-        const dx = a * (Math.sin(t * 61) * 0.6 + Math.sin(t * 37 + 1.3) * 0.4);
-        const dy = a * (Math.sin(t * 53 + 0.7) * 0.6 + Math.sin(t * 29 + 2.1) * 0.4);
-        for (const e of els) e.style.translate = `${dx.toFixed(2)}px ${dy.toFixed(2)}px`;
-        requestAnimationFrame(shake);
-      };
-      requestAnimationFrame(shake);
+    // Releases from about five seconds of charge shake the screen: a little at
+    // five seconds, hard at ten (decaying over a couple of seconds).
+    if (strength > 0.25) {
+      releaseShake.current = { t0: performance.now(), dur: 400 + 2200 * strength, amp: 1.5 + 22 * strength * strength };
     }
   }, []);
 
   // While a black hole is forming (a long hold in open space), the callouts and
-  // notes fade most of the way down, so the scene steps back around it.
+  // notes fade most of the way down, so the scene steps back around it; and
+  // from five seconds the whole scene shakes, slowly at first, harder and
+  // faster until the ten-second release. A strong release shakes it again for
+  // a moment (decaying).
+  const releaseShake = useRef({ t0: 0, dur: 0, amp: 0 });
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let raf = 0;
     let hush = 0;
-    const tick = () => {
+    let phase = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
       const c = heroSignal.charge;
       const target = c <= 0.33 ? 0 : Math.min(1, (c - 0.33) / 0.42);
       hush += (target - hush) * 0.05;
       const el = ui.current;
       if (el) el.style.opacity = hush > 0.005 ? String(1 - 0.75 * hush) : "";
+      // Charging: seconds held (the charge is (held / 10) ^ 1.6).
+      const held = c > 0 ? 10 * Math.pow(c, 1 / 1.6) : 0;
+      const k = Math.min(1, Math.max(0, (held - 5) / 5));
+      const chargeAmp = 12 * k * k;
+      // Faster as it builds (a slow sway at first, a hard tremor at the end).
+      phase += dt * (6 + 40 * k);
+      let dx = chargeAmp * (Math.sin(phase) * 0.6 + Math.sin(phase * 1.7 + 1.3) * 0.4);
+      let dy = chargeAmp * (Math.sin(phase * 1.3 + 0.7) * 0.6 + Math.sin(phase * 0.8 + 2.1) * 0.4);
+      const r = releaseShake.current;
+      const u = r.dur ? (now - r.t0) / r.dur : 1;
+      if (u < 1) {
+        const a = r.amp * (1 - u) * (1 - u);
+        const t = (now - r.t0) / 1000;
+        dx += a * (Math.sin(t * 61) * 0.6 + Math.sin(t * 37 + 1.3) * 0.4);
+        dy += a * (Math.sin(t * 53 + 0.7) * 0.6 + Math.sin(t * 29 + 2.1) * 0.4);
+      }
+      const v = Math.abs(dx) + Math.abs(dy) > 0.01 ? `${dx.toFixed(2)}px ${dy.toFixed(2)}px` : "";
+      // Everything on screen shakes: the scene, the rocks over it, and the header.
+      for (const e of [stage.current, overlay.current, document.querySelector<HTMLElement>("body > div header, header")]) if (e && e.style.translate !== v) e.style.translate = v;
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      // Leave nothing shaken behind (the header outlives the hero).
+      const h = document.querySelector<HTMLElement>("header");
+      if (h) h.style.translate = "";
+    };
   }, []);
 
   useEffect(() => {

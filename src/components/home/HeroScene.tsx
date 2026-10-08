@@ -1643,6 +1643,8 @@ export function HeroScene({
           gl.uniform4fv(U.storm, stormData);
           gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 6000 ? Math.max(0.02, gv.c) : 0], k * 4));
           gl.uniform4fv(U.grav, gravData);
+          // Ten seconds is the most a well can hold: it then releases by itself.
+          if (well.on && now - well.t >= 10000) onUp();
           const wc = well.on ? chargeOf(now) : 0;
           heroSignal.charge = wc;
           gl.uniform4f(U.well, well.x, well.y, wc, well.on ? 1 : 0);
