@@ -1,144 +1,129 @@
-# Art brief: replacing the drawn placeholders
+# Art brief v2: thirty assets in the reference style
 
-Every line-drawing on the site (the consequence sigils, the constellation stars, the story chapters' wave and cliff sketches, the globe's wireframe, the swirl placeholders, the little icons) gets replaced by painted art in the hero's style.
+These replace every drawn placeholder on the site, across the pages and all their sub-pages. They follow the three references:
+- **The hero:** streams of light converging on the planet.
+- **The world index:** thin single-line sigils, numerals cut from planet imagery, and a strip of age panels.
+- **The archive:** glass monoliths with storm interiors, over a mirror floor.
 
-The prompt below is written to paste as-is into an image generator, with the hero image attached as the style reference.
-- **Sheets.** Small things (icons, emblems, marks) are asked for as sheets: several items on one image, in a grid, so they can be cropped apart.
-- **Count.** It covers 27 deliverables: 5 sheets holding about 45 small items, plus 22 single images.
-
----
-
-## The prompt
-
+## The prompt (top of the doc)
 **I need you to generate images in this style. I'll attach an image as a reference.**
 
-Match the reference closely in every image:
-- **Colour:** near-monochrome cool silver and graphite on deep black (#050506), soft film grain, very low saturation.
-- **Light and look:** one cold light source and atmospheric haze; cinematic, painterly realism with soft edges. Quiet, vast, a little uncanny.
-- **Colour accents:** appear only where a subject owns them (a people's glow), and stay faint.
-- **Never:** text, letters, numbers, logos, watermarks, UI or frames.
-- **Sheets:** for every sheet, place each item centred in its own cell of an evenly spaced grid on a plain #050506 background, with generous empty space between cells. No labels and no borders, so each item can be cropped out cleanly. Keep all items on a sheet at the same scale and lighting.
+The style rules:
+- **Colour:** monochrome silver and white light on pure black (#050506), soft film grain, very low saturation.
+- **The world's look:** fine luminous streams of light (like long-exposure threads) and a cloud-wrapped planet with a bright silver limb.
+- **Materials:** translucent glass and crystal with marbled storm interiors; thin glowing single-line sigils (a vertical axis with circles and crescents, drawn with one even hairline); reflections on a black mirror floor.
+- **Feel:** cinematic, quiet, precise, modern.
+- **Never:** text, letters (unless asked for), logos, watermarks, UI chrome, colour casts, metal, wood or parchment.
+- **Sheets:** each item centred in its own cell of an even grid on #050506, with generous spacing, no labels and no borders, all at the same scale and lighting, so they can be cropped apart.
 
-I'll ask for them one at a time. Here is the list.
+## The 30 assets
 
-### Sheets (crop into individual pieces)
+### A. Sigils and marks (sheets, thin luminous line-art)
+1. **Sigils of the ages and the Three Consequences.** 3×3 sheet.
+   - The Shoreborn, the Undertow, the Age of the Veil, the Era of Verdancy, the Tide, today.
+   - The Drowning, the Divergence, the Drift.
+2. **Sigils of the peoples.** 3×3 sheet.
+   - Nyth'rok (root knot), Obscarron (horned shard with one ember dot), Teruānga (shell spiral), Umbrasa (crescent fragments around a void), Resonara (fibre wave).
+   - Irridosai (cliff with a radiant point), Blightmourn (storm spiral over a dune line), Syntherion (an unfinished sigil), the Enclaves (a broken ring with a foreign fragment).
+3. **Sigils of the World and People rooms.** 4×4 sheet, 13 used:
+   - World: environments, places, history and events, technology, relics, phenomena, how the world works, concepts.
+   - People: peoples, characters, creatures, factions, institutions.
+4. **Sigils of the Stories, Studio and Workshop rooms.** 4×4 sheet, 15 used:
+   - Stories: campaigns, one-shots, novels, short fiction.
+   - Studio: music, artwork, elements, aesthetics, branding, other.
+   - Workshop: print queue, builds, publishing (the press), sources, labs.
+5. **Interface glyphs.** 4×4 sheet, the same hairline style:
+   - play, pause, search, menu, close
+   - arrow left, arrow right, arrow down
+   - sound on, sound off
+   - external link, filter, expand, a pin, a frame, a seal
+6. **Map and sky markers.** 3×2 sheet: a people-star with a halo, a faction-star, a ringed place point, a dashed uncertain point, a floating-mountain fragment, a small rift.
 
-**1. Marks of the ages and the Three Consequences.** A 3×3 sheet, square, 3000×3000. Nine small carved-or-cast emblems, like old metal seals or relief medallions, each roughly circular and lit from the upper right:
-1. **The Shoreborn:** a city skyline on a calm horizon.
-2. **The Undertow:** a wave folding over a sinking tower.
-3. **The Age of the Veil:** a closed eye behind a veil of mist.
-4. **The Era of Verdancy:** a sprouting leaf rising out of the sea.
-5. **The Tide:** concentric ripples around a dark centre.
-6. **The Drowning:** swelling lines of water with a mountain tearing upward.
-7. **The Divergence:** a lens with light bending around a bright point.
-8. **The Drift:** offset fragments of different shapes drifting through a rift.
-9. **Today:** a single small flame or star.
+### B. Image-filled type and glass
+7. **Numerals 0–9 cut from planet imagery.** 5×2 sheet. Tall high-contrast serif numerals (like Cormorant Garamond), each filled with cloud-wrapped planet and light streams, as in reference 2. They compose any room index (01, 02.03…).
+8. **Glass monoliths of the peoples.** 8×1 sheet. Eight tall translucent crystal slabs in a row, each holding its people's weather inside:
+   - Nyth'rok: frost.
+   - Obscarron: obsidian with ember veins.
+   - Teruānga: deep sea with faint yellow points.
+   - Umbrasa: shattered moon.
+   - Resonara: white silk fibres.
+   - Irridosai: radiant mist.
+   - Blightmourn: sandstorm.
+   - Syntherion: empty, unfinished glass.
 
-**2. Emblems of the peoples.** A 3×3 sheet, square, 3000×3000. Nine house-seal emblems in the same medallion style:
-1. **Nyth'rok:** a world-tree root knotted into a circle, frost pale.
-2. **Obscarron:** a horned obsidian shard with a glowing ember vein.
-3. **Teruānga:** a turtle-like shell spiral with faint ember-yellow markings.
-4. **Umbrasa:** a crescent of broken moon fragments around a black hole.
-5. **Resonara:** a knot of fine silk fibres shaped like a sound wave.
-6. **Irridosai:** a sea cliff with a faint radiant glow.
-7. **Blightmourn:** a desert dune swept by a storm spiral.
-8. **Syntherion:** an unfinished, half-formed seal, deliberately incomplete.
-9. **The Enclaves:** a broken ring with a fragment from elsewhere lodged in it.
+   No sigils (they are overlaid from sheet 2).
+9. **Glass monoliths of the five sections.** A wide single image, the "Enter" composition from reference 3. Five slabs receding into the dark: World, People, Stories, Studio, Workshop. Light streams weave between them over a mirror floor. The left third stays dark; no text.
+10. **Glass volumes for the library.** 4×1 sheet. Four crystal "books" standing upright, each a distinct proportion: a tall novel, a broad campaign log, a slim one-shot, a thin chapbook. Each has a storm interior.
+11. **Glass vitrine.** A single empty crystal case on a black mirror plinth, lit from above, on a transparent or pure black background. Relics are composited inside it.
 
-**3. Interface icons.** A 4×4 sheet, square, 3200×3200. Sixteen small icons rendered as tiny luminous objects, like engraved silver or glowing glass, each simple enough to read at 24 px:
-1. play
-2. pause
-3. search (a lens)
-4. a pin (inspiration)
-5. a sketch page (draft)
-6. a wax seal (approved)
-7. a picture frame (final)
-8. a 3D printer nozzle (print queue)
-9. a hammer and gear (builds)
-10. a printing press (publishing)
-11. a scroll with a ribbon (sources)
-12. a dial (settings)
-13. a flask (labs)
-14. a compass rose (atlas)
-15. an open book (library)
-16. a quill (stories)
+### C. The story of the world (home; 16:9, 2400×1350, left 40% dark)
+12. **Arrival.** A tiny figure on a black glassy shore; the planet's limb fills the sky; streams of light pour over the horizon; a rift is closing.
+13. **Before.** A near-future coastal city at dusk as a field of lights; a wall of storm and water rising; the streams beginning to bend.
+14. **The Veil.** Drowned ruins in fog; figures in stasis inside glass-like crystal, fused with stone, coral or ice.
+15. **Verdancy.** A lush island's cliffs at night; five shelled swimmers with faint ember points carry a pale girl to shore; one warm glint.
+16. **The Tide.** The horizon tearing: land rising into the sky, light bent by a lens, fragments of other times drifting through a rift.
 
-**4. Map and sky markers.** A 3×2 sheet, 3000×2000. Six markers that sit on top of maps and star charts, glowing softly with transparent-feeling edges:
-1. a bright star with a halo (a people)
-2. a small faint star (a faction)
-3. a ringed point (a place)
-4. a dashed-ring point (an uncertain place)
-5. a tiny floating-mountain fragment
-6. a small shimmering rift
+### D. The World and its rooms
+17. **World hero.** 21:9, 3360×1440. The planet with the streams converging on it, in the composition of reference 2's large numeral: room on the left for a giant numeral. This is the World page opening.
+18. **World map.** 2:1 equirectangular, 4096×2048, greyscale night relief of the same planet:
+    - drowned continents and inland seas;
+    - pale torn-away patches where land has risen into the sky;
+    - no labels.
+19. **The six ages panels.** 6×1 sheet of tall 2:3 panels, like reference 2's strip I–V: the Shoreborn, the Undertow, the Veil, Verdancy, the Tide, today. Each is a crop of the planet in that age. Used by the History room and the era band.
+20. **Environments strata.** 1×4 sheet of seamless panoramic strips, 3200×600 each: drowned sea, storm desert, luminous forest, the abyss. They are the Environments page bands.
+21. **The survey ground.** 16:9. A dark topographic relief seen from straight above, with faint contour lines and a few light points. It is the Places radar background.
+22. **The river of time.** Tall 1:3, 1200×3600. A single luminous stream flowing top to bottom through darkness, braiding and splitting. It sits behind the History spine.
+23. **Phenomena.** 3×2 sheet of squares: the Drowning, the Divergence, the Drift, the Tide, the Windows of Memory, the Echoing Miasma. Each is abstract, made of light and particles.
+24. **Technology and relics.** 4×2 sheet of objects floating in black, each lit like a product shot, slightly translucent:
+    - Technology: a helio-regulator mantle, a star-barge, a geothermal condenser, a gravity bridge segment.
+    - Relics: the Rótbook (a living book of roots), a Shoreborn artefact, a moon-shard, an obsidian idol.
 
-**5. The library shelf.** A 4×1 sheet, wide, 4000×1600. Four book spines standing upright, each a different kind of volume, worn and dark with a faint silver tooling:
-1. a tall heavy novel
-2. a broad leather voyage log (a campaign)
-3. a slim one-shot pamphlet
-4. a thin stitched chapbook (short fiction)
+### E. People and their rooms
+25. **Missing portraits.** 2×1 sheet, 3:4: Irridosai and Blightmourn, matching the existing five. Syntherion waits for its description.
+26. **Homelands.** 5×1 sheet, 16:9 each, the wide headers for each people's page:
+    - the Stillholds (Nyth'rok);
+    - the Molten Cities (Obscarron);
+    - the abyssal cities (Teruānga);
+    - the moon shards around the Aukar (Umbrasa);
+    - the fog-swallowed fibre forest (Resonara).
+27. **Arrivals (enclaves).** 2×2 sheet, 4:3: Normandy, the Conquistador Brotherhood, the pirates of Te Ara Kore, the Armada. Each shows a fragment of another time inside a shimmering rift.
+28. **Unknowns.** 3×1 sheet, the placeholders for anything without art yet: a shrouded figure (3:4), a creature silhouette in fog (4:3), a fog-bound landscape (4:3). They replace the drawn swirls.
 
-### Single images
+### F. Stories, Studio, Workshop
+29. **Room backdrops.** 3×1 sheet, 16:9:
+    - The Library: glass shelves of light receding.
+    - The Studio: a black glass light table with sketches glowing through.
+    - The Workshop: a night bench with a 3D printer under a task light.
+30. **Textures.** 3×1 sheet:
+    - near-black paper grain (seamless 1024²), for the reading view;
+    - a drifting mist layer (2048×1024);
+    - a fine streak/stream overlay (2048×1024) to lay over any image so it joins the hero.
 
-**The story of the world** (home page, after the hero). 16:9, 2400×1350, with the left 40% kept dark and nearly empty, because text sits there.
+## Where each goes (table in the doc)
 
-6. **Arrival.** A lone, tiny figure seen from behind on a black glassy shoreline at night, just arrived. The curved limb of an enormous cloud-wrapped world fills the upper right sky, rimmed in silver. Floating mountains trail mist near the horizon, and a faint heat-haze tear in the air is closing behind the figure. Low sea mist.
-7. **Before.** A near-future coastal city at dusk seen from the sea, its towers and turbines silhouetted. A vast dark wall of water and storm rises on the horizon, with clouds spiralling upward as if gravity were bending.
-8. **The Veil.** Fog-filled ruins of drowned cities, half sunk. In the gloom, faint figures held in long stasis, fused with stone, coral or ice. Dreamlike and very dark.
-9. **Verdancy.** Tall sea cliffs of a lush island at night. In the dark water below, five small shelled swimmers with faint ember markings carry a pale, unconscious girl toward the shore. Tender and hopeful, with one warm glint.
-10. **The Tide.** A planet's horizon in upheaval: coastlines drowning, slabs of land tearing loose and rising into the sky, and light bending around a lens-like distortion. A rift lets fragments of another time drift through, such as a ship's mast and a ruined tower.
-11. **Enter.** A threshold: five tall, dim doorways or arches standing in mist on a dark plain, each faintly lit from within, seen from a distance.
+| Assets | Where they go |
+| --- | --- |
+| 1–2 | the era band, the Three Consequences, the timeline nodes, home chapter V; the people hall, constellation, banners and folio headers |
+| 3–4 | each room's opening (`GroupHero`) and the section index lists |
+| 5 | the player, carousel buttons, navigation and studio stages |
+| 6 | the globe, the survey and the constellation |
+| 7 | the giant room numerals (replacing the outlined numeral) |
+| 8 | the Peoples carousel and hall, home chapter VI |
+| 9 | home chapter VII (Enter) |
+| 10 | the library shelf and the novel covers |
+| 11 | the Relics room |
+| 12–16 | home chapters I–V |
+| 17 | the World opening |
+| 18 | the globe texture |
+| 19 | History and the era band |
+| 20 | Environments |
+| 21 | Places |
+| 22 | History |
+| 23 | Phenomena |
+| 24 | the Technology and Relics rooms |
+| 25–27 | People, the folios and Arrivals |
+| 28 | anywhere art is missing |
+| 29 | the Stories, Studio and Workshop openings |
+| 30 | the reading view, the Veil and Arrival chapters, and a general overlay |
 
-**The world.**
-
-12. **The world map.** Equirectangular, 2:1, 4096×2048, greyscale like a satellite relief map at night. It shows drowned continents with new, broken coastlines, wide inland seas, volcanic regions and pale patches where land has torn loose. It is the surface of the same planet as the reference. No labels, no grid.
-13. **The atlas backdrop.** 16:9, 2400×1350. An old navigator's table seen from above in near darkness: brass instruments, a dark ocean chart, a dim lamp.
-
-**The peoples** (portraits match the existing set: 3:4, 1200×1600, subject centred, dark background, a little headroom).
-
-14. **Irridosai.** A pale, slender person with a faint inner radiance under translucent skin, standing on a sea cliff above a sickly-bright jungle.
-15. **Blightmourn.** A storm-scoured desert dweller wrapped against the dust, with weathered skin like sand-blasted stone and an ozone haze behind.
-16. **Syntherion.** *(Description to come. Leave this one until the people is written.)*
-
-**The arrivals** (enclaves). 4:3, 1600×1200.
-
-17. **The Normandy Enclave.** A coastal settlement built from salvaged warship hulls and cobblestones under a silver moon, with the faded flags of several nations.
-18. **The Conquistador Brotherhood.** Armoured men hiding in obsidian tunnels, lit by a distant lava glow.
-19. **The pirates of Te Ara Kore.** An old sailing ship caught in a fog bank where the sea seems to fold over itself.
-20. **The Armada.** A fleet of galleons emerging from a shimmering haze onto a strange, dark ocean.
-
-**Placeholders** (shown for anything that has no art yet; they replace the drawn swirls).
-
-21. **Unknown, portrait.** 3:4, 1200×1600. A shrouded, indistinct figure in fog, deliberately unresolved.
-22. **Unknown, landscape.** 4:3, 1600×1200. A fog-bound landscape with a vague shape in the distance, deliberately unresolved.
-
-**Section backdrops** (dark enough for text on top). 16:9, 2400×1350.
-
-23. **The Library.** Tall dark bookshelves receding into shadow, with a single shaft of cold light.
-24. **The Studio.** A dark light table seen from above, with sketches, film negatives and paint swatches faintly lit from beneath.
-25. **The Workshop.** A workbench at night with tools on a pegboard, a 3D printer and a dim task lamp.
-
-**Textures** (seamless, tileable).
-
-26. **Dark paper.** 1024×1024. Very subtle, near-black paper grain, for the reading view.
-27. **Mist.** 2048×1024, a soft drifting fog layer on transparent or pure black, for layering over chapters.
-
----
-
-## Where each one goes
-
-| # | Replaces | On the site |
-| --- | --- | --- |
-| 1 | the line-drawn consequence sigils, the era band ticks | World (Three Consequences, eras), home chapter V, entries |
-| 2 | the constellation's plain dots | People: constellation, plates, folio headers |
-| 3 | drawn play/pause and the text-only tool tiles | Studio listening corner and stages, Workshop tool wall, nav |
-| 4 | the drawn dots on the globe and constellation | World atlas, People constellation |
-| 5 | the CSS spines | Stories: the shelf |
-| 6–11 | the drawn waves, cliff, routes, dust and plain backgrounds | Home: the story's seven chapters (the planet shows through on VI) |
-| 12 | the wireframe globe | World: the atlas globe's surface |
-| 13, 23–25 | plain black section openings | The World, Stories, Studio and Workshop page headers |
-| 14–16 | the swirl placeholders in the hall | People: hall, folios, home procession |
-| 17–20 | text-only Arrival cards | People: the Arrivals wing and enclave pages |
-| 21–22 | the drawn swirl `ProceduralMark` everywhere | any entry, story or studio item without art |
-| 26–27 | — | the Stories reading view; layered fog in the Veil and Arrival chapters |
-
-Send them as they're ready, named by number (e.g. `06-arrival.png`, `sheet-01-marks.png`). I'll crop the sheets, convert everything to WebP and wire each piece in.
+**Naming:** `NN-name.png` (e.g. `07-numerals.png`, `12-arrival.png`).
