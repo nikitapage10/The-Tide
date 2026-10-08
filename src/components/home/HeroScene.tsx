@@ -138,6 +138,7 @@ uniform sampler2D uMasks;         // planet: baked masks (R land, G light stream
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
 uniform vec4 uZoom;               // planet: zoom toward a forming black hole (CSS px x, y, zoom >= 1, infall so far)
 uniform vec4 uWell;               // planet: a gravity well being charged (CSS px x, y, charge 0..1, on)
+uniform vec2 uBub;                // planet: the halo bubble's last pinch-off (seconds since, strength)
 uniform vec4 uGrav[2];            // planet: released wells (CSS px x, y, age s, charge; 0 = none)
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
 uniform sampler2D uCentFar, uCentNear;   // meteors: each rock pixel's rock centre + movable flag
@@ -878,9 +879,11 @@ void main() {
       // uZoom.w is how far it has fallen so far (it only grows while charging,
       // faster as the charge builds); each point shows what lay that much
       // farther out, more strongly nearer the hole.
-      float fall = uZoom.w * exp(-gr / (220.0 + 520.0 * bh));
-      float sc = exp(fall);
-      float spin = fall * 0.85;
+      // The inward reach is bounded (sampling ever farther out would run off the
+      // frame into black); the winding is not, so the spiral keeps turning in.
+      float prof = exp(-gr / (220.0 + 520.0 * bh));
+      float sc = exp(0.75 * (1.0 - exp(-uZoom.w / 0.75)) * prof);
+      float spin = uZoom.w * 0.85 * prof;
       float c4 = cos(spin), s4 = sin(spin);
       vec2 rel4 = warped - uWell.xy;
       warped = uWell.xy + vec2(c4 * rel4.x - s4 * rel4.y, s4 * rel4.x + c4 * rel4.y) * sc;
@@ -992,14 +995,28 @@ void main() {
     // of a smooth union of the cursor's circle and the planet itself.
     float r0 = R * 0.32;
     float sLimb = planetDl(uM);
-    float attach = 1.0 - smoothstep(r0 * 0.9, r0 * 2.8, sLimb);
-    float kk = r0 * 1.5 * attach + 0.001;
-    float dC = rF - r0;
+    float attach = 1.0 - smoothstep(r0 * 0.9, r0 * 4.2, sLimb);
+    float kk = r0 * 2.3 * attach + 0.001;
+    // Out from the planet (the way the bubble is being drawn off).
+    vec2 nB = vec2(planetDl(uM + vec2(1.0, 0.0)) - planetDl(uM - vec2(1.0, 0.0)), planetDl(uM + vec2(0.0, 1.0)) - planetDl(uM - vec2(0.0, 1.0)));
+    nB /= max(length(nB), 1e-4);
+    float cB = dot(dmF, nB) / max(rF, 1e-3);
+    // While the neck stretches the bubble sags back toward the planet (a
+    // teardrop); once it pinches off it wobbles into a circle: an elongated
+    // then squashed oval (and a little three-lobed ripple), dying away.
+    float sag = 0.55 * attach * (1.0 - attach) * 4.0 * smoothstep(0.0, -1.0, cB);
+    float bt = uBub.x;
+    float w2 = uBub.y * 0.2 * exp(-bt * 2.6) * cos(bt * 12.5);
+    float w3 = uBub.y * 0.09 * exp(-bt * 3.4) * sin(bt * 19.0);
+    float breathe = 1.0 + uBub.y * 0.07 * exp(-bt * 3.0) * sin(bt * 8.5);
+    float rB = r0 * breathe * (1.0 + sag + w2 * (2.0 * cB * cB - 1.0) + w3 * (4.0 * cB * cB * cB - 3.0 * cB));
+    float dC = rF - rB;
     float dP = planetDl(sp);
     float hh = clamp(0.5 + 0.5 * (dP - dC) / kk, 0.0, 1.0);
     float film = mix(dP, dC, hh) - kk * hh * (1.0 - hh);
-    // Only the part around the cursor (not the whole horizon).
-    float nearC = smoothstep(r0 * 3.4, r0 * 1.5, rF);
+    // Only the part around the cursor (not the whole horizon), reaching back
+    // along the neck while it is still attached.
+    float nearC = smoothstep(r0 * (3.4 + 2.6 * attach), r0 * 1.5, rF);
     float lensRing = exp(-pow(film / (R * 0.12), 2.0)) * nearC;
     float lit0 = dot(col, vec3(0.3333));
     vec3 prism = vec3(1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5), 1.0, 1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5 + 2.0));
@@ -1333,11 +1350,12 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), well: u("uWell"), zoom: u("uZoom"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), well: u("uWell"), bub: u("uBub"), zoom: u("uZoom"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
       // builds up / settles slowly over a couple of seconds.
+      const bubble = { attached: false, t: -1e9, amp: 0 };
       const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, vx: 0, vy: 0, svx: 0, svy: 0, e: 0, target: 0, lx: 0, ly: 0, lt: 0 };
       let dpr = 1;
       // Strands drawn off the planet toward the cursor (planet layer).
@@ -1495,6 +1513,23 @@ export function HeroScene({
           const pcx = g.cx - g.fw / 2 + (0.85 + (1.0122 - 0.85) * sP) * g.fw;
           const pcy = g.cy - g.fh / 2 + (0.58 + (0.65 - 0.58) * sP) * g.fh;
           const pr = (883 / 2000) * g.fw * sP;
+          // The halo bubble pinching off the horizon (or rejoining it): mark
+          // the moment, so the shader can let it wobble into shape.
+          if (pointer.x > -9000) {
+            const r0 = 0.14 * Math.min(rect.width, rect.height) * 0.32;
+            const sLimb = (Math.hypot(pointer.x - pcx, pointer.y - pcy) - pr) * (2000 / (g.fw * sP));
+            if (bubble.attached && sLimb > r0 * 3.6) {
+              bubble.attached = false;
+              bubble.t = now;
+              bubble.amp = Math.min(1, pointer.e * 1.2);
+            } else if (!bubble.attached && sLimb < r0 * 3.1) {
+              bubble.attached = true;
+              if (now - bubble.t > 600) {
+                bubble.t = now;
+                bubble.amp = 0.45 * Math.min(1, pointer.e * 1.2);
+              }
+            }
+          }
           const dx = head.x - pcx;
           const dy = head.y - pcy;
           const out = Math.hypot(dx, dy) - pr;
@@ -1618,6 +1653,7 @@ export function HeroScene({
         gl.uniform2f(U.m, pointer.x, pointer.y);
         gl.uniform2f(U.v, pointer.svx, pointer.svy);
         gl.uniform1f(U.e, reduced ? 0 : pointer.e);
+        gl.uniform2f(U.bub, Math.min(30, (now - bubble.t) / 1000), bubble.amp);
         gl.uniform1f(U.dpr, dpr);
         const sdt = scroll.t ? Math.min(0.1, (now - scroll.t) / 1000) : 0;
         if (sdt > 0) {
