@@ -197,7 +197,11 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         pull += pullVel * h;
       }
       const pulling = Math.abs(pull) > 0.001 || Math.abs(pullVel) > 0.001;
-      const targets = document.querySelectorAll<HTMLElement>("[data-pull], header");
+      // Pieces (data-pull-unit: the title's letters, the menu's words, each
+      // callout, each haiku line...) fall in one by one on their own paths:
+      // nearer ones are caught first; each spirals in, shrinking and turning.
+      // Whole layers (data-pull: the moving objects) contract toward the hole.
+      const targets = document.querySelectorAll<HTMLElement>("[data-pull], [data-pull-unit]");
       for (const e of targets) {
         if (!pulling) {
           if (e.style.transform) {
@@ -213,16 +217,39 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
           box = e.getBoundingClientRect();
           natural.set(e, box);
         }
-        const ox = heroSignal.wellX - box.left;
-        const oy = heroSignal.wellY - box.top;
-        e.style.transformOrigin = `${ox.toFixed(1)}px ${oy.toFixed(1)}px`;
-        e.style.transform = `scale(${(1 - 0.62 * pull).toFixed(4)}) rotate(${(pull * 22).toFixed(3)}deg)`;
+        if (e.hasAttribute("data-pull")) {
+          e.style.transformOrigin = `${(heroSignal.wellX - box.left).toFixed(1)}px ${(heroSignal.wellY - box.top).toFixed(1)}px`;
+          e.style.transform = `scale(${(1 - 0.62 * pull).toFixed(4)}) rotate(${(pull * 22).toFixed(3)}deg)`;
+          continue;
+        }
+        const cx = box.left + box.width / 2;
+        const cy = box.top + box.height / 2;
+        const vx = cx - heroSignal.wellX;
+        const vy = cy - heroSignal.wellY;
+        const d = Math.hypot(vx, vy);
+        if (pull >= 0) {
+          const q = Math.min(1, Math.max(0, pull * 1.35 - 0.35 * Math.min(1, d / 1400)));
+          const k2 = q * q * (3 - 2 * q);
+          const keep = 1 - 0.96 * k2;
+          const a = k2 * 1.9;
+          const px = (vx * Math.cos(a) - vy * Math.sin(a)) * keep;
+          const py = (vx * Math.sin(a) + vy * Math.cos(a)) * keep;
+          e.style.transform = `translate(${(px - vx).toFixed(1)}px, ${(py - vy).toFixed(1)}px) rotate(${(k2 * 140).toFixed(2)}deg) scale(${(1 - 0.9 * k2).toFixed(4)})`;
+        } else {
+          // The overshoot after a release: thrown a little outward, then back.
+          const o = -pull;
+          e.style.transform = `translate(${(vx * o * 0.12).toFixed(1)}px, ${(vy * o * 0.12).toFixed(1)}px) scale(${(1 + 0.25 * o).toFixed(4)})`;
+        }
       }
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
       // Leave nothing shaken behind (the header outlives the hero).
+      for (const e of document.querySelectorAll<HTMLElement>("header [data-pull-unit]")) {
+        e.style.transform = "";
+        e.style.transformOrigin = "";
+      }
       const h = document.querySelector<HTMLElement>("header");
       if (h) {
         h.style.translate = "";
@@ -299,7 +326,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         <HeroDrifters progress={progress} className="pointer-events-none absolute inset-0 z-[1] overflow-hidden" pull />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
-        <div ref={ui} data-hidden="true" data-pull className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
+        <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
           <div className="hero-frame">
             <div className="hero-layer hero-planet">
               <svg aria-hidden="true" className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -311,19 +338,19 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
               [48.5, 55],
               [54, 88],
             ].map(([x, y]) => (
-              <span key={`${x}`} aria-hidden="true" className="hero-pin -ml-[3px] -mt-[3px] h-1.5 w-1.5 rounded-full bg-white/60" style={pin(x!, y!)} />
+              <span key={`${x}`} aria-hidden="true" data-pull-unit className="hero-pin -ml-[3px] -mt-[3px] h-1.5 w-1.5 rounded-full bg-white/60" style={pin(x!, y!)} />
             ))}
             {/* Crosshairs */}
             {[
               [30, 66],
               [60, 18],
             ].map(([x, y]) => (
-              <span key={`c${x}`} aria-hidden="true" className="hero-pin -ml-2 -mt-2 font-[family-name:var(--font-mono)] text-base leading-4 text-white/35" style={pin(x!, y!)}>
+              <span key={`c${x}`} aria-hidden="true" data-pull-unit className="hero-pin -ml-2 -mt-2 font-[family-name:var(--font-mono)] text-base leading-4 text-white/35" style={pin(x!, y!)}>
                 +
               </span>
             ))}
             {callouts.map((c, i) => (
-              <div key={c.title} className="hero-pin" style={pin(c.x, c.y)}>
+              <div key={c.title} data-pull-unit className="hero-pin" style={pin(c.x, c.y)}>
                 <Callout c={c} active={revealed} delay={i * 450} />
               </div>
             ))}
@@ -337,7 +364,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
             ))}
           </div>
           {/* Top-right note from the mockup. */}
-          <div className="absolute right-4 top-[calc(var(--header-h)+1rem)] flex items-center gap-3 sm:right-10">
+          <div data-pull-unit className="absolute right-4 top-[calc(var(--header-h)+1rem)] flex items-center gap-3 sm:right-10">
             <span className="tracked text-right text-[0.6rem] leading-4 text-faint">
               A quieter universe
               <br />
@@ -348,10 +375,18 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         </div>
 
         {/* Screen-anchored interface: scroll cue and footer line. */}
-        <div data-pull className="page-x pointer-events-none absolute inset-0 z-[3] flex flex-col justify-end pb-6">
+        <div className="page-x pointer-events-none absolute inset-0 z-[3] flex flex-col justify-end pb-6">
           <div className="hero-ui tracked flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-[0.68rem] text-faint">
             <span className="flex items-center gap-4">
-              A living atlas of worlds <span aria-hidden="true" className="hidden h-px w-14 bg-white/25 sm:inline-block" /> The Tide
+              <span className="flex gap-[0.6em]">
+                {["A", "living", "atlas", "of", "worlds"].map((w) => (
+                  <span key={w} data-pull-unit className="inline-block">
+                    {w}
+                  </span>
+                ))}
+              </span>
+              <span aria-hidden="true" data-pull-unit className="hidden h-px w-14 bg-white/25 sm:inline-block" />
+              <span data-pull-unit className="inline-block">The Tide</span>
             </span>
           </div>
         </div>
@@ -372,14 +407,19 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         <div className="hero-vignette pointer-events-none absolute inset-0 z-[5]" />
 
         {/* Title: in front of the DOM fallback meteors; behind the WebGL meteors. */}
-        <div data-pull className="page-x pointer-events-none absolute inset-x-0 top-0 z-[6] pt-[calc(var(--header-h)+2.5rem)]">
+        <div className="page-x pointer-events-none absolute inset-x-0 top-0 z-[6] pt-[calc(var(--header-h)+2.5rem)]">
           <div className="hero-title">
             <p className="tracked flex items-center gap-3 text-faint">
-              <span>01 / Home</span>
+              <span data-pull-unit className="inline-block">01 / Home</span>
               <span aria-hidden="true" className="h-px w-20 bg-white/25" />
             </p>
-            <h1 id="hero-title" className="mt-8 whitespace-nowrap font-[family-name:var(--font-display)] text-[clamp(2.6rem,7.4vw,9rem)] font-light uppercase leading-none tracking-[0.32em] text-white sm:tracking-[0.42em]">
-              The Tide
+            <h1 id="hero-title" aria-label="The Tide" className="mt-8 whitespace-nowrap font-[family-name:var(--font-display)] text-[clamp(2.6rem,7.4vw,9rem)] font-light uppercase leading-none tracking-[0.32em] text-white sm:tracking-[0.42em]">
+              {/* Letter by letter, so a black hole can pull them in one at a time. */}
+              {[..."The Tide"].map((ch, i) => (
+                <span key={i} aria-hidden="true" data-pull-unit className="inline-block">
+                  {ch === " " ? "\u00a0" : ch}
+                </span>
+              ))}
             </h1>
           </div>
         </div>
@@ -389,7 +429,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         </div>
 
         {stormNote ? (
-          <div key={stormNote.id} aria-hidden="true" className="obs obs-on pointer-events-none absolute z-[6]" style={{ left: stormNote.x, top: stormNote.y }}>
+          <div key={stormNote.id} aria-hidden="true" data-pull-unit className="obs obs-on pointer-events-none absolute z-[6]" style={{ left: stormNote.x, top: stormNote.y }}>
             <span className="obs-ping absolute -left-2 -top-2 h-4 w-4 rounded-full border border-white/70" />
             <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />
             <span className={`obs-line absolute top-0 h-px bg-white/50 ${stormNote.left ? "right-2 origin-right" : "left-2 origin-left"}`} />
@@ -405,10 +445,10 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         ) : null}
 
         {/* The haiku from the GM's intro, set low along the streams of light. */}
-        <div data-pull className="page-x pointer-events-none absolute inset-x-0 bottom-[16%] z-[6] hidden sm:block">
+        <div className="page-x pointer-events-none absolute inset-x-0 bottom-[16%] z-[6] hidden sm:block">
           <p className="hero-haiku max-w-sm font-[family-name:var(--font-display)] text-[clamp(1rem,0.8rem+0.5vw,1.45rem)] italic leading-relaxed text-white/70">
             {HAIKU.map((line, i) => (
-              <span key={line} className="block">
+              <span key={line} data-pull-unit className="block w-max">
                 <Decode text={line} active={revealed} delay={600 + i * 1500} />
               </span>
             ))}
@@ -427,7 +467,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
           <span className="hero-cue-line block h-9 w-px overflow-hidden bg-white/15" />
         </div>
         {/* A faint hint, once the planet is revealed: the scene can be touched. */}
-        <span aria-hidden="true" className="hero-hint tracked pointer-events-none absolute bottom-[2.35rem] right-[9.5rem] hidden text-[0.56rem] text-white/35 sm:right-[11.5rem] sm:block">
+        <span aria-hidden="true" data-pull-unit className="hero-hint tracked pointer-events-none absolute bottom-[2.35rem] right-[9.5rem] hidden text-[0.56rem] text-white/35 sm:right-[11.5rem] sm:block">
           <span className="hint-fine">Click the planet · hold in the dark</span>
           <span className="hint-coarse">Tap the planet · hold in the dark</span>
         </span>
@@ -469,7 +509,7 @@ function Observations({ items, active, startDelay = 1600, hold = 6200, calc = fa
   if (!o) return null;
   const on = active && shown;
   return (
-    <div aria-hidden="true" className={`hero-pin obs ${on ? "obs-on" : ""}`} style={pin(o.x, o.y)}>
+    <div aria-hidden="true" data-pull-unit className={`hero-pin obs ${on ? "obs-on" : ""}`} style={pin(o.x, o.y)}>
       <CalloutFx key={`fx${index}`} kind={o.fx} on={on} space={calc} />
       <span className="obs-ping absolute -left-2 -top-2 h-4 w-4 rounded-full border border-white/70" />
       <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />

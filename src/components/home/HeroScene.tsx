@@ -136,8 +136,7 @@ uniform sampler2D uPlanet, uFar, uNear;
 uniform sampler2D uFlow;          // planet: weather flow (z: where the clouds were brushed thin)
 uniform sampler2D uMasks;         // planet: baked masks (R land, G light streams on the disc)
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
-uniform vec4 uPull;               // planet: where the cursor left the planet (CSS px x, y), age s, on
-uniform vec3 uZoom;               // planet: zoom toward a forming black hole (CSS px x, y, zoom >= 1)
+uniform vec4 uZoom;               // planet: zoom toward a forming black hole (CSS px x, y, zoom >= 1, infall so far)
 uniform vec4 uWell;               // planet: a gravity well being charged (CSS px x, y, charge 0..1, on)
 uniform vec4 uGrav[2];            // planet: released wells (CSS px x, y, age s, charge; 0 = none)
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
@@ -874,15 +873,17 @@ void main() {
       gArc = max(gArc, bh * exp(-ar * ar) * smoothstep(0.15, -0.55, gdir.y) * (0.6 + 0.4 * tex));
       // A deeper lensing pull around it.
       warped -= gdir * 18.0 * bh * exp(-pow((gr - hR * 2.2) / (hR * 1.5), 2.0));
-      // And everything is drawn in: the scene contracts toward the hole (each
-      // point shows what lies farther out), wider and harder as it grows, and
-      // spirals as it goes; the planet too.
-      float drag = bh * min(gr * 0.75, (30.0 + 240.0 * bh) * exp(-gr / (160.0 + 420.0 * bh)));
-      warped += gdir * drag;
-      float spin = bh * 0.9 * exp(-gr / (120.0 + 260.0 * bh));
+      // And everything keeps flowing in, without pause, until the release: the
+      // scene (the planet too) streams toward the hole and spirals as it goes.
+      // uZoom.w is how far it has fallen so far (it only grows while charging,
+      // faster as the charge builds); each point shows what lay that much
+      // farther out, more strongly nearer the hole.
+      float fall = uZoom.w * exp(-gr / (220.0 + 520.0 * bh));
+      float sc = exp(fall);
+      float spin = fall * 0.85;
       float c4 = cos(spin), s4 = sin(spin);
       vec2 rel4 = warped - uWell.xy;
-      warped = uWell.xy + vec2(c4 * rel4.x - s4 * rel4.y, s4 * rel4.x + c4 * rel4.y);
+      warped = uWell.xy + vec2(c4 * rel4.x - s4 * rel4.y, s4 * rel4.x + c4 * rel4.y) * sc;
       gPullAll = max(gPullAll, bh);
       // Streaks of matter falling in along spiral lanes (log-polar, flowing
       // inward over time).
@@ -932,10 +933,10 @@ void main() {
       gRing += amp * (0.45 + 1.1 * ch + 0.8 * ex) * exp(-q * q);
     }
     // Shafts of light thrown out from the centre (at full charge).
-    gRays += ex * pow(vnoise(vec2(ang * 9.0, sa * 1.4)), 5.0) * exp(-sa * 0.8) * smoothstep(0.0, 0.15, sa) * exp(-gr / 700.0);
+    gRays += ex * pow(vnoise(vec2(ang * 9.0, sa * 1.4)), 5.0) * exp(-sa * 0.8) * smoothstep(0.0, 0.15, sa) * (1.0 - smoothstep(dur * 0.6, dur, sa)) * exp(-gr / 700.0);
     // A churning turbulence lingers behind the fronts (long at full charge).
     if (chaos > 0.0) {
-      float tq = chaos * exp(-sa * (0.7 - 0.4 * ex)) * smoothstep(0.0, 0.3, sa) * exp(-gr * gr / (260.0 * 260.0 * (0.5 + ch + 2.0 * ex)));
+      float tq = chaos * exp(-sa * (0.7 - 0.4 * ex)) * smoothstep(0.0, 0.3, sa) * (1.0 - smoothstep(dur * 0.7, dur + 1.5, sa)) * exp(-gr * gr / (260.0 * 260.0 * (0.5 + ch + 2.0 * ex)));
       float tw = tq * (0.9 + 0.9 * ex) * sin(sa * 3.0 + gr * 0.02);
       float c3 = cos(tw), s3 = sin(tw);
       vec2 rel = warped - uGrav[k].xy;
@@ -984,39 +985,28 @@ void main() {
     // on empty black, so it reads as optics, not as a shape.
     vec2 dmF = sp - uM;
     float rF = length(dmF);
-    float lensRing = exp(-pow((rF - R * 0.32) / (R * 0.12), 2.0));
+    // The halo is a film, like a soap bubble leaving a wand: near the planet it
+    // is still joined to the horizon (a dome over the limb, bulging out with
+    // the cursor, its neck stretching), and once the cursor is far enough out
+    // the neck pinches off and it rounds into a full ring. Drawn as the outline
+    // of a smooth union of the cursor's circle and the planet itself.
+    float r0 = R * 0.32;
+    float sLimb = planetDl(uM);
+    float attach = 1.0 - smoothstep(r0 * 0.9, r0 * 2.8, sLimb);
+    float kk = r0 * 1.5 * attach + 0.001;
+    float dC = rF - r0;
+    float dP = planetDl(sp);
+    float hh = clamp(0.5 + 0.5 * (dP - dC) / kk, 0.0, 1.0);
+    float film = mix(dP, dC, hh) - kk * hh * (1.0 - hh);
+    // Only the part around the cursor (not the whole horizon).
+    float nearC = smoothstep(r0 * 3.4, r0 * 1.5, rF);
+    float lensRing = exp(-pow(film / (R * 0.12), 2.0)) * nearC;
     float lit0 = dot(col, vec3(0.3333));
     vec3 prism = vec3(1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5), 1.0, 1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5 + 2.0));
     col *= 1.0 + e * pointerInSpace * (0.9 * lensRing * prism - 0.0);
     col += vec3(0.72, 0.8, 0.95) * exp(-rF * rF / (R * R * 0.02)) * 0.05 * e * pointerInSpace * (0.6 + 0.4 * smoothstep(0.02, 0.2, lit0));
-    // Leaving the planet: the halo is made of the planet. Where the cursor
-    // crossed the limb a point flares, and two dozen motes peel off the
-    // atmosphere there and stream along curving paths to the cursor, settling
-    // into a ring around it; the halo forms from them (never cropped by the
-    // planet's edge while it forms), then settles into the lens.
-    if (uPull.w > 0.5 && uPull.z < 2.4) {
-      float pa = uPull.z;
-      vec2 ex = uPull.xy;
-      float flare = exp(-dot(sp - ex, sp - ex) / 260.0) * (1.0 - smoothstep(0.0, 1.2, pa));
-      vec2 toC = uM - ex;
-      vec2 nrm = normalize(vec2(-toC.y, toC.x) + 1e-4);
-      float motes = 0.0;
-      for (int i = 0; i < 24; i++) {
-        float fi = float(i);
-        float a = fi / 24.0 * 6.2832 + 0.4;
-        vec2 tgt = uM + vec2(cos(a), sin(a)) * R * 0.32;
-        vec2 st = ex + nrm * (hash(vec2(fi, 1.3)) - 0.5) * 46.0;
-        float delay = hash(vec2(fi, 7.7)) * 0.5;
-        float pp = clamp((pa - delay) / 1.1, 0.0, 1.0);
-        float e2 = pp * pp * (3.0 - 2.0 * pp);
-        vec2 at = mix(st, tgt, e2) + nrm * sin(pp * 3.1416) * (hash(vec2(fi, 4.1)) - 0.5) * 70.0;
-        float vis = smoothstep(0.0, 0.06, pp) * (1.0 - smoothstep(0.88, 1.0, pp));
-        vec2 dm = sp - at;
-        motes += vis * exp(-dot(dm, dm) / (5.0 + 6.0 * (1.0 - pp)));
-      }
-      float fill = exp(-pow((rF - R * 0.32) / (R * 0.09), 2.0)) * smoothstep(0.5, 1.4, pa) * (1.0 - smoothstep(1.6, 2.4, pa));
-      col += vec3(0.8, 0.88, 1.0) * (motes * 0.8 + fill * 0.32 + flare * 0.35);
-    }
+    // A faint sheen on the film itself, so its shape reads even on dark space.
+    col += vec3(0.78, 0.86, 1.0) * exp(-pow(film / (R * 0.05), 2.0)) * nearC * 0.07 * e * smoothstep(-2.0, 6.0, dP);
     // Strands of energy drawn off the planet toward the cursor: a few curved
     // filaments leave the limb nearest the pointer, bending and swaying as if
     // stretched and pulled, with light flowing outward along them. Mild, cool
@@ -1343,7 +1333,7 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), well: u("uWell"), zoom: u("uZoom"), pull: u("uPull"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), well: u("uWell"), zoom: u("uZoom"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
@@ -1372,13 +1362,11 @@ export function HeroScene({
       const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9, c: 0 }));
       // The well being charged (held in open space), if any.
       const well = { on: false, x: 0, y: 0, t: 0 };
-      const zoom = { x: 0, y: 0, z: 1, last: 0 };
+      const zoom = { x: 0, y: 0, z: 1, last: 0, fall: 0 };
       // The charge builds slowly (an ease-in), full at ten seconds.
       const chargeOf = (now: number) => Math.pow(Math.min(1, (now - well.t) / 10000), 1.6);
       let nextGrav = 0;
       const gravData = new Float32Array(8);
-      // Where the cursor last left the planet for space (see uPull).
-      const pull = { x: 0, y: 0, t: -1e9, inside: false };
 
       // Small data textures (weather flow, gravity fields), updated in place.
       const dataTex = new Map<number, WebGLTexture>();
@@ -1666,24 +1654,10 @@ export function HeroScene({
           }
           prevSim.disc = [mx, my];
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
-          // Leaving the planet for space: remember where (the halo is drawn
-          // out of the atmosphere there); going back in cancels it.
-          const insideNow = hasPointer && mx * mx + my * my < 1.0;
-          if (pull.inside && !insideNow && hasPointer && p > 0.6) {
-            // The exact point on the limb where it crossed (in CSS px).
-            const dl = Math.hypot(mx, my) || 1;
-            const lx = 1.0122 + ((mx / dl) * 883) / 2000;
-            const ly = 0.65 + ((my / dl) * 883) / 1126;
-            pull.x = g.cx - g.fw / 2 + (0.85 + (lx - 0.85) * sP) * g.fw;
-            pull.y = g.cy - g.fh / 2 + (0.58 + (ly - 0.58) * sP) * g.fh;
-            pull.t = now;
-          }
-          if (insideNow) pull.t = -1e9;
-          pull.inside = insideNow;
-          gl.uniform4f(U.pull, pull.x, pull.y, (now - pull.t) / 1000, now - pull.t < 2400 ? 1 : 0);
+
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
           gl.uniform4fv(U.storm, stormData);
-          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 6000 ? Math.max(0.02, gv.c) : 0], k * 4));
+          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 10500 ? Math.max(0.02, gv.c) : 0], k * 4));
           gl.uniform4fv(U.grav, gravData);
           // Ten seconds is the most a well can hold: it then releases by itself.
           if (well.on && now - well.t >= 10000) onUp();
@@ -1698,11 +1672,15 @@ export function HeroScene({
           const zdt = zoom.last ? Math.min(0.25, (now - zoom.last) / 1000) : 0;
           zoom.last = now;
           zoom.z += (zTarget - zoom.z) * (1 - Math.exp(-zdt * (zTarget > zoom.z ? 2.4 : 3.0)));
+          // The infall keeps going while it charges (faster as it builds); on
+          // release everything is thrown back out within half a second.
+          if (well.on) zoom.fall += zdt * bh * (0.1 + 0.55 * bh);
+          else zoom.fall *= Math.exp(-zdt * 7);
           if (well.on) {
             zoom.x = well.x;
             zoom.y = well.y;
           }
-          gl.uniform3f(U.zoom, zoom.x, zoom.y, zoom.z);
+          gl.uniform4f(U.zoom, zoom.x, zoom.y, zoom.z, zoom.fall);
         }
         if (fieldFar && fieldNear) {
           // Before scrolling, the pointer is a soft reverse singularity among the rocks.

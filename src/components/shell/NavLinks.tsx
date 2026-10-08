@@ -21,7 +21,7 @@ export function TopNav({ items }: { items: NavItem[] }) {
       {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
-          <li key={item.href}>
+          <li key={item.href} data-pull-unit>
             <Link
               href={item.href}
               aria-current={pathname === item.href ? "page" : active ? "true" : undefined}

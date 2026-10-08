@@ -42,7 +42,7 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
       </a>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur-md [text-shadow:0_1px_8px_rgba(0,0,0,.9)]">
         <div className="page-x flex h-[var(--header-h)] items-center gap-4">
-          <Link href="/" className="flex items-center gap-3 text-white no-underline">
+          <Link href="/" data-pull-unit className="flex items-center gap-3 text-white no-underline">
             {/* The mark, from the original artwork. */}
             <Image src="/brand/tide-mark.png" alt="" width={35} height={58} priority className="h-[58px] w-auto shrink-0" />
             <span className="whitespace-nowrap font-[family-name:var(--font-display)] text-lg uppercase tracking-[0.3em] sm:text-xl sm:tracking-[0.4em]">The Tide</span>
@@ -51,9 +51,9 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
           <nav aria-label="Primary" className="hidden lg:block">
             <TopNav items={NAV.slice(1)} />
           </nav>
-          <Link href="/search" aria-label="Search the archive" title="Search" className="ml-auto hidden h-4 w-4 rounded-full border border-white/70 hover:border-white lg:block" />
+          <Link href="/search" data-pull-unit aria-label="Search the archive" title="Search" className="ml-auto hidden h-4 w-4 rounded-full border border-white/70 hover:border-white lg:block" />
           {mode === "supabase" && !canEdit ? (
-            <Link href="/login" className="tracked hidden px-2 py-1 text-[0.65rem] text-muted no-underline hover:text-white lg:block">
+            <Link href="/login" data-pull-unit className="tracked hidden px-2 py-1 text-[0.65rem] text-muted no-underline hover:text-white lg:block">
               Sign in
             </Link>
           ) : null}
