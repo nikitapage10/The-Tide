@@ -17,6 +17,8 @@ import { timeWords, wordAt, type TimedWord } from "./karaoke";
 
 const CAPTIONS = "/audio/ilyr-narration.vtt";
 const WORDS = "/audio/ilyr-narration.words.json";
+/** Words begin a beat before they are heard, so each is legible as it is spoken (s). */
+const LEAD = 0.18;
 
 interface Line {
   start: number;
@@ -102,9 +104,9 @@ export function SpokenStage({ children }: { children: ReactNode }) {
       if (!a) return;
       const t = a.currentTime;
       // The line being spoken (or the last one, through the pause after it).
-      const line = wordAt(lines, t + 0.05);
+      const line = wordAt(lines, t + LEAD);
       const l = lines.all[line];
-      const word = l ? wordAt(l, t) : -1;
+      const word = l ? wordAt(l, t + LEAD) : -1;
       const lit = !!l && word >= 0 && t < l.ends[word]! + 0.3;
       setAt((p) => (p.line === line && p.word === word && p.lit === lit ? p : { line, word, lit }));
     };
@@ -128,7 +130,7 @@ export function SpokenStage({ children }: { children: ReactNode }) {
           <p key={`l${at.line}`} className="spoken-line">
             {line.words.map((w, k) => (
               <span key={k} className={`spoken-word ${k <= at.word ? "spoken-said" : ""} ${k === at.word && at.lit ? "spoken-now" : ""}`}>
-                <Decode text={w} active={k <= at.word} tick={12} hold={3} />{" "}
+                <Decode text={w} active={k <= at.word} tick={8} hold={1} />{" "}
               </span>
             ))}
           </p>
