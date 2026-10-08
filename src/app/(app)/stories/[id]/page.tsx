@@ -90,7 +90,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
             {parts.map(({ record: p, state: st }, i) => (
               <li key={p.id} id={`part-${p.id}`} className="border-t border-white/[0.07] py-4">
                 <span className="toc-row">
-                  <span className="font-[family-name:var(--font-mono)] text-[0.62rem] text-white/40">{String(p.sequence ?? i + 1).padStart(2, "0")}</span>
+                  <span className="font-[family-name:var(--font-mono)] text-[0.62rem] text-faint">{String(p.sequence ?? i + 1).padStart(2, "0")}</span>
                   <span className="t-title text-text">
                     <Redacted text={p.title} />
                   </span>
@@ -140,7 +140,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
                   return (
                     <li key={x.id} className="relative w-44">
                       <span aria-hidden="true" className={`relative z-[1] mb-4 block h-3.5 w-3.5 rounded-full border ${done ? "border-white bg-white" : "border-white/70 bg-bg"}`} />
-                      <span className="block font-[family-name:var(--font-mono)] text-[0.6rem] text-white/40">Port {String(x.sequence ?? i + 1).padStart(2, "0")}</span>
+                      <span className="block font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">Port {String(x.sequence ?? i + 1).padStart(2, "0")}</span>
                       <Link href={`/stories/sessions/${x.id}`} className="t-title block text-text">
                         <Redacted text={x.title} />
                       </Link>

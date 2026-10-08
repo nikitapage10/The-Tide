@@ -21,14 +21,14 @@ export function TimelineRiver({ entries, hrefOf }: { entries: TimelineEntry[]; h
         {eras.map((era) => (
           <li key={era.era} className="timeline-era relative pr-10" style={{ minWidth: `${Math.max(16, era.items.length * 13)}rem` }}>
             <p className="tracked mb-3 text-[0.62rem] text-white">{era.label}</p>
-            <p className="mb-6 font-[family-name:var(--font-mono)] text-[0.6rem] text-white/35">{era.span}</p>
+            <p className="mb-6 font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">{era.span}</p>
             <span aria-hidden="true" className="timeline-line absolute left-0 right-0 top-[4.3rem] h-px" />
             <ol className="flex gap-6">
               {era.items.map((e) => (
                 <li key={e.id} className="relative w-48 shrink-0 pt-6">
                   <span aria-hidden="true" className="timeline-tick absolute left-0 top-[-0.2rem] h-5 w-px" data-certainty={CERTAIN[e.certainty] ?? "dotted"} />
                   <Link href={hrefOf(e.id)} className="group block no-underline">
-                    <span className="block font-[family-name:var(--font-mono)] text-[0.6rem] tracking-[0.12em] text-white/45">{e.label}</span>
+                    <span className="block font-[family-name:var(--font-mono)] text-[0.6rem] tracking-[0.12em] text-faint">{e.label}</span>
                     <span className="t-title mt-1 block text-[1.08rem] text-text group-hover:text-white">
                       <Redacted text={e.title} />
                     </span>

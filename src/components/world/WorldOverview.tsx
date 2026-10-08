@@ -43,7 +43,7 @@ export function WorldOverview({ state }: { state: PublishedState }) {
       <section aria-labelledby="atlas-h" className="mb-24 grid gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:items-center">
         <div className="relative mx-auto aspect-square w-full max-w-[38rem]">
           <Globe points={points} />
-          <p className="tracked pointer-events-none absolute bottom-2 left-0 text-[0.58rem] text-white/30">Orthographic · tilted · turning</p>
+          <p className="tracked pointer-events-none absolute bottom-2 left-0 text-[0.58rem] text-faint">Orthographic · tilted · turning</p>
         </div>
         <div>
           <Reveal as="h2" className="t-display-m mb-2" decode="The atlas" />

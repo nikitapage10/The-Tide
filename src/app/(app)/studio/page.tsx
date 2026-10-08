@@ -56,7 +56,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Searc
               <div key={stage} className="bg-[#0a0a0c] p-5" data-stage={stage}>
                 <p className="tracked mb-5 flex flex-wrap items-baseline justify-between gap-x-3 text-[0.6rem] text-faint">
                   <span>{STAGE[stage].label}</span>
-                  <span className="text-white/30">{STAGE[stage].note}</span>
+                  <span className="text-faint">{STAGE[stage].note}</span>
                 </p>
                 {items.length ? (
                   <ul className="space-y-6">
@@ -85,7 +85,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Searc
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-white/25">Nothing here yet.</p>
+                  <p className="text-sm text-faint">Nothing here yet.</p>
                 )}
               </div>
             );

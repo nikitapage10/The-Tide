@@ -38,7 +38,7 @@ export function Constellation({ stars, links }: { stars: Star[]; links: Relation
   const lines = links.filter((l) => pos.has(l.fromId) && pos.has(l.toId) && !/faction of/i.test(l.label));
   return (
     <div className="constellation -mx-1 overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full min-w-[640px]" role="img" aria-labelledby="constellation-title">
+      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full min-w-[640px]" role="group" aria-labelledby="constellation-title">
         <title id="constellation-title">The peoples, their factions, and the bonds between them</title>
         {/* Bonds between factions and peoples. */}
         {lines.map((l) => {

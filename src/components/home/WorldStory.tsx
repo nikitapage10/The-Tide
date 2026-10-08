@@ -58,8 +58,9 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
         const t = Math.min(1, Math.max(0, x - i));
         const present = Math.max(0, 1 - Math.max(0, Math.abs(x - (i + 0.5)) - 0.38) / 0.16);
         c.style.setProperty("--t", t.toFixed(4));
+        // Opacity only: every chapter stays readable to screen readers and reachable by keyboard.
         c.style.opacity = present.toFixed(3);
-        c.style.visibility = present > 0.001 ? "visible" : "hidden";
+        c.style.pointerEvents = present > 0.5 ? "auto" : "none";
         if (present > 0.5) best = i;
       });
       setActive((a) => (a === best ? a : best));
@@ -67,6 +68,16 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
     const queue = () => {
       if (!raf) raf = requestAnimationFrame(measure);
     };
+    // Keyboard focus landing in a chapter that isn't showing scrolls the story to it.
+    const onFocus = (e: FocusEvent) => {
+      const c = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-chapter]");
+      if (!c) return;
+      const i = Number(c.dataset.chapter);
+      const r = el.getBoundingClientRect();
+      const span = r.height - window.innerHeight;
+      window.scrollTo({ top: window.scrollY + r.top + (span * (i + 0.5)) / CHAPTERS, behavior: "instant" as ScrollBehavior });
+    };
+    el.addEventListener("focusin", onFocus);
     queue();
     window.addEventListener("scroll", queue, { passive: true });
     window.addEventListener("resize", queue);
@@ -74,6 +85,7 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", queue);
       window.removeEventListener("resize", queue);
+      el.removeEventListener("focusin", onFocus);
       delete el.dataset.live;
     };
   }, []);

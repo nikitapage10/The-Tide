@@ -174,7 +174,7 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
                     {moments.map((m) => (
                       <li key={m.id}>
                         <Link href={href(m.id)} className="group block border-t border-white/[0.07] py-3 no-underline">
-                          <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-white/40">{m.label}</span>
+                          <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-faint">{m.label}</span>
                           <span className="block text-text group-hover:text-white">
                             <Redacted text={m.title} />
                           </span>
@@ -280,7 +280,7 @@ function Specimen({ state, r, section }: { state: PublishedState; r: EntityRecor
               <p className="tracked mb-3 text-[0.6rem] text-faint">On the timeline</p>
               {before ? (
                 <Link href={href(before.id)} className="block border-t border-white/[0.07] py-3 no-underline">
-                  <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-white/40">Before · {before.label}</span>
+                  <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-faint">Before · {before.label}</span>
                   <span className="text-text">
                     <Redacted text={before.title} />
                   </span>
@@ -288,7 +288,7 @@ function Specimen({ state, r, section }: { state: PublishedState; r: EntityRecor
               ) : null}
               {after ? (
                 <Link href={href(after.id)} className="block border-t border-white/[0.07] py-3 no-underline">
-                  <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-white/40">After · {after.label}</span>
+                  <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-faint">After · {after.label}</span>
                   <span className="text-text">
                     <Redacted text={after.title} />
                   </span>

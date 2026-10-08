@@ -162,7 +162,7 @@ function PlateCaption({ p, n }: { p: EntityRecord; n: number }) {
         <span className="t-title text-text">
           <Redacted text={p.title} />
         </span>
-        <span className="font-[family-name:var(--font-mono)] text-[0.6rem] text-white/35">{String(n).padStart(2, "0")}</span>
+        <span className="font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">{String(n).padStart(2, "0")}</span>
       </span>
       {p.aliases?.[0] ? <span className="tracked block text-[0.56rem] text-faint">{p.aliases[0]}</span> : null}
       <span className="mt-2 line-clamp-3 block text-[0.82rem] leading-snug text-muted">

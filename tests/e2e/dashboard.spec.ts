@@ -12,15 +12,24 @@ async function axe(page: Page) {
   expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")}`)).toEqual([]);
 }
 
-test("home shows real summaries, demo labels and unresolved lore", async ({ page }) => {
+test("home tells the story of the world; the workshop shows the bench and unresolved lore", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "The Tide" })).toBeVisible();
   await expect(page.getByText("Echoes through the void.").first()).toBeAttached();
-  await expect(page.getByText("No session is scheduled.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Undertow, the Age of the Abyssal Veil and The Tide" })).toBeVisible();
+  // The seven chapters of the story, each a heading; the world's name withheld.
+  for (const chapter of ["Arrival", "Before", "The Veil", "Verdancy", "The Tide", "The Peoples", "Enter"]) {
+    await expect(page.getByRole("heading", { level: 2, name: new RegExp(`${chapter}$`) })).toBeAttached();
+  }
+  await expect(page.locator("body")).not.toContainText("Primus");
   for (const name of ["World", "People", "Stories", "Studio", "Workshop"]) {
     await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name, exact: true })).toBeVisible();
   }
+  await axe(page);
+
+  await page.goto("/workshop");
+  await expect(page.getByText("No session is scheduled.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Unresolved lore" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How long was the Age of the Veil?" })).toBeVisible();
   await expect(page.getByText("Demo", { exact: true }).first()).toBeVisible();
   await axe(page);
 });
@@ -35,10 +44,12 @@ test("keyboard: skip link first, visible focus, search by Unicode-insensitive na
   await page.getByRole("link", { name: "Search the archive" }).click();
   await page.getByRole("searchbox", { name: "Search", exact: true }).fill("teruanga");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: /1 result/ })).toBeVisible();
-  await page.getByRole("link", { name: "Teruānga" }).click();
+  await expect(page.getByRole("heading", { name: /\d+ results?/ })).toBeVisible();
+  await page.getByRole("link", { name: "Teruānga", exact: true }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "Teruānga" })).toBeVisible();
-  await expect(page.getByText("source material has not been supplied")).toBeVisible();
+  // The folio, in the documents' own template, with its rail.
+  await expect(page.getByRole("heading", { level: 2, name: "Anatomy" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Contents" }).first()).toBeAttached();
   await expect(page.getByRole("button", { name: /edit in space/i })).toHaveCount(0);
   await axe(page);
 });
@@ -46,9 +57,10 @@ test("keyboard: skip link first, visible focus, search by Unicode-insensitive na
 test("filters and two-way relationship navigation", async ({ page }) => {
   await page.goto("/people?tag=the+eight+peoples");
   await expect(page.getByRole("heading", { name: "8 entries matching filters" })).toBeVisible();
-  await page.getByRole("link", { name: "Nyth’rok" }).click();
-  await page.getByRole("link", { name: "Future Earth" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Future Earth" })).toBeVisible();
+  await page.getByRole("link", { name: "Nyth'rok" }).first().click();
+  // The world itself, its name withheld.
+  await page.getByRole("link", { name: "[redacted]" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "[redacted]" })).toBeVisible();
   const peoples = page.getByRole("definition").filter({ has: page.getByRole("link", { name: "Umbrasa" }) });
   await expect(peoples.getByRole("link")).toHaveCount(8);
   await page.goto("/world?canon=demo&status=all");
@@ -56,7 +68,7 @@ test("filters and two-way relationship navigation", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Cataclysms", exact: true })).toHaveCount(0);
 });
 
-test("session live state, checklist and GM notes work and appear on Home", async ({ page }) => {
+test("session live state, checklist and GM notes work and appear on the bench", async ({ page }) => {
   await page.goto(`/stories/sessions/${ID.ss_1}`);
   await expect(page.getByText("Published from Space Pages · read-only")).toBeVisible();
   await page.getByLabel("Status").selectOption("scheduled");
@@ -76,11 +88,34 @@ test("session live state, checklist and GM notes work and appear on Home", async
   await expect(page.getByText("E2E private note")).toBeVisible();
   await axe(page);
 
-  await page.goto("/");
+  await page.goto("/workshop");
   await expect(page.getByRole("link", { name: "Demo session 1" }).first()).toBeVisible();
   await expect(page.getByText("2099-01-15")).toBeVisible();
   await expect(page.getByText("Prep item completed: \"E2E prep item\"")).toBeVisible();
   await expect(page.getByText("E2E private note")).toHaveCount(0);
+});
+
+test("each section is its own instrument, accessible, with the world's name withheld", async ({ page }) => {
+  const rooms: [string, string][] = [
+    ["/world", "The World"],
+    ["/people", "The Peoples"],
+    ["/stories", "The Library"],
+    ["/studio", "The Studio"],
+  ];
+  for (const [url, title] of rooms) {
+    await page.goto(url);
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    await expect(page.locator("main")).not.toContainText("Primus");
+    // Let everything arrive (reveals fade up as they enter the view) before checking contrast.
+    for (let y = 0; y < 8000; y += 700) await page.evaluate((v) => window.scrollTo(0, v), y);
+    await page.waitForTimeout(1600);
+    await axe(page);
+  }
+  await page.goto("/world");
+  await expect(page.getByRole("img", { name: /globe of the world/ })).toBeVisible();
+  await expect(page.getByLabel("Timeline, scrolls sideways")).toBeVisible();
+  await page.goto("/people");
+  await expect(page.getByRole("group", { name: /peoples, their factions/ })).toBeVisible();
 });
 
 test("print job dialog: keyboard, validation, create and record attempts", async ({ page }) => {
@@ -132,7 +167,8 @@ test("publishing: preview without change, explicit publish, rollback keeps live 
   await page.getByRole("dialog").getByRole("button", { name: "Confirm publish" }).click();
   await expect(page.getByText("Release published")).toBeVisible();
   await axe(page);
-  await expect(page.getByLabel("Release history").getByText("Version 2", { exact: true })).toBeVisible();
+  // Version 1 is the seed, 2 the lore from the GM's documents.
+  await expect(page.getByLabel("Release history").getByText("Version 3", { exact: true })).toBeVisible();
 
   await page.goto(`/people/entry/${ID.d_faction}`);
   await expect(page.getByRole("heading", { level: 1, name: "Demo faction (renamed)" })).toBeVisible();
@@ -141,7 +177,7 @@ test("publishing: preview without change, explicit publish, rollback keeps live 
   await page.goto("/workshop/publishing");
   await page.getByLabel("Release history").getByRole("listitem").filter({ hasText: "Version 1" }).getByRole("button", { name: "Roll back to this" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Create rollback release" }).click();
-  await expect(page.getByLabel("Release history").getByText("Version 3", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Release history").getByText("Version 4", { exact: true })).toBeVisible();
 
   await page.goto(`/people/entry/${ID.d_faction}`);
   await expect(page.getByRole("heading", { level: 1, name: "Demo faction" })).toBeVisible();
@@ -152,7 +188,7 @@ test("publishing: preview without change, explicit publish, rollback keeps live 
 
 test("small screens: no horizontal scroll and a working menu", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 760 });
-  for (const url of ["/", `/stories/sessions/${ID.ss_1}`, "/workshop/prints", "/workshop/publishing", "/studio"]) {
+  for (const url of ["/", "/world", "/people", "/stories", "/studio", "/workshop", `/people/entry/${ID.p_teruanga}`, `/stories/sessions/${ID.ss_1}`, "/workshop/prints", "/workshop/publishing"]) {
     await page.goto(url);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, url).toBeLessThanOrEqual(0);

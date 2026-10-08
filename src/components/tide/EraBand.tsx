@@ -29,7 +29,7 @@ export function EraBand({ current, compact = false, className = "" }: { current?
             {compact && !on ? <span className="sr-only">{e.label}</span> : (
               <span className="block truncate pt-2">
                 <span className={`tracked block truncate text-[0.6rem] ${on ? "text-white" : "text-faint"}`}>{e.label}</span>
-                {!compact && e.span ? <span className="block truncate font-[family-name:var(--font-mono)] text-[0.58rem] text-white/30">{e.span}</span> : null}
+                {!compact && e.span ? <span className="block truncate font-[family-name:var(--font-mono)] text-[0.58rem] text-faint">{e.span}</span> : null}
               </span>
             )}
           </li>
