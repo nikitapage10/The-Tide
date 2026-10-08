@@ -180,7 +180,7 @@ const perspective = (z: number) => CAM / Math.max(0.3, CAM - z);
 /** Never more than this many things in motion at once. */
 const MAX_TOTAL = 2;
 
-export function HeroDrifters({ progress, className }: { progress: { current: number }; className?: string }) {
+export function HeroDrifters({ progress, className, pull = false }: { progress: { current: number }; className?: string; pull?: boolean }) {
   const layer = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [shown, setShown] = useState<Record<number, boolean>>({});
@@ -259,8 +259,9 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         lastReal = 0;
         return;
       }
-      hush += (smooth(0.33, 0.75, heroSignal.charge) - hush) * 0.05;
-      clockNow += lastReal ? Math.min(100, real - lastReal) * (1 - 0.9 * hush) : 0;
+      const rdt = lastReal ? Math.min(250, real - lastReal) : 0;
+      hush += (smooth(0.33, 0.75, heroSignal.charge) - hush) * (1 - Math.exp(-rdt * 0.003));
+      clockNow += rdt * (1 - 0.9 * hush);
       if (!clockNow) clockNow = real;
       lastReal = real;
       const now = clockNow;
@@ -328,7 +329,9 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           y = pcy + pr * oy;
           z = oz;
           behind = z < 0;
-          depth = perspective(z);
+          // A strong size difference: a faint speck by the horizon, growing
+          // noticeably (about seven times) as it comes across the face.
+          depth = z >= 0 ? 0.22 + 1.55 * Math.pow(Math.min(1, z / 1.1), 1.2) : Math.max(0.12, 0.22 * (1 + z));
         } else if (m.mode === "capture") {
           // A captured fragment: a tilted circular orbit that shrinks as it falls
           // in; it is lost behind the planet.
@@ -409,7 +412,9 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
                 : smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
         const px = m.base * k;
         // Orbiters fade out as they pass the horizon (going behind).
-        const past = m.mode === "capture" ? smooth(-0.18, 0.04, z) : 1;
+        // Captured fragments fade as they go behind; orbiters are faint by the
+        // horizon and come up as they near.
+        const past = m.mode === "capture" ? smooth(-0.18, 0.04, z) : m.mode === "orbit" ? 0.2 + 0.8 * smooth(0, 0.55, z) : 1;
         el.style.opacity = (fade * past * 0.85 * smooth(3, 11, px)).toFixed(3);
         // The callout follows the object; it hides while the object is behind.
         const tag = el.lastElementChild as HTMLElement | null;
@@ -460,7 +465,7 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
   }, [progress]);
 
   return (
-    <div ref={layer} aria-hidden="true" className={className} style={{ opacity: 0 }}>
+    <div ref={layer} aria-hidden="true" data-pull={pull ? "" : undefined} className={className} style={{ opacity: 0 }}>
       {items.map((it) => (
         <div
           key={it.id}

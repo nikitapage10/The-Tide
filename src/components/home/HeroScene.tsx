@@ -825,6 +825,11 @@ void main() {
   float gDiskF = 0.0;
   float gDiskB = 0.0;
   float gArc = 0.0;
+  float gStreak = 0.0;
+  float gRays = 0.0;
+  float gWhite = 0.0;
+  // How strongly a black hole is pulling (it warps the planet too, then).
+  float gPullAll = 0.0;
   if (uWell.w > 0.5) {
     float c = uWell.z;
     vec2 gd = sp - uWell.xy;
@@ -869,55 +874,80 @@ void main() {
       gArc = max(gArc, bh * exp(-ar * ar) * smoothstep(0.15, -0.55, gdir.y) * (0.6 + 0.4 * tex));
       // A deeper lensing pull around it.
       warped -= gdir * 18.0 * bh * exp(-pow((gr - hR * 2.2) / (hR * 1.5), 2.0));
+      // And everything is drawn in: the scene contracts toward the hole (each
+      // point shows what lies farther out), wider and harder as it grows, and
+      // spirals as it goes; the planet too.
+      float drag = bh * min(gr * 0.75, (30.0 + 240.0 * bh) * exp(-gr / (160.0 + 420.0 * bh)));
+      warped += gdir * drag;
+      float spin = bh * 0.9 * exp(-gr / (120.0 + 260.0 * bh));
+      float c4 = cos(spin), s4 = sin(spin);
+      vec2 rel4 = warped - uWell.xy;
+      warped = uWell.xy + vec2(c4 * rel4.x - s4 * rel4.y, s4 * rel4.x + c4 * rel4.y);
+      gPullAll = max(gPullAll, bh);
+      // Streaks of matter falling in along spiral lanes (log-polar, flowing
+      // inward over time).
+      float lr = log(max(gr, 1.0));
+      float lane = atan(gd.y, gd.x) * 3.0 + lr * 5.0;
+      float st = pow(vnoise(vec2(lane * 1.6, lr * 7.0 + uT * 2.6)), 5.0);
+      gStreak = max(gStreak, bh * st * smoothstep(hR * 1.1, hR * 2.2, gr) * exp(-gr / (180.0 + 260.0 * bh)));
     }
   }
   for (int k = 0; k < 2; k++) {
     float c = uGrav[k].w;
     if (c <= 0.0) continue;
+    // Tiers: the charge at about five seconds (c = 1/3) already gives the full
+    // shockwave (ch = 1); beyond that, toward ten seconds, chaos builds (ex).
+    float ch = clamp(c * 3.0, 0.0, 1.0);
+    float ex = smoothstep(0.5, 1.0, c);
     float sa = uGrav[k].z;
-    float dur = 1.1 + 3.9 * c;
-    if (sa < 0.0 || sa > dur + 0.8) continue;
+    float dur = 1.1 + 3.9 * ch + 2.5 * ex;
+    if (sa < 0.0 || sa > dur + 1.5) continue;
     vec2 gd = sp - uGrav[k].xy;
     float gr = length(gd);
     vec2 gdir = gr > 0.001 ? gd / gr : vec2(0.0);
     float ang = atan(gd.y, gd.x);
-    float chaos = smoothstep(0.55, 1.0, c);
-    // The core collapses in a moment, with a flash (from about half charge).
-    float coreR = 5.0 + 17.0 * c;
+    float chaos = max(smoothstep(0.55, 1.0, ch), ex);
+    // The core collapses in a moment, with a flash; at full charge the whole
+    // screen whites out for an instant.
+    float coreR = 5.0 + 17.0 * ch + 10.0 * ex;
     gCore = max(gCore, smoothstep(0.12, 0.0, sa) * smoothstep(0.04, 0.2, c) * (1.0 - smoothstep(coreR * 0.3, coreR * 0.8, gr)));
-    gFlash += smoothstep(0.35, 1.0, c) * exp(-sa * (7.0 - 3.0 * c)) * exp(-gr / (120.0 + 380.0 * c));
-    // One ring for a tap, two for a few seconds, three from about half charge;
-    // the strongest ones have ragged, churning fronts.
-    float rings = 1.0 + step(0.15, c) + step(0.45, c);
-    for (int j = 0; j < 3; j++) {
+    gFlash += smoothstep(0.35, 1.0, ch) * exp(-sa * (7.0 - 3.0 * ch)) * exp(-gr / (120.0 + 380.0 * ch + 400.0 * ex));
+    gWhite = max(gWhite, ex * exp(-sa * 2.4) * smoothstep(0.0, 0.04, sa));
+    // Rings: one for a tap, up to three at five seconds, five at ten, with
+    // ragged, churning fronts that reach right across the screen.
+    float rings = 1.0 + step(0.15, ch) + step(0.45, ch) + 2.0 * step(0.5, ex);
+    for (int j = 0; j < 5; j++) {
       float fj = float(j);
       if (fj >= rings) continue;
-      float sj = sa - fj * (0.16 + 0.12 * c);
+      float sj = sa - fj * (0.16 + 0.12 * ch + 0.1 * ex);
       if (sj <= 0.0) continue;
       float u = sj / dur;
       if (u > 1.0) continue;
-      float amp = smoothstep(0.0, 0.05, sj) * pow(1.0 - u, 2.0) * (1.0 - 0.3 * fj);
-      float ragged = 1.0 + chaos * 0.22 * (vnoise(vec2(ang * 3.0 + fj * 5.0, sj * 2.5 + fj)) - 0.5) * 2.0;
-      float rr = (14.0 + (120.0 + 680.0 * c) * pow(u, 0.7)) * ragged;
-      float w = 9.0 + (12.0 + 30.0 * c) * u;
+      float amp = smoothstep(0.0, 0.05, sj) * pow(1.0 - u, 2.0) * (1.0 - 0.15 * fj);
+      float ragged = 1.0 + (0.22 * smoothstep(0.55, 1.0, ch) + 0.3 * ex) * (vnoise(vec2(ang * (3.0 + 2.0 * ex) + fj * 5.0, sj * 2.5 + fj)) - 0.5) * 2.0;
+      float rr = (14.0 + (120.0 + 680.0 * ch) * (1.0 + 0.9 * ex) * pow(u, 0.7)) * ragged;
+      float w = 9.0 + (12.0 + 30.0 * ch + 30.0 * ex) * u;
       float q = (gr - rr) / w;
-      warped += gdir * amp * (7.0 + 40.0 * c) * q * exp(-q * q);
-      gRing += amp * (0.45 + 1.1 * c) * exp(-q * q);
+      warped += gdir * amp * (7.0 + 40.0 * ch) * (1.0 + 1.4 * ex) * q * exp(-q * q);
+      gRing += amp * (0.45 + 1.1 * ch + 0.8 * ex) * exp(-q * q);
     }
-    // At full charge, a churning turbulence lingers behind the fronts.
+    // Shafts of light thrown out from the centre (at full charge).
+    gRays += ex * pow(vnoise(vec2(ang * 9.0, sa * 1.4)), 5.0) * exp(-sa * 0.8) * smoothstep(0.0, 0.15, sa) * exp(-gr / 700.0);
+    // A churning turbulence lingers behind the fronts (long at full charge).
     if (chaos > 0.0) {
-      float tq = chaos * exp(-sa * 0.7) * smoothstep(0.0, 0.3, sa) * exp(-gr * gr / (260.0 * 260.0 * (0.5 + c)));
-      float tw = tq * 0.9 * sin(sa * 3.0 + gr * 0.02);
+      float tq = chaos * exp(-sa * (0.7 - 0.4 * ex)) * smoothstep(0.0, 0.3, sa) * exp(-gr * gr / (260.0 * 260.0 * (0.5 + ch + 2.0 * ex)));
+      float tw = tq * (0.9 + 0.9 * ex) * sin(sa * 3.0 + gr * 0.02);
       float c3 = cos(tw), s3 = sin(tw);
       vec2 rel = warped - uGrav[k].xy;
       warped = uGrav[k].xy + vec2(c3 * rel.x - s3 * rel.y, s3 * rel.x + c3 * rel.y);
-      warped += vec2(vnoise(sp * 0.02 + sa * 2.0) - 0.5, vnoise(sp * 0.02 + 7.0 - sa * 2.0) - 0.5) * 30.0 * tq;
+      warped += vec2(vnoise(sp * 0.02 + sa * 2.0) - 0.5, vnoise(sp * 0.02 + 7.0 - sa * 2.0) - 0.5) * 30.0 * (1.0 + 1.5 * ex) * tq;
     }
   }
   if (uLayer == 0) {
     // The lens bends space, not the planet: no warp over the planet's disc (its
     // clouds still part, and the light ring, prism and flares still show).
-    float onSpace = smoothstep(0.0, 90.0, planetDl(sp));
+    // (A black hole drags the planet in too.)
+    float onSpace = max(smoothstep(0.0, 90.0, planetDl(sp)), gPullAll);
     warped = mix(sp, warped, onSpace);
     dir *= onSpace;
   }
@@ -959,28 +989,33 @@ void main() {
     vec3 prism = vec3(1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5), 1.0, 1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5 + 2.0));
     col *= 1.0 + e * pointerInSpace * (0.9 * lensRing * prism - 0.0);
     col += vec3(0.72, 0.8, 0.95) * exp(-rF * rF / (R * R * 0.02)) * 0.05 * e * pointerInSpace * (0.6 + 0.4 * smoothstep(0.02, 0.2, lit0));
-    // Leaving the planet: the halo is drawn out of the atmosphere. A point on
-    // the limb flares where the cursor left; a thread of light is pulled from it
-    // to the cursor (a pulse running along it); and the halo's ring fills in
-    // around the cursor from the side facing the planet, then settles.
+    // Leaving the planet: the halo is made of the planet. Where the cursor
+    // crossed the limb a point flares, and two dozen motes peel off the
+    // atmosphere there and stream along curving paths to the cursor, settling
+    // into a ring around it; the halo forms from them (never cropped by the
+    // planet's edge while it forms), then settles into the lens.
     if (uPull.w > 0.5 && uPull.z < 2.4) {
       float pa = uPull.z;
       vec2 ex = uPull.xy;
-      vec2 seg = uM - ex;
-      float segL = max(length(seg), 1.0);
-      float h = clamp(dot(sp - ex, seg) / (segL * segL), 0.0, 1.0);
-      float dl = length(sp - ex - seg * h);
-      float life = 1.0 - smoothstep(0.6, 2.2, pa);
-      float wTh = mix(3.2, 1.0, h);
-      float thread = exp(-dl * dl / (wTh * wTh)) * (0.35 + 0.65 * h) * life;
-      float packet = exp(-pow((h - clamp(pa / 0.7, 0.0, 1.2)) / 0.12, 2.0)) * exp(-dl * dl / 16.0) * (1.0 - smoothstep(0.7, 1.0, pa));
-      float flare = exp(-dot(sp - ex, sp - ex) / 260.0) * (1.0 - smoothstep(0.0, 1.4, pa));
-      vec2 toEx = normalize(ex - uM + 1e-4);
-      float ang = acos(clamp(dot(normalize(dmF + 1e-4), toEx), -1.0, 1.0));
-      float sweep = 1.0 - smoothstep(0.0, 0.25, ang / 3.1416 - smoothstep(0.15, 1.1, pa));
-      float fill = exp(-pow((rF - R * 0.32) / (R * 0.07), 2.0)) * sweep * (1.0 - smoothstep(1.0, 2.4, pa));
-      col += vec3(0.78, 0.86, 1.0) * (thread * 0.16 + packet * 0.45 + flare * 0.35 + fill * 0.22) * pointerInSpace;
-      col += vec3(0.78, 0.86, 1.0) * flare * 0.25 * (1.0 - pointerInSpace);
+      float flare = exp(-dot(sp - ex, sp - ex) / 260.0) * (1.0 - smoothstep(0.0, 1.2, pa));
+      vec2 toC = uM - ex;
+      vec2 nrm = normalize(vec2(-toC.y, toC.x) + 1e-4);
+      float motes = 0.0;
+      for (int i = 0; i < 24; i++) {
+        float fi = float(i);
+        float a = fi / 24.0 * 6.2832 + 0.4;
+        vec2 tgt = uM + vec2(cos(a), sin(a)) * R * 0.32;
+        vec2 st = ex + nrm * (hash(vec2(fi, 1.3)) - 0.5) * 46.0;
+        float delay = hash(vec2(fi, 7.7)) * 0.5;
+        float pp = clamp((pa - delay) / 1.1, 0.0, 1.0);
+        float e2 = pp * pp * (3.0 - 2.0 * pp);
+        vec2 at = mix(st, tgt, e2) + nrm * sin(pp * 3.1416) * (hash(vec2(fi, 4.1)) - 0.5) * 70.0;
+        float vis = smoothstep(0.0, 0.06, pp) * (1.0 - smoothstep(0.88, 1.0, pp));
+        vec2 dm = sp - at;
+        motes += vis * exp(-dot(dm, dm) / (5.0 + 6.0 * (1.0 - pp)));
+      }
+      float fill = exp(-pow((rF - R * 0.32) / (R * 0.09), 2.0)) * smoothstep(0.5, 1.4, pa) * (1.0 - smoothstep(1.6, 2.4, pa));
+      col += vec3(0.8, 0.88, 1.0) * (motes * 0.8 + fill * 0.32 + flare * 0.35);
     }
     // Strands of energy drawn off the planet toward the cursor: a few curved
     // filaments leave the limb nearest the pointer, bending and swaying as if
@@ -1081,6 +1116,9 @@ void main() {
     col += vec3(0.86, 0.9, 1.0) * gEin * 0.55 * pointerInSpace;
     col += vec3(0.74, 0.82, 0.98) * gRing * 0.05 * pointerInSpace;
     col += vec3(0.86, 0.9, 1.0) * min(gFlash, 1.0) * 0.35;
+    col += vec3(0.88, 0.9, 0.94) * gStreak * 0.55;
+    col += vec3(0.9, 0.92, 0.96) * gRays * 0.5;
+    col = mix(col, vec3(0.93, 0.95, 0.98), min(gWhite, 1.0) * 0.85);
     // Overall grade: a slight cool tint.
     col *= vec3(0.975, 0.993, 1.02);
     gl_FragColor = vec4(col, 1.0);
@@ -1334,7 +1372,7 @@ export function HeroScene({
       const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9, c: 0 }));
       // The well being charged (held in open space), if any.
       const well = { on: false, x: 0, y: 0, t: 0 };
-      const zoom = { x: 0, y: 0, z: 1 };
+      const zoom = { x: 0, y: 0, z: 1, last: 0 };
       // The charge builds slowly (an ease-in), full at ten seconds.
       const chargeOf = (now: number) => Math.pow(Math.min(1, (now - well.t) / 10000), 1.6);
       let nextGrav = 0;
@@ -1632,8 +1670,12 @@ export function HeroScene({
           // out of the atmosphere there); going back in cancels it.
           const insideNow = hasPointer && mx * mx + my * my < 1.0;
           if (pull.inside && !insideNow && hasPointer && p > 0.6) {
-            pull.x = pointer.x;
-            pull.y = pointer.y;
+            // The exact point on the limb where it crossed (in CSS px).
+            const dl = Math.hypot(mx, my) || 1;
+            const lx = 1.0122 + ((mx / dl) * 883) / 2000;
+            const ly = 0.65 + ((my / dl) * 883) / 1126;
+            pull.x = g.cx - g.fw / 2 + (0.85 + (lx - 0.85) * sP) * g.fw;
+            pull.y = g.cy - g.fh / 2 + (0.58 + (ly - 0.58) * sP) * g.fh;
             pull.t = now;
           }
           if (insideNow) pull.t = -1e9;
@@ -1652,7 +1694,10 @@ export function HeroScene({
           // out gently after the release.
           const bh = smooth(0.33, 0.75, wc);
           const zTarget = 1 + 0.32 * bh;
-          zoom.z += (zTarget - zoom.z) * (zTarget > zoom.z ? 0.04 : 0.05);
+          // Time-based easing (the same pace at any frame rate).
+          const zdt = zoom.last ? Math.min(0.25, (now - zoom.last) / 1000) : 0;
+          zoom.last = now;
+          zoom.z += (zTarget - zoom.z) * (1 - Math.exp(-zdt * (zTarget > zoom.z ? 2.4 : 3.0)));
           if (well.on) {
             zoom.x = well.x;
             zoom.y = well.y;
@@ -1809,6 +1854,9 @@ export function HeroScene({
           well.y = y;
           well.t = performance.now();
           heroSignal.charging = true;
+          // In page coordinates, for the interface that drifts into it.
+          heroSignal.wellX = x + rect.left;
+          heroSignal.wellY = y + rect.top;
           return;
         }
         const st = storms[nextStorm]!;
@@ -1838,6 +1886,30 @@ export function HeroScene({
         heroSignal.gravAt = now;
         heroSignal.gravStrength = c;
         onGravity?.(well.x, well.y, c);
+        // At full charge the shockwave reaches the planet and storms break out
+        // across its face (lightning, blackouts, thunder).
+        if (c > 0.8 && flow) {
+          [0, 1, 2].forEach((i) => {
+            window.setTimeout(() => {
+              if (disposed) return;
+              let mx = 0, my = 0;
+              for (let tries = 0; tries < 20; tries++) {
+                mx = -0.95 + Math.random() * 0.6;
+                my = -0.6 + Math.random() * 1.2;
+                if (mx * mx + my * my < 0.85) break;
+              }
+              const st = storms[nextStorm]!;
+              nextStorm = (nextStorm + 1) % storms.length;
+              st.x = mx;
+              st.y = my;
+              st.t = performance.now();
+              st.seed = Math.random();
+              heroSignal.surgeAt = st.t;
+              flow.vortex(mx, my);
+              stormPuffs?.spawn(mx, my);
+            }, 650 + i * 420 + Math.random() * 200);
+          });
+        }
       };
       window.addEventListener("pointermove", onMove, { passive: true });
       window.addEventListener("pointerdown", onDown, { passive: true });

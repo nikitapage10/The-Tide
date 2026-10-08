@@ -119,24 +119,34 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
   }, []);
 
   // While a black hole is forming (a long hold in open space), the callouts and
-  // notes fade most of the way down, so the scene steps back around it; and
-  // from five seconds the whole scene shakes, slowly at first, harder and
-  // faster until the ten-second release. A strong release shakes it again for
-  // a moment (decaying).
+  // notes fade most of the way down, so the scene steps back around it; from
+  // five seconds the whole scene shakes, slowly at first, harder and faster
+  // until the ten-second release, while the colour drains out of everything
+  // and, in the last second, the screen turns toward a negative. A strong
+  // release shakes it again for a moment (decaying) and the colour returns.
   const releaseShake = useRef({ t0: 0, dur: 0, amp: 0 });
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let raf = 0;
     let hush = 0;
     let phase = 0;
+    // The black hole drains the colour from everything, then (in the last
+    // second) turns the screen toward a negative; both ease back after release.
+    let drain = 0;
+    let inv = 0;
+    let pull = 0;
+    let pullVel = 0;
+    const natural = new Map<HTMLElement, DOMRect>();
     let last = performance.now();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = Math.min(0.25, (now - last) / 1000);
       last = now;
+      // Time-based easing: the same pace at any frame rate.
+      const ease = (rate: number) => 1 - Math.exp(-dt * rate);
       const c = heroSignal.charge;
       const target = c <= 0.33 ? 0 : Math.min(1, (c - 0.33) / 0.42);
-      hush += (target - hush) * 0.05;
+      hush += (target - hush) * ease(3);
       const el = ui.current;
       if (el) el.style.opacity = hush > 0.005 ? String(1 - 0.75 * hush) : "";
       // Charging: seconds held (the charge is (held / 10) ^ 1.6).
@@ -156,15 +166,70 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         dy += a * (Math.sin(t * 53 + 0.7) * 0.6 + Math.sin(t * 29 + 2.1) * 0.4);
       }
       const v = Math.abs(dx) + Math.abs(dy) > 0.01 ? `${dx.toFixed(2)}px ${dy.toFixed(2)}px` : "";
-      // Everything on screen shakes: the scene, the rocks over it, and the header.
-      for (const e of [stage.current, overlay.current, document.querySelector<HTMLElement>("body > div header, header")]) if (e && e.style.translate !== v) e.style.translate = v;
+      const ramp = (a: number, b: number, x: number) => {
+        const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+        return t * t * (3 - 2 * t);
+      };
+      const drainTo = ramp(5, 8.5, held);
+      const invTo = 0.9 * ramp(8.8, 10, held);
+      // Builds slowly; after the release, the negative snaps back in a flash and
+      // the colour returns over about a second.
+      drain += (drainTo - drain) * ease(drainTo > drain ? 5 : 2.5);
+      inv += (invTo - inv) * ease(invTo > inv ? 6 : 8);
+      const f = drain > 0.003 || inv > 0.003 ? `saturate(${(1 - 0.97 * drain).toFixed(3)}) contrast(${(1 + 0.15 * drain).toFixed(3)}) invert(${inv.toFixed(3)})` : "";
+      // Everything on screen shakes (and loses its colour): the scene, the
+      // rocks over it, and the header.
+      for (const e of [stage.current, overlay.current, document.querySelector<HTMLElement>("header")]) {
+        if (!e) continue;
+        if (e.style.translate !== v) e.style.translate = v;
+        if (e.style.filter !== f) e.style.filter = f;
+      }
+      // From five seconds everything drifts into the black hole: the title,
+      // the callouts, the haiku, the moving objects, the header; contracting
+      // toward it and turning as it goes. On release it springs back out
+      // (overshooting a little, as if thrown by the shockwave).
+      const pullTo = Math.pow(ramp(5, 10, held), 1.4);
+      // A damped spring, stepped in small slices so it stays stable even when
+      // frames are slow (it overshoots by only about a tenth).
+      for (let left = dt; left > 0; left -= 1 / 120) {
+        const h = Math.min(left, 1 / 120);
+        pullVel += ((pullTo - pull) * 30 - pullVel * (pullTo > 0 ? 9 : 6.5)) * h;
+        pull += pullVel * h;
+      }
+      const pulling = Math.abs(pull) > 0.001 || Math.abs(pullVel) > 0.001;
+      const targets = document.querySelectorAll<HTMLElement>("[data-pull], header");
+      for (const e of targets) {
+        if (!pulling) {
+          if (e.style.transform) {
+            e.style.transform = "";
+            e.style.transformOrigin = "";
+          }
+          natural.delete(e);
+          continue;
+        }
+        // Its untransformed box (measured before the pull begins).
+        let box = natural.get(e);
+        if (!box) {
+          box = e.getBoundingClientRect();
+          natural.set(e, box);
+        }
+        const ox = heroSignal.wellX - box.left;
+        const oy = heroSignal.wellY - box.top;
+        e.style.transformOrigin = `${ox.toFixed(1)}px ${oy.toFixed(1)}px`;
+        e.style.transform = `scale(${(1 - 0.62 * pull).toFixed(4)}) rotate(${(pull * 22).toFixed(3)}deg)`;
+      }
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
       // Leave nothing shaken behind (the header outlives the hero).
       const h = document.querySelector<HTMLElement>("header");
-      if (h) h.style.translate = "";
+      if (h) {
+        h.style.translate = "";
+        h.style.filter = "";
+        h.style.transform = "";
+        h.style.transformOrigin = "";
+      }
     };
   }, []);
 
@@ -231,10 +296,10 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} onGravity={onGravity} tip={tip} anchors={anchors} className="hero-layer z-[1] h-full w-full" />
 
         {/* Things passing through: orbiters on the dashed orbit, debris drifting by. */}
-        <HeroDrifters progress={progress} className="pointer-events-none absolute inset-0 z-[1] overflow-hidden" />
+        <HeroDrifters progress={progress} className="pointer-events-none absolute inset-0 z-[1] overflow-hidden" pull />
 
         {/* Orbit (scales with the planet) and callouts/glyphs (pinned to the art, constant size). */}
-        <div ref={ui} data-hidden="true" className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
+        <div ref={ui} data-hidden="true" data-pull className="hero-ui pointer-events-none absolute inset-0 z-[2] hidden sm:block">
           <div className="hero-frame">
             <div className="hero-layer hero-planet">
               <svg aria-hidden="true" className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -283,7 +348,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         </div>
 
         {/* Screen-anchored interface: scroll cue and footer line. */}
-        <div className="page-x pointer-events-none absolute inset-0 z-[3] flex flex-col justify-end pb-6">
+        <div data-pull className="page-x pointer-events-none absolute inset-0 z-[3] flex flex-col justify-end pb-6">
           <div className="hero-ui tracked flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-[0.68rem] text-faint">
             <span className="flex items-center gap-4">
               A living atlas of worlds <span aria-hidden="true" className="hidden h-px w-14 bg-white/25 sm:inline-block" /> The Tide
@@ -307,7 +372,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         <div className="hero-vignette pointer-events-none absolute inset-0 z-[5]" />
 
         {/* Title: in front of the DOM fallback meteors; behind the WebGL meteors. */}
-        <div className="page-x pointer-events-none absolute inset-x-0 top-0 z-[6] pt-[calc(var(--header-h)+2.5rem)]">
+        <div data-pull className="page-x pointer-events-none absolute inset-x-0 top-0 z-[6] pt-[calc(var(--header-h)+2.5rem)]">
           <div className="hero-title">
             <p className="tracked flex items-center gap-3 text-faint">
               <span>01 / Home</span>
@@ -340,7 +405,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         ) : null}
 
         {/* The haiku from the GM's intro, set low along the streams of light. */}
-        <div className="page-x pointer-events-none absolute inset-x-0 bottom-[16%] z-[6] hidden sm:block">
+        <div data-pull className="page-x pointer-events-none absolute inset-x-0 bottom-[16%] z-[6] hidden sm:block">
           <p className="hero-haiku max-w-sm font-[family-name:var(--font-display)] text-[clamp(1rem,0.8rem+0.5vw,1.45rem)] italic leading-relaxed text-white/70">
             {HAIKU.map((line, i) => (
               <span key={line} className="block">

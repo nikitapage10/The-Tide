@@ -12,7 +12,7 @@
  */
 
 /** Written by the hero scene each frame; read by the sound engine. */
-export const heroSignal = { overPlanet: false, surgeAt: 0, gravAt: 0, gravStrength: 0, charging: false, charge: 0 };
+export const heroSignal = { overPlanet: false, surgeAt: 0, gravAt: 0, gravStrength: 0, charging: false, charge: 0, wellX: 0, wellY: 0 };
 
 export class HeroSound {
   private ctx: AudioContext;
