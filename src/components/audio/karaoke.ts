@@ -100,8 +100,12 @@ function align(page: string[], heard: string[]): number[] {
   return match;
 }
 
-/** Start and end times for each page word, from the transcript's timed words. */
-export function timeWords(page: string[], timed: TimedWord[]): { starts: number[]; ends: number[] } {
+/**
+ * Start and end times for each page word, from the transcript's timed words.
+ * `origin` is where untimed opening words are spread from (the start of the
+ * passage: 0 for the whole recording, a line's own start for one line).
+ */
+export function timeWords(page: string[], timed: TimedWord[], origin = 0): { starts: number[]; ends: number[] } {
   const match = align(
     page.map(norm),
     timed.map((t) => norm(t[2])),
@@ -120,7 +124,7 @@ export function timeWords(page: string[], timed: TimedWord[]): { starts: number[
     if (!Number.isNaN(starts[i])) continue;
     let k = i;
     while (k < page.length && Number.isNaN(starts[k])) k++;
-    const from = i > 0 ? ends[i - 1]! : 0;
+    const from = i > 0 ? ends[i - 1]! : origin;
     const to = k < page.length ? starts[k]! : last;
     const step = (to - from) / (k - i + 1);
     for (let x = i; x < k; x++) {

@@ -19,6 +19,7 @@ import { ArtSigil } from "@/components/tide/ArtSigil";
 import { WorldName } from "@/components/tide/WorldName";
 import { ART, monolith, peopleKey, peopleSigil } from "@/lib/art";
 import { Narration } from "@/components/audio/Narration";
+import { SpokenStage } from "@/components/audio/SpokenStage";
 
 export interface StoryPeople {
   id: string;
@@ -107,9 +108,12 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
           <p className="story-line t-display-l max-w-4xl">
             <Decode text="Breathe, little spark." active={on(0)} />
           </p>
-          <p className="story-text">
-            You have washed upon the shores of <WorldName />, adrift on currents far from your origin. A world that feels fundamentally wrong to your senses, yet strangely&hellip; resonant.
-          </p>
+          {/* While the narration plays, the line being spoken takes this paragraph's place, large. */}
+          <SpokenStage>
+            <p className="story-text">
+              You have washed upon the shores of <WorldName />, adrift on currents far from your origin. A world that feels fundamentally wrong to your senses, yet strangely&hellip; resonant.
+            </p>
+          </SpokenStage>
           <div className="mt-10">
             <Narration />
           </div>

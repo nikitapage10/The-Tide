@@ -156,7 +156,7 @@ export function Narration({ follow }: { follow?: string } = {}) {
   }, [follow, playing]);
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent("tide:narration", { detail: { playing } }));
+    window.dispatchEvent(new CustomEvent("tide:narration", { detail: { playing, audio: audio.current } }));
   }, [playing]);
   useEffect(() => () => void window.dispatchEvent(new CustomEvent("tide:narration", { detail: { playing: false } })), []);
 
@@ -175,6 +175,7 @@ export function Narration({ follow }: { follow?: string } = {}) {
     }
     setDocked(false);
     setLine("");
+    window.dispatchEvent(new CustomEvent("tide:narration", { detail: { playing: false, open: false } }));
   };
   const seek = (s: number) => {
     const a = audio.current;

@@ -41,6 +41,12 @@ test("the Arrival can be heard: on the home story and on its Library page", asyn
   await listen.click();
   const bar = page.getByRole("region", { name: "Narration" });
   await expect(bar).toBeVisible();
+  // The line being spoken takes the chapter text's place, large, its word flaring.
+  await page.evaluate(() => {
+    document.querySelector("audio")!.currentTime = 24;
+  });
+  await expect(page.locator(".spoken-wrap[data-on] .spoken-line")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".spoken-now")).toHaveCount(1, { timeout: 10_000 });
   // The spoken line follows along.
   await expect(bar.locator(".narration-line")).toContainText(/\w{3,}/, { timeout: 15_000 });
   // The bar stays while the story scrolls on.

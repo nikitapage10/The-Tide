@@ -702,12 +702,12 @@ a.tracklist-row:hover { background: rgba(255,255,255,0.03); }
    its heart) and settles to ordinary reading once said. */
 [data-reading] .rw { color: rgba(220, 220, 223, 0.38); transition: color 0.9s ease, text-shadow 0.9s ease; }
 [data-reading] .rw-said { color: #dcdcdf; }
-[data-reading] .rw-now { position: relative; color: #fff; transition: none; text-shadow: 0 0 6px rgba(255,255,255,0.95), 0 0 18px rgba(196,218,255,0.7), 0 0 44px rgba(160,190,255,0.35); }
-[data-reading] .rw-now::after { content: ""; position: absolute; left: 50%; top: 54%; width: calc(100% + 3.2em); height: 1px; translate: -50% -50%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(220,232,255,0.25) 22%, #fff 50%, rgba(220,232,255,0.25) 78%, transparent); box-shadow: 0 0 6px 0.5px rgba(200,220,255,0.55); animation: rw-streak 0.75s cubic-bezier(.2,.7,.1,1) both; }
-[data-reading] .rw-now::before { content: ""; position: absolute; left: 50%; top: 52%; width: 0.7em; height: 0.7em; translate: -50% -50%; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: radial-gradient(circle, #fff 0, rgba(255,255,255,0.55) 22%, rgba(190,210,255,0.18) 48%, transparent 70%); animation: rw-star 0.75s ease-out both; }
+[data-reading] .rw-now, .spoken-now { position: relative; color: #fff; transition: none; text-shadow: 0 0 6px rgba(255,255,255,0.95), 0 0 18px rgba(196,218,255,0.7), 0 0 44px rgba(160,190,255,0.35); }
+[data-reading] .rw-now::after, .spoken-now::after { content: ""; position: absolute; left: 50%; top: 54%; width: calc(100% + 3.2em); height: 1px; translate: -50% -50%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(220,232,255,0.25) 22%, #fff 50%, rgba(220,232,255,0.25) 78%, transparent); box-shadow: 0 0 6px 0.5px rgba(200,220,255,0.55); animation: rw-streak 0.75s cubic-bezier(.2,.7,.1,1) both; }
+[data-reading] .rw-now::before, .spoken-now::before { content: ""; position: absolute; left: 50%; top: 52%; width: 0.7em; height: 0.7em; translate: -50% -50%; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: radial-gradient(circle, #fff 0, rgba(255,255,255,0.55) 22%, rgba(190,210,255,0.18) 48%, transparent 70%); animation: rw-star 0.75s ease-out both; }
 @keyframes rw-streak { from { opacity: 0; scale: 0.15 1; } 35% { opacity: 1; } to { opacity: 0.6; scale: 1 1; } }
 @keyframes rw-star { from { opacity: 0; scale: 0.3; } 30% { opacity: 1; scale: 1.25; } to { opacity: 0.55; scale: 1; } }
-@media (prefers-reduced-motion: reduce) { [data-reading] .rw-now::after, [data-reading] .rw-now::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { [data-reading] .rw-now::after, [data-reading] .rw-now::before, .spoken-now::before { animation: none; } }
 
 /* A plate without its own art yet: one of the Unknowns, held back in the dark. */
 .plate-unknown img { filter: brightness(0.5) contrast(1.05); transition: filter .6s ease; }
@@ -760,3 +760,20 @@ a.tracklist-row:hover { background: rgba(255,255,255,0.03); }
 .cover-glass:hover .cover-volume { filter: brightness(0.95) drop-shadow(0 0 20px rgba(255,255,255,0.15)); }
 .cover-glass .cover-title { position: relative; text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
 .cover-glass .cover-meta, .cover-glass .cover-rule { position: relative; }
+
+/* The narration, spoken large (components/audio/SpokenStage): the chapter's own
+   paragraph and the spoken line share one place and cross-fade. */
+.spoken-wrap { display: grid; max-width: 46rem; }
+.spoken-wrap > * { grid-area: 1 / 1; }
+.spoken-own { transition: opacity .8s ease, filter .8s ease; }
+.spoken-stage { position: relative; min-height: 9.5rem; margin-top: 0.6rem; opacity: 0; pointer-events: none; transition: opacity .8s ease; }
+.spoken-wrap[data-on] .spoken-own { opacity: 0; filter: blur(4px); }
+.spoken-wrap[data-on] .spoken-stage { opacity: 1; }
+.spoken-line { font-family: var(--font-display); font-weight: 300; font-size: clamp(1.45rem, 1.05rem + 1.25vw, 2.35rem); line-height: 1.32; color: #fff; text-wrap: pretty; animation: spoken-in .7s cubic-bezier(.2,.7,.1,1) both; }
+.spoken-word { color: rgba(255,255,255,0.92); transition: color .8s ease, text-shadow .8s ease; }
+.spoken-said { color: #e6e6ea; }
+.spoken-now { color: #fff; }
+.spoken-prev { position: absolute; left: 0; right: 0; bottom: 100%; margin-bottom: 0.35rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-display); font-style: italic; font-size: 0.92rem; line-height: 1.3; color: rgba(220,220,223,0.32); animation: spoken-lift 1.2s cubic-bezier(.2,.7,.1,1) both; }
+@keyframes spoken-in { from { opacity: 0; translate: 0 14px; filter: blur(3px); } }
+@keyframes spoken-lift { from { opacity: 0.9; translate: 0 2.4rem; filter: blur(0); } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .spoken-line, .spoken-prev { animation: none; } }
