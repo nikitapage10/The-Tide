@@ -506,3 +506,159 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 }
 .story-planet { position: absolute; inset: 0; pointer-events: none; opacity: calc(0.22 - var(--sp, 0) * 0.12); filter: grayscale(0.7) brightness(0.6); translate: calc(var(--sp, 0) * 12%) 0; scale: calc(1 + var(--sp, 0) * 0.15); mask-image: linear-gradient(90deg, transparent 30%, #000 75%); }
 .world-story:not([data-live]) .story-planet { display: none; }
+
+/* ── Sub-page rooms (components/browse) ───────────────────────────────── */
+.group-hero-numeral { position: absolute; right: -0.04em; top: -0.32em; font-family: var(--font-display); font-weight: 300; font-size: clamp(7rem, 4rem + 14vw, 17rem); line-height: 1; color: transparent; -webkit-text-stroke: 1px hsl(var(--tint, 0 0% 100%) / 0.12); letter-spacing: -0.02em; pointer-events: none; user-select: none; }
+.empty-room { background: repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 14px); }
+
+/* Environments: strata. Bands of slow weather; the hovered one opens. */
+.strata { display: flex; flex-direction: column; gap: 2px; }
+.stratum { position: relative; min-height: 6.5rem; overflow: hidden; transition: min-height .7s cubic-bezier(.2,.7,.1,1); background: linear-gradient(100deg, hsl(var(--tint) / 0.03), hsl(var(--tint) / 0.11) 40%, hsl(var(--tint) / 0.02) 80%); background-size: 220% 100%; animation: stratum-flow calc(14s + var(--i) * 3s) linear infinite; }
+.stratum:hover, .stratum:focus-within { min-height: 13rem; }
+.stratum-empty { display: flex; align-items: center; padding: 0 1.5rem; opacity: 0.55; }
+.stratum-link { position: absolute; inset: 0; display: grid; grid-template-columns: 3rem minmax(0, 1fr); grid-template-rows: auto 1fr; align-content: center; column-gap: 1rem; padding: 1.2rem 1.5rem; }
+.stratum-summary { grid-column: 2; max-width: 42rem; opacity: 0; translate: 0 8px; transition: opacity .6s ease .1s, translate .6s ease .1s; }
+.stratum:hover .stratum-summary, .stratum:focus-within .stratum-summary { opacity: 1; translate: none; }
+@keyframes stratum-flow { to { background-position: -220% 0; } }
+
+/* Places: a survey field with a radar sweep. */
+.survey { height: min(78svh, 46rem); border: 1px solid rgba(255,255,255,0.07); background-image: radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1.3px); background-size: 26px 26px; }
+.survey-rings { position: absolute; inset: 0; background: repeating-radial-gradient(circle at 50% 50%, transparent 0 89px, hsl(var(--tint) / 0.08) 90px 91px); pointer-events: none; }
+.survey-sweep { position: absolute; left: 50%; top: 50%; width: 160%; aspect-ratio: 1; translate: -50% -50%; background: conic-gradient(from 0deg, hsl(var(--tint) / 0.16), transparent 14%); border-radius: 50%; pointer-events: none; animation: sweep 9s linear infinite; }
+@keyframes sweep { to { rotate: 360deg; } }
+
+/* History: the spine draws as you read; events step out to either side. */
+.history-counter { font-family: var(--font-display); font-weight: 300; font-size: clamp(4rem, 3rem + 3vw, 6.5rem); line-height: 1; color: #fff; font-variant-numeric: tabular-nums; }
+.history-spine { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, #fff, hsl(var(--tint) / 0.6)); transform-origin: top; scale: 1 var(--draw, 0); }
+.history-item { position: relative; width: 50%; padding: 2.2rem 3rem; }
+.history-left { margin-right: auto; text-align: right; }
+.history-right { margin-left: auto; }
+.history-node { position: absolute; top: 2.9rem; width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.6); background: var(--bg); transition: background .6s ease, box-shadow .6s ease, scale .6s ease; }
+.history-left .history-node { right: -7px; }
+.history-right .history-node { left: -6px; }
+.history-node[data-certainty="approximate"] { border-style: dashed; }
+.history-node[data-certainty="uncertain"], .history-node[data-certainty="unknown"] { border-style: dotted; border-width: 2px; }
+.history-item[data-lit] .history-node { background: #fff; box-shadow: 0 0 18px rgba(255,255,255,0.6); scale: 1.15; }
+.history-card { opacity: 0.35; translate: 0 18px; transition: opacity .9s ease, translate .9s cubic-bezier(.2,.7,.1,1); }
+.history-item[data-lit] .history-card { opacity: 1; translate: none; }
+@media (max-width: 767px) {
+  .history-spine { left: 6px; }
+  .history-item, .history-left, .history-right { width: 100%; margin: 0; text-align: left; padding: 1.6rem 0 1.6rem 2rem; }
+  .history-left .history-node, .history-right .history-node { left: 0; right: auto; }
+}
+
+/* Technology: blueprints. */
+.blueprint { background-color: #070a0d; background-image: linear-gradient(rgba(150,190,220,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(150,190,220,0.06) 1px, transparent 1px), linear-gradient(rgba(150,190,220,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(150,190,220,0.03) 1px, transparent 1px); background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px; }
+.blueprint-card { position: relative; padding: 1.8rem; height: 100%; transition: background .4s ease; }
+.blueprint-card:hover { background: rgba(150,190,220,0.04); }
+.blueprint-corners { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#cfe0ee, #cfe0ee) left top / 14px 1px no-repeat, linear-gradient(#cfe0ee, #cfe0ee) left top / 1px 14px no-repeat, linear-gradient(#cfe0ee, #cfe0ee) right top / 14px 1px no-repeat, linear-gradient(#cfe0ee, #cfe0ee) right top / 1px 14px no-repeat, linear-gradient(#cfe0ee, #cfe0ee) left bottom / 14px 1px no-repeat, linear-gradient(#cfe0ee, #cfe0ee) left bottom / 1px 14px no-repeat, linear-gradient(#cfe0ee, #cfe0ee) right bottom / 14px 1px no-repeat, linear-gradient(#cfe0ee, #cfe0ee) right bottom / 1px 14px no-repeat; opacity: 0.5; transition: inset .4s ease; }
+.blueprint-card:hover .blueprint-corners { inset: -6px; opacity: 0.9; }
+
+/* Relics: vitrines under a slow moving light. */
+.vitrine { position: relative; }
+.vitrine-light { position: absolute; left: 50%; top: -3rem; width: 120%; height: 120%; translate: -50% 0; background: radial-gradient(40% 50% at 50% 0%, rgba(235,240,246,0.16), transparent 70%); animation: vitrine-sway calc(9s + var(--i) * 1.3s) ease-in-out infinite alternate; pointer-events: none; }
+.vitrine-case { position: relative; margin: 0 12%; box-shadow: 0 30px 50px -30px rgba(0,0,0,0.9); }
+.vitrine-plinth { display: block; height: 14px; margin: 0 6%; background: linear-gradient(#17171b, #0b0b0d); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12); }
+.vitrine-plaque { display: block; margin: 1rem 12% 0; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.1); }
+@keyframes vitrine-sway { from { translate: -58% 0; } to { translate: -42% 0; } }
+
+/* Phenomena: the hero's particles, large and live. */
+.live-fx { pointer-events: none; }
+.live-fx-inner { position: absolute; left: 0; top: 0; transform-origin: center; }
+.live-fx .callout-fx { opacity: 1; }
+.phenomenon { min-height: 22rem; }
+.phenomenon::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, var(--bg) 18%, transparent 65%); pointer-events: none; }
+
+/* World mechanics: a circuit of rules, current running down the wires. */
+.circuit-node { padding-bottom: 3.2rem; }
+.circuit-card { position: relative; display: block; padding: 1.6rem 1.8rem; border: 1px solid rgba(255,255,255,0.1); background: linear-gradient(135deg, hsl(var(--tint) / 0.05), transparent 60%); }
+.circuit-pulse { position: absolute; left: -5px; top: 1.9rem; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 14px #fff; animation: pulse 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * 0.4s); }
+.circuit-wire { position: absolute; left: 0; top: 2.3rem; bottom: -2.3rem; width: 1px; background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.5) 0 6px, transparent 6px 12px); background-size: 1px 24px; animation: wire 1.4s linear infinite; }
+@keyframes pulse { 0%, 100% { opacity: 0.35; scale: 0.8; } 50% { opacity: 1; scale: 1.2; } }
+@keyframes wire { to { background-position: 0 24px; } }
+
+/* Concepts: a glossary. */
+.glossary-letter { font-family: var(--font-display); font-weight: 300; font-size: 3.6rem; line-height: 0.9; color: #fff; --glyph-w: 0.9em; --glyph-h: 1.1em; }
+
+/* Peoples: one people per screen. */
+.carousel-strip { scroll-snap-type: x mandatory; scrollbar-width: none; }
+.carousel-strip::-webkit-scrollbar { display: none; }
+.carousel-slide { scroll-snap-align: start; min-height: min(80svh, 46rem); padding: 1rem 0; }
+.carousel-portrait { background: #08080a; translate: calc(var(--off, 0) * 18%) 0; transition: translate .1s linear; }
+.carousel-portrait img { filter: grayscale(0.4) brightness(0.9); }
+.carousel-text { translate: calc(var(--off, 0) * -8%) 0; opacity: calc(1 - min(1, abs(var(--off, 0)) * 1.4)); }
+.carousel-empty { position: absolute; inset: 28% 22%; border: 1px dashed rgba(255,255,255,0.18); border-radius: 50%; }
+.carousel-btn { width: 2.75rem; height: 2.75rem; border: 1px solid rgba(255,255,255,0.25); color: #fff; transition: border-color .3s ease; }
+.carousel-btn:hover { border-color: #fff; }
+
+/* Characters: a mosaic of faces. */
+.mosaic { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1rem; }
+.mosaic-wide { grid-column: span 2; }
+.mosaic-tile { position: relative; }
+.mosaic-name { position: absolute; left: 1rem; right: 1rem; bottom: 1rem; }
+@media (max-width: 520px) { .mosaic-wide { grid-column: auto; } }
+
+/* Creatures: a reticle over each specimen. */
+.bestiary-reticle { position: absolute; inset: 14%; pointer-events: none; border: 1px solid rgba(255,255,255,0.0); background: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)) center / 1px 22px no-repeat, linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)) center / 22px 1px no-repeat; opacity: 0.35; transition: inset .6s ease, opacity .6s ease; }
+.bestiary:hover .bestiary-reticle { inset: 22%; opacity: 0.8; }
+
+/* Factions: banners under each people's colour. */
+.banner-swatch { display: inline-block; width: 22px; height: 2px; background: var(--banner); box-shadow: 0 0 10px var(--banner); }
+.banner { position: relative; padding: 1.1rem 1.2rem 1.2rem 1.4rem; background: linear-gradient(90deg, color-mix(in srgb, var(--banner) 9%, transparent), transparent 75%); border-left: 1px solid color-mix(in srgb, var(--banner) 70%, transparent); transition: background .4s ease, padding .4s ease; }
+.banner:hover { padding-left: 1.8rem; background: linear-gradient(90deg, color-mix(in srgb, var(--banner) 16%, transparent), transparent 85%); }
+
+/* Institutions: a ledger. */
+.ledger { border-top: 1px solid rgba(255,255,255,0.12); }
+.ledger-row { display: grid; grid-template-columns: 5rem minmax(0, 1fr) 10rem; gap: 1.5rem; align-items: baseline; padding: 1.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+@media (max-width: 640px) { .ledger-row { grid-template-columns: 3.5rem minmax(0, 1fr); } .ledger-row > :last-child { display: none; } }
+.tilt { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .5s cubic-bezier(.2,.7,.1,1); transform-style: preserve-3d; }
+
+/* Campaigns: voyages. */
+.voyage-route { display: block; width: 100%; min-width: 48rem; height: 7rem; fill: none; stroke: hsl(var(--tint) / 0.5); stroke-width: 1; stroke-dasharray: 4 6; animation: route 30s linear infinite; }
+.voyage-port { display: block; width: 14px; height: 14px; border: 1px solid #fff; border-radius: 50%; background: var(--bg); box-shadow: 0 0 0 5px rgba(255,255,255,0.05); }
+@keyframes route { to { stroke-dashoffset: -400; } }
+
+/* One-shots: a fanned deck. */
+.deck { position: relative; display: flex; justify-content: center; padding: 3rem 0 6rem; min-height: 26rem; }
+.deck-card { width: 15rem; height: 21rem; margin-left: -5rem; rotate: calc((var(--i) - (var(--n) - 1) / 2) * 7deg); translate: 0 calc(abs(var(--i) - (var(--n) - 1) / 2) * 0.8rem); transform-origin: 50% 120%; transition: rotate .5s cubic-bezier(.2,.7,.1,1), translate .5s cubic-bezier(.2,.7,.1,1); }
+.deck-card:first-child { margin-left: 0; }
+.deck-card:hover, .deck-card:focus-within { rotate: 0deg; translate: 0 -2.4rem; z-index: 5; }
+.deck-face { display: flex; flex-direction: column; padding: 1.4rem; background: linear-gradient(160deg, #18181d, #0c0c0f); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12), 0 30px 40px -20px rgba(0,0,0,0.9); }
+@media (max-width: 640px) { .deck-card { width: 11rem; height: 16rem; margin-left: -6rem; } }
+
+/* Novels: covers that turn toward you. */
+.cover { position: relative; display: flex; flex-direction: column; justify-content: flex-end; aspect-ratio: 2 / 3; padding: 1.6rem 1.4rem; background: radial-gradient(120% 80% at 30% 0%, hsl(var(--tint) / 0.14), transparent 60%), linear-gradient(160deg, #17171b, #09090b); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 18px 30px 50px -24px rgba(0,0,0,0.95); }
+.cover-spine { position: absolute; left: 0; top: 0; bottom: 0; width: 10px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+.cover-title { color: #fff; }
+.cover-rule { display: block; width: 2.5rem; height: 1px; margin: 1rem 0 0.8rem; background: rgba(255,255,255,0.4); }
+.cover-meta { color: var(--faint); }
+
+/* Short fiction: first lines, set large. */
+.first-line { font-family: var(--font-display); font-weight: 300; font-style: italic; font-size: clamp(1.6rem, 1.2rem + 1.8vw, 2.8rem); line-height: 1.3; color: #e8e8ea; max-width: 46rem; text-wrap: balance; transition: color .4s ease; }
+.first-lines a:hover .first-line { color: #fff; }
+
+/* Music: a level meter that breathes. */
+.meter { display: flex; align-items: flex-end; gap: 4px; height: 5rem; }
+.meter > span { flex: 1; background: linear-gradient(to top, rgba(255,255,255,0.6), rgba(255,255,255,0.1)); height: 20%; animation: meter calc(0.9s + (var(--i) * 0.07s)) ease-in-out infinite alternate; animation-delay: calc(var(--i) * -0.13s); }
+@keyframes meter { from { height: 8%; } to { height: calc(30% + (var(--i) * 2%)); } }
+.tracklist { border-top: 1px solid rgba(255,255,255,0.12); }
+.tracklist-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; align-items: baseline; gap: 1rem; padding: 1.1rem 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.08); transition: background .3s ease; }
+a.tracklist-row:hover { background: rgba(255,255,255,0.03); }
+
+/* Artwork: masonry. */
+.masonry { columns: 3 18rem; column-gap: 1.5rem; }
+.masonry-item { break-inside: avoid; margin-bottom: 2rem; }
+
+/* Aesthetics: a pinned collage. */
+.collage { display: flex; flex-wrap: wrap; gap: 2.5rem 2rem; justify-content: center; padding: 2rem 0; }
+.collage-item { position: relative; width: clamp(12rem, 22vw, 18rem); rotate: var(--r); translate: 0 var(--y); transition: rotate .5s ease, translate .5s ease, scale .5s ease; }
+.collage-item:hover { rotate: 0deg; translate: 0 calc(var(--y) - 10px); scale: 1.04; z-index: 2; }
+.collage-pin { position: absolute; left: 50%; top: -6px; z-index: 3; width: 10px; height: 10px; translate: -50% 0; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, #8a8a93); box-shadow: 0 3px 6px rgba(0,0,0,0.6); }
+
+/* Other: a stack of documents. */
+.doc-stack { position: relative; }
+.doc-sheet { position: relative; margin-top: -1.2rem; padding: 1.4rem 1.6rem 2.2rem; background: linear-gradient(180deg, #141418, #0e0e11); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), 0 -12px 24px -14px rgba(0,0,0,0.9); rotate: calc((var(--i) - 1) * 0.6deg); transition: translate .4s ease, rotate .4s ease; }
+.doc-sheet:first-child { margin-top: 0; }
+.doc-sheet:hover { translate: 0 -0.6rem; rotate: 0deg; z-index: 2; }
+
+@media (prefers-reduced-motion: reduce) { .survey-sweep, .vitrine-light, .stratum, .circuit-pulse, .circuit-wire, .voyage-route, .meter > span { animation: none; } }

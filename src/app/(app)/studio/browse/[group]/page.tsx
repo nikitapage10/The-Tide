@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { GroupView } from "@/components/browse/GroupView";
 import { StudioBrowser } from "@/components/records/StudioBrowser";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { STUDIO_TYPE_GROUPS } from "@/lib/domain/sections";
@@ -12,6 +13,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   const ctx = await requirePageContext();
   const state = await ctx.publicationStore.getActiveState();
   const sp = await searchParams;
+  if (!Object.keys(sp).length) return <GroupView state={state} section="studio" group={group} />;
   return (
     <>
       <PageHeader crumbs={[{ href: "/studio", label: "The Studio" }]} title={g.label} description={g.description} />

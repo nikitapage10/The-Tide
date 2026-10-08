@@ -8,6 +8,7 @@ import { listRecords } from "@/lib/domain/queries";
 import type { AppContext } from "@/lib/server/context";
 import { one, type SearchParams } from "@/lib/server/params";
 import { RecordBadges } from "./Badges";
+import { GroupView, hasGroupView } from "@/components/browse/GroupView";
 import { EntityBrowser } from "./EntityBrowser";
 import { EntryFolio } from "./EntryFolio";
 
@@ -55,6 +56,8 @@ export async function BrowsePage({ ctx, section, group, searchParams }: { ctx: A
   const g = groupsFor(section)[group];
   if (!g) notFound();
   const state = await ctx.publicationStore.getActiveState();
+  // Each group is its own room; filtering shows the plain list.
+  if (!Object.keys(await searchParams).length && hasGroupView(section, group)) return <GroupView state={state} section={section} group={group} />;
   const def = sectionDef(section);
   return (
     <>
