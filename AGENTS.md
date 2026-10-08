@@ -15,3 +15,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   - a Workshop entry page at `src/app/(app)/workshop/<name>-lab/page.tsx` (heading, short description, "Open the …" link);
   - a subsection in `src/lib/domain/sections.ts` (Workshop) and the `"lab"` badge in `src/app/(app)/workshop/page.tsx`.
   Current labs: Cloud lab, Alphabet lab, Orbit sketch.
+- **Publishing lore to the live site.** When the GM asks to publish:
+  - Run `npm run publish:lore` (rebuilds `fixtures/publication/lore-release.json` from `lore/`, then publishes it), or `npm run publish:bundle -- <bundle.json>` for any other bundle.
+  - Both read `SUPABASE_URL` and `SUPABASE_SECRET_KEY` from the session's environment (set in the cloud environment's settings). Never write the key into a file or commit.
+  - Publishing validates first, stops on errors, and every release can be rolled back in Workshop → Publishing.

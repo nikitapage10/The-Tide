@@ -2,7 +2,7 @@
   "name": "the-tide",
   "version": "0.1.0",
   "private": true,
-  "description": "The Tide — private worldbuilding and tabletop campaign dashboard for Primus.",
+  "description": "The Tide \u2014 private worldbuilding and tabletop campaign dashboard for Primus.",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -20,7 +20,9 @@
     "check:bundle-secrets": "node scripts/check-bundle-secrets.mjs",
     "contract:schema": "tsx scripts/generate-json-schema.ts",
     "contract:hash": "tsx scripts/hash-bundle.ts",
-    "demo:reset": "node scripts/reset-demo.mjs"
+    "demo:reset": "node scripts/reset-demo.mjs",
+    "publish:bundle": "NODE_OPTIONS=--conditions=react-server tsx scripts/publish-bundle.ts",
+    "publish:lore": "tsx scripts/build-lore-bundle.ts && NODE_OPTIONS=--conditions=react-server tsx scripts/publish-bundle.ts fixtures/publication/lore-release.json"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
