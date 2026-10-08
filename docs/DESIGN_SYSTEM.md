@@ -85,6 +85,7 @@ Everything honours `prefers-reduced-motion` (it shows at once, with no movement)
 | --- | --- |
 | `Callout` | The universal annotation: a ringed point, a hairline leader, a decoding label. Place it on maps, plates and timelines (`x`, `y` in %), or inline. Its leader is drawn by canon status. |
 | `WorldName`, `WorldText` | The world's name, decoding from the script. `WorldText` renders any title, summary or label with the old working name replaced by Ilyr; `Markdown` does this automatically. |
+| `ArtSigil`, `src/lib/art.ts` | The painted art (docs/ART_BRIEF.md), cut by `scripts/build-art.py` into `public/art`. Ask `lib/art` by meaning (`roomSigil`, `monolith`, `homeland`, `phenomenon`...), never by path. `SectionIntro` takes `backdrop` and `numerals`; `Plate` falls back to the Unknowns. |
 | `CanonMark` | A short rule drawn by canon status (solid, dashed, dotted). |
 | `EraBand` | The long history in one strip, with the current era lit. |
 | `ConsequenceSigil` | The marks of the Drowning, the Divergence and the Drift. |

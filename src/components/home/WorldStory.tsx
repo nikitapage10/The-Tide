@@ -5,7 +5,8 @@
  *   1 Arrival · 2 Before (the Shoreborn, the Undertow) · 3 The Veil ·
  *   4 Verdancy (the First Ascent) · 5 The Tide (its Three Consequences) ·
  *   6 The Peoples · 7 Enter (the five rooms of the site)
- * Each chapter's own progress (--t, 0..1) drives its drawing. Without
+ * Each chapter stands in its own painted scene (public/art/story), which
+ * drifts as the chapter's own progress (--t, 0..1) runs. Without
  * JavaScript, or with reduced motion, the chapters simply stack and read in
  * order.
  */
@@ -14,7 +15,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Decode } from "@/components/glyphs/Decode";
 import { ConsequenceSigil } from "@/components/tide/ConsequenceSigil";
+import { ArtSigil } from "@/components/tide/ArtSigil";
 import { WorldName } from "@/components/tide/WorldName";
+import { ART, monolith, peopleKey, peopleSigil } from "@/lib/art";
 import { Narration } from "@/components/audio/Narration";
 
 export interface StoryPeople {
@@ -100,7 +103,7 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
           <Image src="/brand/planet-v2.webp" alt="" fill sizes="100vw" className="object-cover" />
         </div>
         {/* 1 · Arrival */}
-        <Chapter i={0} n="I" title="Arrival">
+        <Chapter i={0} n="I" title="Arrival" scene={ART.story.arrival}>
           <p className="story-line t-display-l max-w-4xl">
             <Decode text="Breathe, little spark." active={on(0)} />
           </p>
@@ -114,7 +117,7 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
         </Chapter>
 
         {/* 2 · Before */}
-        <Chapter i={1} n="II" title="Before">
+        <Chapter i={1} n="II" title="Before" scene={ART.story.before}>
           <ol className="story-years" aria-label="The last years of the Shoreborn">
             {[
               ["~2012", "Warming, documented and debated"],
@@ -132,15 +135,11 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
           <p className="story-text">
             The Shoreborn reached, and the planet answered. For nine months the world convulsed: coastlines drowned, gravity bent, and something came through from beyond. Most perished. The rest were changed.
           </p>
-          <svg className="story-flood" viewBox="0 0 1200 200" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 120 C 150 90, 300 150, 450 115 S 750 80, 900 120 S 1100 150, 1200 110 L1200 200 L0 200 Z" />
-            <path d="M0 150 C 200 120, 350 175, 550 145 S 850 110, 1000 150 S 1150 170, 1200 140 L1200 200 L0 200 Z" opacity="0.6" />
-          </svg>
           {hrefs.undertow ? <More href={hrefs.undertow}>The Undertow</More> : null}
         </Chapter>
 
         {/* 3 · The Veil */}
-        <Chapter i={2} n="III" title="The Veil">
+        <Chapter i={2} n="III" title="The Veil" scene={ART.story.veil}>
           <p className="story-line t-display-m max-w-3xl">
             <Decode text="Some seven centuries, alone." active={on(2)} />
           </p>
@@ -161,27 +160,18 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
         </Chapter>
 
         {/* 4 · Verdancy */}
-        <Chapter i={3} n="IV" title="Verdancy">
+        <Chapter i={3} n="IV" title="Verdancy" scene={ART.story.verdancy}>
           <p className="story-line t-display-m max-w-3xl">
             <Decode text="Five swimmers, and a girl who fell." active={on(3)} />
           </p>
           <p className="story-text">
             Carried far by a current, five young Teruānga saw a girl fall from the cliffs of an unknown island and brought her home. The isolation ended there. The Teruānga set out across the oceans, and the peoples found each other: trade, quarrels, cities in the clouds, colonies on the moon.
           </p>
-          <svg className="story-routes" viewBox="0 0 600 300" aria-hidden="true">
-            <path className="story-cliff" d="M380 300 L380 150 L410 120 L440 130 L470 95 L520 110 L600 90 L600 300" />
-            {[0, 1, 2, 3, 4].map((k) => (
-              <circle key={k} className="story-swimmer" cx={300 + k * 14} cy={238 - (k % 2) * 6} r="2.2" style={{ ["--k" as string]: k } as CSSProperties} />
-            ))}
-            <path className="story-route" d="M60 240 C 160 120, 300 80, 470 95" />
-            <path className="story-route" d="M60 240 C 120 180, 180 160, 250 60" style={{ ["--k" as string]: 1 } as CSSProperties} />
-            <path className="story-route" d="M60 240 C 220 260, 380 220, 560 200" style={{ ["--k" as string]: 2 } as CSSProperties} />
-          </svg>
           {hrefs.ascent ? <More href={hrefs.ascent}>The First Ascent</More> : null}
         </Chapter>
 
         {/* 5 · The Tide */}
-        <Chapter i={4} n="V" title="The Tide">
+        <Chapter i={4} n="V" title="The Tide" scene={ART.story.tide}>
           <p className="story-line t-display-m max-w-3xl">
             <Decode text="Then the Tide, and what it left behind." active={on(4)} />
           </p>
@@ -194,7 +184,7 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
               ] as const
             ).map(([kind, title, line, href], k) => (
               <li key={kind} style={{ ["--k" as string]: k } as CSSProperties}>
-                <ConsequenceSigil kind={kind} size={40} className="text-white/80" />
+                <ConsequenceSigil kind={kind} size={56} />
                 {href ? (
                   <Link href={href} className="t-title mt-4 block text-text no-underline hover:text-white">
                     {title}
@@ -217,10 +207,7 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
             {peoples.map((p, k) => (
               <li key={p.id} style={{ ["--k" as string]: k, ...(p.palette ? { "--plate-glow": p.palette } : {}) } as CSSProperties}>
                 <Link href={p.href} className="block no-underline">
-                  <span className="story-portrait">
-                    {p.portrait ? <Image src={p.portrait} alt={`${p.title}, portrait`} fill sizes="12rem" className="object-cover" /> : <span className="story-portrait-empty" />}
-                    <span aria-hidden="true" className="plate-glow" />
-                  </span>
+                  <StoryMonolith people={p} />
                   <span className="t-title mt-3 block text-text">{p.title}</span>
                   {p.epithet ? <span className="tracked block text-[0.54rem] text-faint">{p.epithet}</span> : null}
                 </Link>
@@ -230,7 +217,7 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
         </Chapter>
 
         {/* 7 · Enter */}
-        <Chapter i={6} n="VII" title="Enter">
+        <Chapter i={6} n="VII" title="Enter" scene={ART.story.enter}>
           <p className="story-line t-display-m max-w-3xl">
             <Decode text="Observe, adapt, and find your place." active={on(6)} />
           </p>
@@ -253,9 +240,34 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
   );
 }
 
-function Chapter({ i, n, title, children }: { i: number; n: string; title: string; children: ReactNode }) {
+/** A people as a slab of glass holding its weather, its sigil floating on it; its portrait where there is no slab. */
+function StoryMonolith({ people: p }: { people: StoryPeople }) {
+  const key = peopleKey(p.title);
+  const slab = monolith(key);
+  const sigil = peopleSigil(key);
+  if (!slab)
+    return (
+      <span className="story-portrait">
+        {p.portrait ? <Image src={p.portrait} alt={`${p.title}, portrait`} fill sizes="12rem" className="object-cover" /> : <span className="story-portrait-empty" />}
+        <span aria-hidden="true" className="plate-glow" />
+      </span>
+    );
+  return (
+    <span className="story-monolith">
+      <Image src={slab} alt="" fill sizes="12rem" className="object-contain" />
+      {sigil ? <ArtSigil src={sigil} size={96} className="story-monolith-sigil" /> : null}
+    </span>
+  );
+}
+
+function Chapter({ i, n, title, scene, children }: { i: number; n: string; title: string; scene?: string; children: ReactNode }) {
   return (
     <article className="story-chapter" data-chapter={i} aria-labelledby={`chapter-${i}`}>
+      {scene ? (
+        <div aria-hidden="true" className="story-scene">
+          <Image src={scene} alt="" fill sizes="100vw" className="object-cover" priority={i === 0} />
+        </div>
+      ) : null}
       <div className="page-x story-chapter-inner">
         <h2 id={`chapter-${i}`} className="tracked flex items-center gap-3 text-[0.65rem] text-faint">
           <span className="text-white/70">{n}</span>

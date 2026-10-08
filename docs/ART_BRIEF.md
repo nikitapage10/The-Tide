@@ -127,3 +127,6 @@ The style rules:
 | 30 | the reading view, the Veil and Arrival chapters, and a general overlay |
 
 **Naming:** `NN-name.png` (e.g. `07-numerals.png`, `12-arrival.png`).
+
+## Status
+Delivered and in place (sheets in `art/source`, cut by `python3 scripts/build-art.py` into `public/art`, wired through `src/lib/art.ts`): all but **#18, the world map**, which is still wanted (the globe keeps its current texture). Not yet used: the interface glyphs beyond the carousel arrows, and the map and sky markers (#6). To replace any piece, drop a new sheet over its file in `art/source` and re-run the script.

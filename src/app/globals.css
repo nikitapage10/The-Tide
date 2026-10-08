@@ -263,7 +263,8 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 
 /* Page gutters that grow with the screen: content anchors left on wide displays
    instead of sitting in a centred column. */
-.page-x { padding-inline: clamp(16px, 3.2vw, 96px); }
+:root { --page-x: clamp(16px, 3.2vw, 96px); }
+.page-x { padding-inline: var(--page-x); }
 .page-mx { margin-inline: clamp(16px, 3.2vw, 96px); }
 
 /* The haiku arrives with the interface, a little after the callouts. */
@@ -459,7 +460,6 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .story-years { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.2rem; max-width: 60rem; border-top: 1px solid rgba(255,255,255,0.18); }
 .story-years li { padding-top: 0.9rem; opacity: clamp(0.15, calc(var(--t) * 5 - var(--k) * 0.7), 1); }
 .story-years li:last-child span:last-child { color: #fff; }
-.story-flood { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 40svh; fill: rgba(200,212,226,0.05); stroke: rgba(220,230,240,0.35); stroke-width: 1; translate: 0 calc((1 - var(--t)) * 28svh); z-index: 0; }
 @media (max-width: 640px) { .story-years { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* III: sleepers in the fog. */
@@ -468,10 +468,6 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .story-fog { position: absolute; inset: -20%; z-index: 0; pointer-events: none; background: radial-gradient(40% 30% at 30% 60%, rgba(200,210,220,0.09), transparent 70%), radial-gradient(35% 25% at 70% 40%, rgba(200,210,220,0.07), transparent 70%); translate: calc(var(--t) * -6%) 0; }
 
 /* IV: the cliff, five swimmers, routes drawn across the sea. */
-.story-routes { width: min(100%, 40rem); max-height: 32svh; height: auto; fill: none; }
-.story-cliff { stroke: rgba(255,255,255,0.35); stroke-width: 1; fill: rgba(255,255,255,0.03); }
-.story-swimmer { fill: #e8d48a; opacity: clamp(0, calc(var(--t) * 4 - 0.4), 1); }
-.story-route { stroke: rgba(255,255,255,0.5); stroke-width: 0.8; stroke-dasharray: 600; stroke-dashoffset: calc(600 - clamp(0, var(--t) * 1.6 - var(--k, 0) * 0.15, 1) * 600); }
 
 /* V: the Three Consequences in turn. */
 .story-consequences { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem; max-width: 64rem; }
@@ -488,8 +484,8 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 /* VII: the doors. */
 .story-doors { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); max-width: 80rem; border-top: 1px solid rgba(255,255,255,0.1); border-left: 1px solid rgba(255,255,255,0.1); }
 .story-doors li { border-right: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); opacity: clamp(0.15, calc(var(--t) * 5 - var(--k) * 0.5), 1); }
-.story-door { padding: 1.6rem 1.4rem 2.2rem; transition: background .4s ease; }
-.story-door:hover { background: rgba(255,255,255,0.03); }
+.story-door { padding: 1.6rem 1.4rem 2.2rem; background: rgba(5,5,6,0.55); backdrop-filter: blur(6px); transition: background .4s ease; }
+.story-door:hover { background: rgba(20,20,24,0.7); }
 @media (max-width: 1023px) { .story-doors { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
   .story-doors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -498,11 +494,29 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
   .story-door span:last-child { display: none; }
   .story-chapter-inner { gap: 1.1rem; padding-block: 5.5rem 2rem; }
 }
+/* Each chapter's painted scene: full bleed, darkened toward the text, drifting as the chapter runs. */
+.story-scene { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.story-scene img { object-position: 70% 50%; scale: calc(1.1 - var(--t) * 0.08); translate: calc((0.5 - var(--t)) * 2%) 0; filter: brightness(0.85) contrast(1.05); }
+.story-scene::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--bg) 0%, rgba(5,5,6,0.88) 26%, rgba(5,5,6,0.35) 58%, rgba(5,5,6,0.1) 100%), linear-gradient(0deg, var(--bg) 0%, transparent 22%, transparent 82%, rgba(5,5,6,0.6) 100%); }
+@media (max-width: 760px) { .story-scene::after { background: linear-gradient(0deg, var(--bg) 0%, rgba(5,5,6,0.82) 45%, rgba(5,5,6,0.45) 100%); } }
+@media (prefers-reduced-motion: reduce) { .story-scene img { scale: 1.02; translate: none; } }
+
+/* The peoples as glass monoliths, each holding its weather, its sigil afloat. */
+.story-monolith { position: relative; display: block; aspect-ratio: 1 / 3; max-height: 46svh; margin-inline: auto; }
+.story-monolith img { filter: drop-shadow(0 0 24px rgba(255,255,255,0.08)); transition: filter .5s ease; }
+.story-procession a:hover .story-monolith img, .story-procession a:focus-visible .story-monolith img { filter: drop-shadow(0 0 28px rgba(255,255,255,0.28)) brightness(1.1); }
+.story-monolith-sigil { position: absolute; left: 50%; top: 20%; translate: -50% 0; width: 62%; height: auto; padding: 10%; border-radius: 50%; background: radial-gradient(circle, rgba(5,5,6,0.88) 0 48%, rgba(5,5,6,0.5) 62%, transparent 72%); filter: drop-shadow(0 0 6px rgba(255,255,255,0.35)); }
+.story-procession li:has(.story-monolith) { width: clamp(5rem, 9vw, 8rem); }
+
 .story-planet { position: absolute; inset: 0; pointer-events: none; opacity: calc(0.22 - var(--sp, 0) * 0.12); filter: grayscale(0.7) brightness(0.6); translate: calc(var(--sp, 0) * 12%) 0; scale: calc(1 + var(--sp, 0) * 0.15); mask-image: linear-gradient(90deg, transparent 30%, #000 75%); }
 .world-story:not([data-live]) .story-planet { display: none; }
 
 /* ── Sub-page rooms (components/browse) ───────────────────────────────── */
-.group-hero-numeral { position: absolute; right: -0.04em; top: -0.32em; font-family: var(--font-display); font-weight: 300; font-size: clamp(7rem, 4rem + 14vw, 17rem); line-height: 1; color: transparent; -webkit-text-stroke: 1px hsl(var(--tint, 0 0% 100%) / 0.12); letter-spacing: -0.02em; pointer-events: none; user-select: none; }
+.group-hero-numeral { position: absolute; right: 0; top: -1.6rem; display: flex; align-items: flex-end; gap: 0.2rem; height: clamp(8rem, 4rem + 11vw, 15rem); pointer-events: none; user-select: none; opacity: 0.85; mask-image: linear-gradient(180deg, #000 50%, transparent 100%); }
+.group-hero-digit { height: 100%; width: auto; mix-blend-mode: screen; }
+.group-hero p.tracked { text-shadow: 0 0 6px var(--bg), 0 0 14px var(--bg); }
+.group-hero-sigil { width: clamp(2.6rem, 1.8rem + 2vw, 4.4rem); height: auto; filter: drop-shadow(0 0 10px rgba(255,255,255,0.35)); }
+@media (max-width: 640px) { .group-hero-numeral { opacity: 0.45; height: 8rem; } }
 .empty-room { background: repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 14px); }
 
 /* Environments: strata. Bands of slow weather; the hovered one opens. */
@@ -582,8 +596,13 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .carousel-portrait img { filter: grayscale(0.4) brightness(0.9); }
 .carousel-text { translate: calc(var(--off, 0) * -8%) 0; opacity: calc(1 - min(1, abs(var(--off, 0)) * 1.4)); }
 .carousel-empty { position: absolute; inset: 28% 22%; border: 1px dashed rgba(255,255,255,0.18); border-radius: 50%; }
-.carousel-btn { width: 2.75rem; height: 2.75rem; border: 1px solid rgba(255,255,255,0.25); color: #fff; transition: border-color .3s ease; }
-.carousel-btn:hover { border-color: #fff; }
+.carousel-btn { display: grid; place-items: center; width: 3rem; height: 3rem; color: #fff; opacity: 0.75; transition: opacity .3s ease, filter .3s ease; }
+.carousel-btn:hover, .carousel-btn:focus-visible { opacity: 1; filter: drop-shadow(0 0 8px rgba(255,255,255,0.6)); }
+.carousel-btn img { width: 100%; height: auto; }
+.carousel-homeland { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.carousel-homeland img { opacity: 0.32; filter: brightness(0.75); translate: calc(var(--off, 0) * -8%) 0; scale: 1.1; }
+.carousel-homeland::after { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 80% at 30% 50%, rgba(5,5,6,0.35), var(--bg) 95%); }
+.carousel-sigil { filter: drop-shadow(0 0 10px rgba(255,255,255,0.4)); }
 
 /* Characters: a mosaic of faces. */
 .mosaic { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1rem; }
@@ -689,3 +708,55 @@ a.tracklist-row:hover { background: rgba(255,255,255,0.03); }
 @keyframes rw-streak { from { opacity: 0; scale: 0.15 1; } 35% { opacity: 1; } to { opacity: 0.6; scale: 1 1; } }
 @keyframes rw-star { from { opacity: 0; scale: 0.3; } 30% { opacity: 1; scale: 1.25; } to { opacity: 0.55; scale: 1; } }
 @media (prefers-reduced-motion: reduce) { [data-reading] .rw-now::after, [data-reading] .rw-now::before { animation: none; } }
+
+/* A plate without its own art yet: one of the Unknowns, held back in the dark. */
+.plate-unknown img { filter: brightness(0.5) contrast(1.05); transition: filter .6s ease; }
+.plate:hover .plate-unknown img { filter: brightness(0.65); }
+
+/* World rooms, in their art. */
+.stratum-band { object-fit: cover; object-position: 50% 50%; opacity: 0.55; filter: brightness(0.8); transition: opacity .7s ease, scale 1.2s ease; pointer-events: none; }
+.stratum:hover .stratum-band, .stratum:focus-within .stratum-band { opacity: 0.85; scale: 1.03; }
+.stratum::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(5,5,6,0.88) 0%, rgba(5,5,6,0.45) 45%, transparent 85%); }
+.stratum-link { z-index: 1; }
+.survey-ground { object-fit: cover; opacity: 0.45; filter: brightness(0.75); pointer-events: none; }
+.ages-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.6rem; }
+.ages-panel { position: relative; aspect-ratio: 9 / 19; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); }
+.ages-panel img { filter: brightness(0.7); transition: filter .6s ease, scale 1.2s ease; }
+.ages-panel:hover img { filter: brightness(0.95); scale: 1.04; }
+.ages-panel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(5,5,6,0.9) 0%, transparent 55%); pointer-events: none; }
+.ages-label { position: absolute; left: 0.8rem; right: 0.8rem; bottom: 1rem; z-index: 1; }
+@media (max-width: 760px) { .ages-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.history-river { position: absolute; left: 50%; top: 0; height: 100%; width: auto; max-width: none; translate: -50% 0; opacity: 0.22; pointer-events: none; mask-image: linear-gradient(180deg, transparent, #000 10%, #000 90%, transparent); }
+@media (max-width: 1023px) { .history-river { left: 6px; opacity: 0.15; } }
+.blueprint-object { float: right; width: 7.5rem; height: auto; margin: 0 0 0.6rem 1rem; filter: drop-shadow(0 0 16px rgba(190,215,240,0.2)); transition: translate .6s ease, filter .6s ease; }
+.blueprint-card:hover .blueprint-object { translate: 0 -4px; filter: drop-shadow(0 0 22px rgba(190,215,240,0.4)); }
+.vitrine-glass { position: relative; aspect-ratio: 3 / 2; margin: 0 4%; }
+.vitrine-object { position: absolute; left: 50%; top: 46%; width: 34%; height: auto; translate: -50% -50%; filter: drop-shadow(0 0 18px rgba(255,255,255,0.25)); animation: vitrine-float 7s ease-in-out infinite alternate; }
+@keyframes vitrine-float { from { translate: -50% -52%; } to { translate: -50% -46%; } }
+.phenomenon { display: flex; flex-direction: column; justify-content: flex-end; min-height: 28rem; }
+/* The art fills the top of the card; the words sit beneath it. */
+.phenomenon-art { object-fit: contain; height: 62% !important; bottom: auto !important; padding: 1.5rem 1.5rem 0; opacity: 0.85; transition: scale 1.2s ease, opacity .6s ease; }
+.phenomenon:hover .phenomenon-art { scale: 1.05; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .vitrine-object { animation: none; } }
+
+/* A section's opening in its art (components/tide/SectionIntro). */
+.section-intro-art { min-height: min(62svh, 40rem); display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 2rem; }
+.section-backdrop { position: absolute; z-index: 0; top: calc(-2.5rem - 4px); bottom: -4rem; left: calc(-1 * var(--page-x)); width: 100vw; pointer-events: none; overflow: hidden; }
+.section-backdrop img { object-position: 75% 50%; filter: brightness(0.85); animation: backdrop-drift 40s ease-in-out infinite alternate; }
+.section-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--bg) 0%, rgba(5,5,6,0.82) 30%, rgba(5,5,6,0.25) 65%, rgba(5,5,6,0.05) 100%), linear-gradient(0deg, var(--bg) 0%, transparent 40%); }
+@keyframes backdrop-drift { from { scale: 1.02; } to { scale: 1.08; translate: -1% 0; } }
+@media (max-width: 760px) { .section-backdrop::after { background: linear-gradient(0deg, var(--bg) 5%, rgba(5,5,6,0.75) 50%, rgba(5,5,6,0.4) 100%); } }
+@media (prefers-reduced-motion: reduce) { .section-backdrop img { animation: none; } }
+.section-numerals { display: flex; align-items: flex-end; gap: 0.15rem; height: clamp(6rem, 3rem + 9vw, 12rem); flex-shrink: 0; }
+.section-numerals img { height: 100%; width: auto; mix-blend-mode: screen; }
+.folio-homeland { position: absolute; left: 0; right: 0; top: calc(var(--header-h) + 2.9rem); height: min(70svh, 44rem); overflow: hidden; pointer-events: none; z-index: 0; }
+.folio-homeland img { opacity: 0.4; filter: brightness(0.8); object-position: 50% 40%; }
+.folio-homeland::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--bg) 0%, rgba(5,5,6,0.55) 55%, rgba(5,5,6,0.35) 100%), linear-gradient(90deg, rgba(5,5,6,0.5), transparent 60%); }
+.folio-sigil { display: block; filter: drop-shadow(0 0 10px rgba(255,255,255,0.4)); }
+
+/* A novel as a glass volume holding its storm; the title written on the glass. */
+.cover-glass { isolation: isolate; background: none; box-shadow: none; padding: 2rem 1.6rem 3.2rem 2.4rem; }
+.cover-volume { object-fit: contain; z-index: -1; filter: brightness(0.75); transition: filter .5s ease; }
+.cover-glass:hover .cover-volume { filter: brightness(0.95) drop-shadow(0 0 20px rgba(255,255,255,0.15)); }
+.cover-glass .cover-title { position: relative; text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
+.cover-glass .cover-meta, .cover-glass .cover-rule { position: relative; }

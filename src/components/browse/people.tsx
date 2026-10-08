@@ -17,6 +17,7 @@ import { hrefFor, listRecords, type Listed } from "@/lib/domain/queries";
 import { renameWorld } from "@/lib/domain/world-name";
 import type { PublishedState } from "@/lib/domain/types";
 import { factionsOf, imageFor, isEnclave } from "@/lib/domain/views";
+import { arrival, homeland, peopleKey, peopleSigil } from "@/lib/art";
 import { HoverDecode, PeoplesCarousel, Tilt } from "./client";
 import { EmptyRoom } from "./GroupHero";
 
@@ -35,10 +36,12 @@ export function Peoples({ state, items }: { state: PublishedState; items: Items 
         title: renameWorld(p.title),
         epithet: isEnclave(p) ? "An enclave · arrived with the Drift" : (p.aliases?.[0] ?? null),
         summary: p.summary ? renameWorld(p.summary) : null,
-        portrait: imageFor(state, p.id),
+        portrait: imageFor(state, p.id) ?? (isEnclave(p) ? arrival(p.title) : null),
         palette: p.palette ?? null,
         factions: factionsOf(state, p.id).map((f) => renameWorld(f.record.title)),
         index: i + 1,
+        sigil: peopleSigil(isEnclave(p) ? "enclaves" : peopleKey(p.title)),
+        homeland: homeland(peopleKey(p.title)),
       }))}
     />
   );
@@ -76,7 +79,7 @@ export function Creatures({ state, items }: { state: PublishedState; items: Item
         <li key={c.id} className="bestiary">
           <Link href={href(state, c.id)} className="block no-underline">
             <div className="relative">
-              <Plate src={imageFor(state, c.id)} alt={c.title} seed={c.id} ratio="4 / 3" sizes="(min-width: 768px) 40rem, 90vw" />
+              <Plate src={imageFor(state, c.id)} alt={c.title} seed={c.id} ratio="4 / 3" unknownAs="creature" sizes="(min-width: 768px) 40rem, 90vw" />
               <span aria-hidden="true" className="bestiary-reticle" />
             </div>
             <div className="mt-5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-6">

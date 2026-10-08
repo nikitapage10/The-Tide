@@ -16,6 +16,7 @@ import type { PublishedState } from "@/lib/domain/types";
 import { consequences, places, timeline } from "@/lib/domain/views";
 import { Globe, type GlobePoint } from "./Globe";
 import { TimelineRiver } from "./TimelineRiver";
+import { ART } from "@/lib/art";
 
 export function WorldOverview({ state }: { state: PublishedState }) {
   const href = (id: string) => hrefFor(state.records[id]) ?? "/world";
@@ -27,6 +28,8 @@ export function WorldOverview({ state }: { state: PublishedState }) {
     <div data-section="world">
       <SectionIntro
         index="01"
+        numerals
+        backdrop={ART.heroes.world}
         eyebrow="The World"
         title={WORLD_NAME}
         size="xl"

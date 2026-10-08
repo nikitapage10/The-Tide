@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/States";
 import { listRecords } from "@/lib/domain/queries";
 import { STORY_FORMAT_GROUPS } from "@/lib/domain/sections";
 import { requirePageContext } from "@/lib/server/page-context";
+import { ART } from "@/lib/art";
 
 export const metadata = { title: "Stories" };
 
@@ -21,6 +22,8 @@ export default async function StoriesPage() {
     <div data-section="stories">
       <SectionIntro
         index="03"
+        numerals
+        backdrop={ART.backdrops.stories}
         eyebrow="Stories"
         title="The Library"
         lede={

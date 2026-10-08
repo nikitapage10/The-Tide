@@ -16,6 +16,7 @@ import { PEOPLE_KIND_GROUPS } from "@/lib/domain/sections";
 import type { PublishedState } from "@/lib/domain/types";
 import { enclaves, factionsOf, imageFor, ofKinds, peoples } from "@/lib/domain/views";
 import { Constellation } from "./Constellation";
+import { ART } from "@/lib/art";
 
 export function PeopleGallery({ state }: { state: PublishedState }) {
   const href = (id: string) => hrefFor(state.records[id]) ?? "/people";
@@ -30,6 +31,8 @@ export function PeopleGallery({ state }: { state: PublishedState }) {
     <div data-section="people">
       <SectionIntro
         index="02"
+        numerals
+        backdrop={ART.heroes.people}
         eyebrow="People"
         title="The Peoples"
         lede="Born of adaptation: forms merging flesh with stone, light with shadow, mechanism with life. Each remembers little of the world before."

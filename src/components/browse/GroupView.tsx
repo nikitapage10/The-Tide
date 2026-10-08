@@ -63,7 +63,7 @@ export function GroupView({ state, section, group }: { state: PublishedState; se
     const at = Object.keys(groups).indexOf(group) + 1;
     return (
       <div data-section={section} data-room={group}>
-        <GroupHero
+        <GroupHero room={group}
           section={section === "world" ? "The World" : "People"}
           sectionHref={`/${section}`}
           index={`${section === "world" ? "01" : "02"}.${pad(at)}`}
@@ -83,7 +83,7 @@ export function GroupView({ state, section, group }: { state: PublishedState; se
     const items = listRecords(state, "story").filter((s) => g.formats.includes(s.record.format));
     return (
       <div data-section="stories" data-room={group}>
-        <GroupHero section="The Library" sectionHref="/stories" index={`03.${pad(Object.keys(STORY_FORMAT_GROUPS).indexOf(group) + 1)}`} title={g.label} description={g.description} count={items.length} noun={["story", "stories"]} />
+        <GroupHero room={group} section="The Library" sectionHref="/stories" index={`03.${pad(Object.keys(STORY_FORMAT_GROUPS).indexOf(group) + 1)}`} title={g.label} description={g.description} count={items.length} noun={["story", "stories"]} />
         <View state={state} items={items} />
       </div>
     );
@@ -93,7 +93,7 @@ export function GroupView({ state, section, group }: { state: PublishedState; se
   const items = listRecords(state, "media").filter((m) => g.types.includes(m.record.mediaType));
   return (
     <div data-section="studio" data-room={group}>
-      <GroupHero
+      <GroupHero room={group}
         section="The Studio"
         sectionHref="/studio"
         index={`04.${pad(Object.keys(STUDIO_TYPE_GROUPS).indexOf(group) + 1)}`}

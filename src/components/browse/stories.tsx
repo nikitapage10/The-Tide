@@ -2,9 +2,10 @@
  * The Library's rooms:
  *  campaigns     → voyages: each a route through its sessions
  *  one-shots     → a fanned deck of cards
- *  novels        → covers that turn toward you
+ *  novels        → glass volumes that turn toward you
  *  short fiction → first lines, set large
  */
+import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { CanonMark } from "@/components/tide/CanonMark";
@@ -12,6 +13,7 @@ import { WorldText } from "@/components/tide/WorldText";
 import type { StoryRecord } from "@/lib/contract/schema";
 import { partsForStory, sessionsForStory, type Listed } from "@/lib/domain/queries";
 import { renameWorld } from "@/lib/domain/world-name";
+import { volume } from "@/lib/art";
 import type { PublishedState } from "@/lib/domain/types";
 import { Tilt } from "./client";
 import { EmptyRoom } from "./GroupHero";
@@ -93,8 +95,8 @@ export function Novels({ state, items }: { state: PublishedState; items: Items }
         return (
           <li key={s.id}>
             <Tilt className="cover-wrap">
-              <Link href={`/stories/${s.id}`} className="cover block no-underline">
-                <span aria-hidden="true" className="cover-spine" />
+              <Link href={`/stories/${s.id}`} className="cover cover-glass block no-underline">
+                <Image src={volume("novel")} alt="" fill sizes="(min-width: 1024px) 22vw, 45vw" className="cover-volume" />
                 <span className="cover-title t-display-m">{renameWorld(s.title)}</span>
                 <span aria-hidden="true" className="cover-rule" />
                 <span className="tracked cover-meta text-[0.54rem]">{parts.length ? `${parts.length} parts` : "unwritten"}</span>

@@ -12,6 +12,7 @@ import { STUDIO_TYPE_GROUPS } from "@/lib/domain/sections";
 import { isImageUrl, peoples } from "@/lib/domain/views";
 import { requirePageContext } from "@/lib/server/page-context";
 import { one, type SearchParams } from "@/lib/server/params";
+import { ART } from "@/lib/art";
 
 export const metadata = { title: "The Studio" };
 
@@ -41,7 +42,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Searc
   const palettes = peoples(state).filter((p) => p.record.palette);
   return (
     <div data-section="studio">
-      <SectionIntro index="04" eyebrow="Studio" title="The Studio" lede="Where the world gets its look and its sound: work pinned up from first sketch to framed final." />
+      <SectionIntro index="04" numerals backdrop={ART.backdrops.studio} eyebrow="Studio" title="The Studio" lede="Where the world gets its look and its sound: work pinned up from first sketch to framed final." />
 
       {/* The light table. */}
       <section aria-labelledby="table-h" className="mb-24">

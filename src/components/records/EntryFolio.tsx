@@ -25,6 +25,9 @@ import { renameWorld } from "@/lib/domain/world-name";
 import { ENTITY_KIND_LABEL } from "@/lib/domain/sections";
 import type { PublishedState, RecordState } from "@/lib/domain/types";
 import { belongings, factionsOf, imageFor, isEnclave, timeline } from "@/lib/domain/views";
+import { arrival, environmentBand, homeland, object, peopleKey, peopleSigil, phenomenon } from "@/lib/art";
+import { ArtSigil } from "@/components/tide/ArtSigil";
+import Image from "next/image";
 import type { AppContext } from "@/lib/server/context";
 import { Decode } from "@/components/glyphs/Decode";
 import { RefLink, RefList } from "./RefLink";
@@ -77,7 +80,10 @@ function Title({ r, className = "t-display-l" }: { r: EntityRecord; className?: 
 
 /** A people or an enclave: the folio. */
 function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRecord; section: "world" | "people" }) {
-  const portrait = imageFor(state, r.id);
+  const portrait = imageFor(state, r.id) ?? (isEnclave(r) ? arrival(r.title) : null);
+  const key = peopleKey(r.title);
+  const land = homeland(key);
+  const sigil = peopleSigil(isEnclave(r) ? "enclaves" : key);
   const { intro, sections } = splitBody(r.body);
   const factions = factionsOf(state, r.id).map((f) => f.record);
   const own = belongings(state, r.id).map((b) => b.record);
@@ -91,7 +97,13 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
   const href = (id: string) => hrefFor(state.records[id]) ?? "#";
   return (
     <>
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
+      {/* The homeland, wide across the top of the folio. */}
+      {land ? (
+        <div aria-hidden="true" className="folio-homeland">
+          <Image src={land} alt="" fill sizes="100vw" priority className="object-cover" />
+        </div>
+      ) : null}
+      <div className="relative grid gap-10 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
         {/* The portrait, held while the text scrolls. */}
         <div className="lg:sticky lg:top-[calc(var(--header-h)+5rem)] lg:self-start">
           <Plate src={portrait} alt={`${r.title}, portrait`} seed={r.id} palette={r.palette} sizes="(min-width: 1024px) 22rem, 90vw" priority />
@@ -101,6 +113,7 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
         </div>
         <div className="min-w-0">
           <Crumbs section={section} r={r} />
+          {sigil ? <ArtSigil src={sigil} size={80} className="folio-sigil mb-4" /> : null}
           <Title r={r} className="t-display-xl" />
           {r.aliases?.length ? <p className="tracked mt-4 text-[0.62rem] text-faint">{r.aliases.join(" · ")}</p> : null}
           {r.summary ? (
@@ -199,7 +212,17 @@ function Specimen({ state, r, section }: { state: PublishedState; r: EntityRecor
   const { intro, sections } = splitBody(r.body);
   const href = (id: string) => hrefFor(state.records[id]) ?? "#";
   const children = childrenOf(state, r.id).map((c) => c.record);
-  const image = imageFor(state, r.id, "hero") ?? imageFor(state, r.id);
+  // Without its own image, an entry takes its kind's art (a phenomenon's light, an object's glass, a land's band).
+  const image =
+    imageFor(state, r.id, "hero") ??
+    imageFor(state, r.id) ??
+    (r.kind === "phenomenon"
+      ? phenomenon(r.title)
+      : r.kind === "technology" || r.kind === "relic"
+        ? object(r.title, r.id, r.kind)
+        : r.kind === "environment"
+          ? environmentBand(r.title, r.id)
+          : null);
   const parent = r.parentId ? resolveRef(state, r.parentId) : null;
   // Before and after, on the timeline.
   const line = timeline(state);

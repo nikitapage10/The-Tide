@@ -1,14 +1,16 @@
 /**
  * The World's rooms, each built for what it holds:
- *  environments → strata (bands of weather you can open)
- *  places       → a survey (a radar field with callouts)
- *  history      → a spine drawn as you scroll, with a running year
- *  technology   → blueprints
- *  relics       → vitrines under moving light
- *  phenomena    → live particle fields
+ *  environments → strata (painted bands of weather you can open)
+ *  places       → a survey (a radar over the relief, with callouts)
+ *  history      → the six ages, then a spine over the river of time, drawn
+ *                 as you scroll, with a running year
+ *  technology   → blueprints, each with its glass object
+ *  relics       → crystal vitrines under moving light
+ *  phenomena    → their luminous images (live particle fields otherwise)
  *  workings     → a circuit of rules feeding each other
  *  concepts     → a glossary
  */
+import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { FxKind } from "@/components/home/CalloutFx";
@@ -18,6 +20,8 @@ import { CanonMark } from "@/components/tide/CanonMark";
 import { eraLabel } from "@/components/tide/EraBand";
 import { Plate } from "@/components/tide/Plate";
 import { WorldText } from "@/components/tide/WorldText";
+import { ArtSigil } from "@/components/tide/ArtSigil";
+import { AGES, ART, agePanel, ageSigil, environmentBand, object, phenomenon, type AgeArt } from "@/lib/art";
 import type { EntityRecord } from "@/lib/contract/schema";
 import { hrefFor, type Listed } from "@/lib/domain/queries";
 import { renameWorld } from "@/lib/domain/world-name";
@@ -38,9 +42,17 @@ export function Environments({ state, items }: { state: PublishedState; items: I
   if (!items.length)
     return (
       <div className="strata" aria-hidden="false">
-        {["Seas", "Deserts", "Forests", "The deep"].map((n, i) => (
+        {(
+          [
+            ["Seas", "sea"],
+            ["Deserts", "desert"],
+            ["Forests", "forest"],
+            ["The deep", "abyss"],
+          ] as const
+        ).map(([n, band], i) => (
           <div key={n} className="stratum stratum-empty" style={{ "--i": i } as CSSProperties}>
-            <span className="tracked text-[0.6rem] text-faint">{n} · uncharted</span>
+            <Image src={environmentBand(band, band)} alt="" fill sizes="100vw" className="stratum-band" />
+            <span className="tracked relative text-[0.6rem] text-faint">{n} · uncharted</span>
           </div>
         ))}
         <p className="mt-6 text-sm text-faint">No environments have been recorded yet. Biomes, seas and regions appear here as bands you can open.</p>
@@ -50,6 +62,7 @@ export function Environments({ state, items }: { state: PublishedState; items: I
     <ol className="strata">
       {items.map(({ record: r }, i) => (
         <li key={r.id} className="stratum" style={{ "--i": i } as CSSProperties}>
+          <Image src={imageFor(state, r.id, "hero") ?? environmentBand(r.title, r.id)} alt="" fill sizes="100vw" className="stratum-band" />
           <Link href={href(state, r.id)} className="stratum-link no-underline">
             <span className="font-[family-name:var(--font-mono)] text-[0.62rem] text-faint">{String(i + 1).padStart(2, "0")}</span>
             <span className="t-display-m text-text">
@@ -72,6 +85,7 @@ export function Places({ state, items: all }: { state: PublishedState; items: It
   return (
     <>
       <div className="survey relative hidden overflow-hidden md:block" aria-label="Survey of places">
+        <Image src={ART.survey} alt="" fill sizes="100vw" className="survey-ground" />
         <span aria-hidden="true" className="survey-sweep" />
         <span aria-hidden="true" className="survey-rings" />
         {items.map(({ record: r }, i) => {
@@ -123,7 +137,11 @@ export function History({ state, items }: { state: PublishedState; items: Items 
   });
   return (
     <>
-      <HistoryScroll items={dated.map(toItem)} />
+      <AgesStrip />
+      <div className="history-river-wrap relative">
+        <Image src={ART.river} alt="" width={600} height={1800} aria-hidden="true" className="history-river" />
+        <HistoryScroll items={dated.map(toItem)} />
+      </div>
       {undated.length ? (
         <section aria-labelledby="undated-h" className="mt-20 border-t border-white/10 pt-8">
           <h2 id="undated-h" className="tracked mb-6 text-[0.62rem] text-faint">
@@ -144,6 +162,26 @@ export function History({ state, items }: { state: PublishedState; items: Items 
   );
 }
 
+const AGE_NAMES: Record<AgeArt, string> = { shoreborn: "The Shoreborn", undertow: "The Undertow", veil: "The Veil", verdancy: "Verdancy", tide: "The Tide", today: "Today" };
+
+/** The six ages as tall panels, each a crop of the planet in its time, under its sigil. */
+function AgesStrip() {
+  return (
+    <ol className="ages-strip mb-20" aria-label="The ages">
+      {AGES.map((a, i) => (
+        <li key={a} className="ages-panel" style={{ "--i": i } as CSSProperties}>
+          <Image src={agePanel(a)} alt="" fill sizes="(min-width: 1024px) 15vw, 30vw" className="object-cover" />
+          <span className="ages-label">
+            <ArtSigil src={ageSigil(a)} size={44} className="mb-3" />
+            <span className="font-[family-name:var(--font-mono)] block text-[0.6rem] text-white/60">{["I", "II", "III", "IV", "V", "VI"][i]}</span>
+            <span className="tracked block text-[0.6rem] text-white">{AGE_NAMES[a]}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function Technology({ state, items }: { state: PublishedState; items: Items }) {
   if (!items.length) return <EmptyRoom>No technology has been recorded yet.</EmptyRoom>;
   return (
@@ -152,6 +190,7 @@ export function Technology({ state, items }: { state: PublishedState; items: Ite
         <li key={r.id}>
           <Link href={href(state, r.id)} className="blueprint-card group block no-underline">
             <span aria-hidden="true" className="blueprint-corners" />
+            <Image src={imageFor(state, r.id) ?? object(r.title, r.id, "technology")} alt="" width={320} height={320} className="blueprint-object" />
             <span className="flex items-baseline justify-between font-[family-name:var(--font-mono)] text-[0.62rem] text-faint">
               <span>FIG. {String(i + 1).padStart(2, "0")}</span>
               <span>{r.canonStatus.toUpperCase()}</span>
@@ -183,10 +222,20 @@ export function Relics({ state, items }: { state: PublishedState; items: Items }
         <li key={r.id} className="vitrine" style={{ "--i": i } as CSSProperties}>
           <Link href={href(state, r.id)} className="block no-underline">
             <span aria-hidden="true" className="vitrine-light" />
-            <div className="vitrine-case">
-              <Plate src={imageFor(state, r.id, "hero") ?? imageFor(state, r.id)} alt={r.title} seed={r.id} ratio="1 / 1" sizes="22rem" />
-            </div>
-            <span aria-hidden="true" className="vitrine-plinth" />
+            {imageFor(state, r.id, "hero") ?? imageFor(state, r.id) ? (
+              <>
+                <div className="vitrine-case">
+                  <Plate src={imageFor(state, r.id, "hero") ?? imageFor(state, r.id)} alt={r.title} seed={r.id} ratio="1 / 1" sizes="22rem" />
+                </div>
+                <span aria-hidden="true" className="vitrine-plinth" />
+              </>
+            ) : (
+              // No photograph yet: the relic's glass likeness, in the crystal case.
+              <div className="vitrine-glass">
+                <Image src={ART.vitrine} alt="" fill sizes="22rem" className="object-contain" />
+                <Image src={object(r.title, r.id, "relic")} alt="" width={240} height={240} className="vitrine-object" />
+              </div>
+            )}
             <span className="vitrine-plaque">
               <span className="t-title block text-text">
                 <WorldText text={r.title} />
@@ -223,7 +272,11 @@ export function Phenomena({ state, items }: { state: PublishedState; items: Item
       {items.map(({ record: r }) => (
         <li key={r.id} className="bg-bg">
           <Link href={href(state, r.id)} className="phenomenon group relative block overflow-hidden no-underline">
-            <LiveFx kind={fxFor(r.title)} scale={3} className="absolute left-1/2 top-[30%]" />
+            {phenomenon(r.title) ? (
+              <Image src={phenomenon(r.title)!} alt="" fill sizes="(min-width: 1024px) 33vw, 90vw" className="phenomenon-art" />
+            ) : (
+              <LiveFx kind={fxFor(r.title)} scale={3} className="absolute left-1/2 top-[30%]" />
+            )}
             <span className="relative z-[1] flex h-full flex-col justify-end p-6">
               <span className="tracked text-[0.56rem] text-faint">{eraLabel(r.era) ?? "phenomenon"}</span>
               <span className="t-display-m mt-2 block text-text group-hover:text-white">

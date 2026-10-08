@@ -11,6 +11,8 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Decode } from "@/components/glyphs/Decode";
 import { CalloutFx, type FxKind } from "@/components/home/CalloutFx";
 import { useScrollProgress } from "@/components/motion/useScrollProgress";
+import { ArtSigil } from "@/components/tide/ArtSigil";
+import { glyph } from "@/lib/art";
 
 /** Re-decodes its text each time it is hovered or focused (and once on arrival). */
 export function HoverDecode({ text, className = "" }: { text: string; className?: string }) {
@@ -151,6 +153,9 @@ export interface CarouselPeople {
   palette: string | null;
   factions: string[];
   index: number;
+  /** Art: the people's sigil, and its homeland to stand in. */
+  sigil?: string | null;
+  homeland?: string | null;
 }
 
 /** One people per screen, snapping sideways; the portrait drifts against the text. */
@@ -183,13 +188,19 @@ export function PeoplesCarousel({ peoples }: { peoples: CarouselPeople[] }) {
       <ol ref={strip} className="carousel-strip flex overflow-x-auto" aria-label="The peoples">
         {peoples.map((p) => (
           <li key={p.id} data-slide className="carousel-slide relative w-full shrink-0" style={(p.palette ? { "--plate-glow": p.palette } : {}) as CSSProperties}>
-            <div className="grid h-full items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+            {p.homeland ? (
+              <div aria-hidden="true" className="carousel-homeland">
+                <Image src={p.homeland} alt="" fill sizes="100vw" className="object-cover" />
+              </div>
+            ) : null}
+            <div className="relative grid h-full items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
               <div className="carousel-portrait relative mx-auto aspect-[3/4] w-full max-w-[26rem] overflow-hidden">
                 {p.portrait ? <Image src={p.portrait} alt={`${p.title}, portrait`} fill sizes="(min-width: 768px) 26rem, 80vw" className="object-cover" /> : <span className="carousel-empty" />}
                 <span aria-hidden="true" className="plate-glow" />
               </div>
               <div className="carousel-text min-w-0">
                 <p className="font-[family-name:var(--font-mono)] text-[0.7rem] text-faint">{String(p.index).padStart(2, "0")} / {String(peoples.length).padStart(2, "0")}</p>
+                {p.sigil ? <ArtSigil src={p.sigil} size={72} className="carousel-sigil mt-5" /> : null}
                 <h2 className="t-display-xl mt-3">{p.title}</h2>
                 {p.epithet ? <p className="tracked mt-3 text-[0.62rem] text-faint">{p.epithet}</p> : null}
                 {p.summary ? <p className="t-lede mt-6 max-w-xl">{p.summary}</p> : null}
@@ -218,10 +229,10 @@ export function PeoplesCarousel({ peoples }: { peoples: CarouselPeople[] }) {
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => go(-1)} className="carousel-btn" aria-label="Previous people">
-            ←
+            <Image src={glyph("arrow-left")} alt="" width={40} height={40} />
           </button>
           <button type="button" onClick={() => go(1)} className="carousel-btn" aria-label="Next people">
-            →
+            <Image src={glyph("arrow-right")} alt="" width={40} height={40} />
           </button>
         </div>
       </div>
