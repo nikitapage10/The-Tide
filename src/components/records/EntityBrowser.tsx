@@ -129,7 +129,7 @@ export function EntityBrowser({
         <EmptyState title={inSection.length ? "No entries match these filters." : "Nothing has been published here yet."}>
           {inSection.length
             ? "Try clearing a filter. Names are matched without accents or apostrophes, so “Teruanga” finds “Teruānga”."
-            : "Entries appear after a release that includes them is published from Space Pages."}
+            : "Entries appear after a release that includes them is published from its ChatGPT space."}
         </EmptyState>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

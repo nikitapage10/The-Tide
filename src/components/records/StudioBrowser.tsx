@@ -104,7 +104,7 @@ export function StudioBrowser({ state, types, filters, basePath }: { state: Publ
         {results.length} {results.length === 1 ? "item" : "items"}
       </h2>
       {results.length === 0 ? (
-        <EmptyState title={all.length ? "No items match these filters." : "Nothing has been published here yet."}>Studio items are published from Space Pages as links or private asset references.</EmptyState>
+        <EmptyState title={all.length ? "No items match these filters." : "Nothing has been published here yet."}>Studio items are published from the ChatGPT spaces as links or private asset references.</EmptyState>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {results.map(({ record: m, state: s }) => (

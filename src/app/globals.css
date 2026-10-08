@@ -404,3 +404,25 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .tide-callout-line { width: 3.5rem; }
 .tide-callout[data-canon="provisional"] .tide-callout-line { background: repeating-linear-gradient(90deg, rgba(255,255,255,.5) 0 4px, transparent 4px 7px); }
 .tide-callout[data-canon="unverified"] .tide-callout-line { background: repeating-linear-gradient(90deg, rgba(255,255,255,.5) 0 1px, transparent 1px 4px); }
+
+/* Timeline river (components/world/TimelineRiver). */
+.timeline-line { background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.28) 10%, rgba(255,255,255,0.28) 90%, rgba(255,255,255,0.05)); }
+.timeline-tick { border-left: 1px solid rgba(255,255,255,0.75); }
+.timeline-tick[data-certainty="dashed"] { border-left-style: dashed; }
+.timeline-tick[data-certainty="dotted"] { border-left-style: dotted; border-left-width: 2px; opacity: 0.8; }
+.timeline-river { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
+
+/* Constellation (components/people/Constellation). */
+.constellation-label { fill: rgba(236,236,238,0.55); font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.constellation-name { fill: #fff; font-family: var(--font-display); letter-spacing: 0.12em; }
+.constellation a:hover .constellation-label, .constellation a:focus-visible .constellation-label { fill: #fff; }
+@media (prefers-reduced-motion: no-preference) {
+  .star-halo { animation: star-breathe 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .star-faint { animation: star-twinkle 4.5s ease-in-out infinite; }
+}
+@keyframes star-breathe { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.25); opacity: 0.35; } }
+@keyframes star-twinkle { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.45; } }
+
+/* The gallery corridor (components/people/PeopleGallery). */
+.corridor { scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
+.corridor > li { scroll-snap-align: start; }

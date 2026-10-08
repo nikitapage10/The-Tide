@@ -14,7 +14,7 @@ export const FORMAT_LABEL: Record<StoryRecord["format"], string> = {
 export const CONTINUITY_LABEL = { shared_canon: "Shared canon", story_specific: "Story-specific continuity", unknown: "Continuity not stated" } as const;
 
 export function StoryList({ stories, empty }: { stories: Listed<StoryRecord>[]; empty: string }) {
-  if (!stories.length) return <EmptyState title={empty}>Stories appear after a release that includes them is published from Space Pages.</EmptyState>;
+  if (!stories.length) return <EmptyState title={empty}>Stories appear after a release that includes them is published from its ChatGPT space.</EmptyState>;
   return (
     <ul className="grid gap-3 md:grid-cols-2">
       {stories.map(({ record: s, state }) => (

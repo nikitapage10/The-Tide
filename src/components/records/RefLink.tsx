@@ -1,13 +1,14 @@
 import Link from "next/link";
 import type { ResolvedRef } from "@/lib/domain/queries";
 import { DemoBadge } from "@/components/ui/Badge";
+import { Redacted } from "@/components/tide/Redacted";
 import { LifecycleBadge } from "./Badges";
 
 /** Link to a stable ID that stays meaningful when the target is archived, removed or unknown. */
 export function RefLink({ r, showType = false }: { r: ResolvedRef; showType?: boolean }) {
   const label = (
     <>
-      {r.title}
+      <Redacted text={r.title} />
       {showType && r.type ? <span className="ml-1 text-xs text-faint">({r.type.replace("_", " ")})</span> : null}
     </>
   );

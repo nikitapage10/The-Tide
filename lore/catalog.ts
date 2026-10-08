@@ -554,3 +554,10 @@ export const QUESTIONS: QuestionEntry[] = [
     related: ["people/syntherion"],
   },
 ];
+
+/** Records from the first release that the documents have settled; archived (still readable). */
+export const ARCHIVE: { id: string; reason: string }[] = [
+  { id: "9a46b54a-e616-430f-a561-ca41b7aff4dc", reason: "Settled by Tide 101: the Undertow, then the Age of the Veil, then the Era of Verdancy and the Tide." },
+  { id: "e0610884-7454-47a3-bc06-821cdf136460", reason: "Settled by Tide 101: the Undertow, then the Age of the Veil, then the Era of Verdancy and the Tide." },
+  { id: "8fd756a2-5aa4-4522-b6c3-aad04214aa45", reason: "Settled by Tide 101: the Undertow, then the Age of the Veil, then the Era of Verdancy and the Tide." },
+];

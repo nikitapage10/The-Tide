@@ -90,7 +90,7 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
           {children}
         </main>
         <footer className="tracked page-mx flex flex-wrap justify-between gap-2 border-t border-white/10 py-6 text-[0.62rem] text-faint">
-          <span>Authored lore lives in Space Pages. This dashboard shows published releases only.</span>
+          <span>Lore is written in the ChatGPT spaces. This site shows published releases only.</span>
           <span>{mode === "demo" ? "Local demo · not production data" : canEdit ? `Signed in · ${actorLabel}` : "Public view · read-only"}</span>
         </footer>
       </div>

@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import ids from "../fixtures/ids.json";
 import seed from "../fixtures/publication/seed-release.json";
-import { ENTITIES, EXISTING, QUESTIONS, RELATIONS, SOURCES, type Body } from "../lore/catalog";
+import { ARCHIVE, ENTITIES, EXISTING, QUESTIONS, RELATIONS, SOURCES, type Body } from "../lore/catalog";
 import { recordId } from "../src/lib/contract/ids";
 import { parseBundleText } from "../src/lib/domain/publication";
 
@@ -200,6 +200,9 @@ for (const q of QUESTIONS) {
     },
   });
 }
+
+// Settled records from the first release.
+for (const a of ARCHIVE) operations.push({ op: "archive", targetId: a.id, reason: a.reason });
 
 const bundle = {
   schemaVersion: "tide.publication.v1",

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Decode } from "@/components/glyphs/Decode";
+import { redactPlain } from "@/lib/domain/redaction";
 
 export function PageHeader({
   eyebrow,
@@ -36,7 +37,7 @@ export function PageHeader({
       <div className="flex flex-wrap items-start justify-between gap-3">
         {/* Page titles arrive in the Tide's script and translate into English. */}
         <h1 className="text-3xl sm:text-4xl">
-          <Decode text={title} active delay={120} />
+          <Decode text={redactPlain(title)} active delay={120} />
         </h1>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
