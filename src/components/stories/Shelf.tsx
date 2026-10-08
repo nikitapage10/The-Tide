@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import type { StoryRecord } from "@/lib/contract/schema";
-import { redactPlain } from "@/lib/domain/redaction";
+import { renameWorld } from "@/lib/domain/world-name";
 
 const SHAPE: Record<StoryRecord["format"], { h: number; w: number; label: string }> = {
   novel: { h: 15.5, w: 3.4, label: "Novel" },
@@ -28,11 +28,11 @@ export function Shelf({ stories }: { stories: StoryRecord[] }) {
                 className="spine group relative flex flex-col items-center justify-between no-underline"
                 data-format={s.format}
                 style={{ height: `${shape.h + ((i * 7) % 3) * 0.5}rem`, width: `${shape.w}rem` }}
-                aria-label={`${redactPlain(s.title)}, ${shape.label.toLowerCase()}`}
+                aria-label={`${renameWorld(s.title)}, ${shape.label.toLowerCase()}`}
               >
                 <span aria-hidden="true" className="spine-band mt-3 h-px w-3/5" />
                 <span aria-hidden="true" className="spine-title">
-                  {redactPlain(s.title)}
+                  {renameWorld(s.title)}
                 </span>
                 <span aria-hidden="true" className="spine-band mb-3 h-px w-3/5" />
               </Link>

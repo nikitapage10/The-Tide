@@ -40,10 +40,18 @@ DOCS = {
 
 TOP = re.compile(
     r"^(origins\b|.*age of the abyssal veil$|(the )?impact of\b|.*\btoday\b|state of\b|anatomy$|behavior$|"
-    r"unique abilities$|reproduction$|habitat$|about$|history$|the return to primus)",
+    r"unique abilities$|reproduction$|habitat$|about$|history$|the return to\b)",
     re.I,
 )
 WHOLE_BOLD = re.compile(r"^\*{2,3}(.+?)\*{2,3}$")
+
+
+def rename_world(text: str) -> str:
+    """The world is Ilyr (Teruānga, "light that remains"); the documents still say Primus."""
+    text = re.sub(r'\\?\[Placeholder: The specific origin story of the name "Primus" requires further detail\.\\?\]', 'The name comes from the Teruānga for "light that remains."', text)
+    text = re.sub(r"\bPrimus(['’]s)\b", r"Ilyr\1", text)
+    text = re.sub(r"\bPrimus\b", "Ilyr", text)
+    return re.sub(r"\bPrimal\b", "Ilyrian", text)
 
 
 def convert(src: str, slug: str) -> None:
@@ -65,6 +73,7 @@ def convert(src: str, slug: str) -> None:
 
     md = md.replace("​", "").replace("﻿", "")
     md = re.sub(r"<img[^>]*>", "", md)
+    md = rename_world(md)
     lines = md.splitlines()
     out_lines = []
     title = None

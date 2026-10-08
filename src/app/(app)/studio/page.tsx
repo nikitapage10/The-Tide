@@ -3,7 +3,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { MEDIA_TYPE_LABEL } from "@/components/records/StudioBrowser";
 import { SectionIntro } from "@/components/tide/SectionIntro";
 import { Plate } from "@/components/tide/Plate";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import { ThemePlayer } from "@/components/studio/ThemePlayer";
 import { StudioBrowser } from "@/components/records/StudioBrowser";
 import { MEDIA_STAGES, type MediaRecord } from "@/lib/contract/schema";
@@ -72,7 +72,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Searc
                           caption={
                             <>
                               <span className="block text-sm text-text">
-                                <Redacted text={m.title} />
+                                <WorldText text={m.title} />
                               </span>
                               <span className="tracked text-[0.56rem] text-faint">
                                 {MEDIA_TYPE_LABEL[m.mediaType]}
@@ -109,7 +109,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Searc
               {music.map(({ record: m }) => (
                 <li key={m.id}>
                   <Link href={`/studio/item/${m.id}`} className="block border-t border-white/[0.07] py-3 text-text no-underline hover:text-white">
-                    <Redacted text={m.title} />
+                    <WorldText text={m.title} />
                     {m.demo ? <span className="ml-2 text-xs text-faint">demo</span> : null}
                   </Link>
                 </li>

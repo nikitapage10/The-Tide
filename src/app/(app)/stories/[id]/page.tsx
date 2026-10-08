@@ -8,12 +8,12 @@ import { ChecklistPanel } from "@/components/live/ChecklistPanel";
 import { GmNotesPanel } from "@/components/live/GmNotesPanel";
 import { Decode } from "@/components/glyphs/Decode";
 import { CanonMark } from "@/components/tide/CanonMark";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import { Badge } from "@/components/ui/Badge";
 import { Markdown } from "@/components/ui/Markdown";
 import { EmptyState, Notice } from "@/components/ui/States";
 import { mediaFor, partsForStory, relationsFor, resolveRef, sessionsForStory } from "@/lib/domain/queries";
-import { redactPlain } from "@/lib/domain/redaction";
+import { renameWorld } from "@/lib/domain/world-name";
 import { requirePageContext } from "@/lib/server/page-context";
 
 export default async function StoryPage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,11 +55,11 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
         </nav>
         <span aria-hidden="true" className="tint-rule mx-auto mb-10 block h-px w-16" />
         <h1 id="story-title" className="t-display-xl">
-          <Decode text={redactPlain(s.title)} active delay={120} />
+          <Decode text={renameWorld(s.title)} active delay={120} />
         </h1>
         {s.summary ? (
           <p className="t-lede mx-auto mt-8 max-w-xl">
-            <Redacted text={s.summary} />
+            <WorldText text={s.summary} />
           </p>
         ) : null}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
@@ -92,14 +92,14 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
                 <span className="toc-row">
                   <span className="font-[family-name:var(--font-mono)] text-[0.62rem] text-faint">{String(p.sequence ?? i + 1).padStart(2, "0")}</span>
                   <span className="t-title text-text">
-                    <Redacted text={p.title} />
+                    <WorldText text={p.title} />
                   </span>
                   <span aria-hidden="true" className="toc-fill" />
                   <span className="tracked text-[0.56rem] text-faint">{p.partType}</span>
                 </span>
                 {p.summary ? (
                   <p className="mt-1 pl-8 font-[family-name:var(--font-display)] italic text-muted">
-                    <Redacted text={p.summary} />
+                    <WorldText text={p.summary} />
                   </p>
                 ) : null}
                 <div className="mt-1 flex flex-wrap gap-1.5 pl-8">
@@ -142,7 +142,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
                       <span aria-hidden="true" className={`relative z-[1] mb-4 block h-3.5 w-3.5 rounded-full border ${done ? "border-white bg-white" : "border-white/70 bg-bg"}`} />
                       <span className="block font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">Port {String(x.sequence ?? i + 1).padStart(2, "0")}</span>
                       <Link href={`/stories/sessions/${x.id}`} className="t-title block text-text">
-                        <Redacted text={x.title} />
+                        <WorldText text={x.title} />
                       </Link>
                       <span className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-muted">
                         <Badge tone="info">{(live?.status ?? "planned").replace("_", " ")}</Badge>

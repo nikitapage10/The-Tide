@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Decode, decodeMs } from "@/components/glyphs/Decode";
-import { redactPlain } from "@/lib/domain/redaction";
+import { renameWorld } from "@/lib/domain/world-name";
 
 export function Callout({
   title,
@@ -44,7 +44,7 @@ export function Callout({
     return () => io.disconnect();
   }, []);
   const placed = x !== undefined && y !== undefined;
-  const t = redactPlain(title);
+  const t = renameWorld(title);
   const label = (
     <>
       <span className="tracked block text-white">
@@ -52,7 +52,7 @@ export function Callout({
       </span>
       {sub ? (
         <span className="tracked block text-[0.66rem] leading-5 text-muted">
-          <Decode text={redactPlain(sub)} active={on} delay={delay + decodeMs(t) * 0.5} />
+          <Decode text={renameWorld(sub)} active={on} delay={delay + decodeMs(t) * 0.5} />
         </span>
       ) : null}
     </>

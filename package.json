@@ -2,7 +2,7 @@
   "name": "the-tide",
   "version": "0.1.0",
   "private": true,
-  "description": "The Tide \u2014 private worldbuilding and tabletop campaign dashboard for Primus.",
+  "description": "The Tide \u2014 private worldbuilding and tabletop campaign dashboard for Ilyr.",
   "engines": {
     "node": ">=20.9.0"
   },

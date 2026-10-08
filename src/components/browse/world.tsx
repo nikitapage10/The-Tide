@@ -17,10 +17,10 @@ import { Callout } from "@/components/tide/Callout";
 import { CanonMark } from "@/components/tide/CanonMark";
 import { eraLabel } from "@/components/tide/EraBand";
 import { Plate } from "@/components/tide/Plate";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import type { EntityRecord } from "@/lib/contract/schema";
 import { hrefFor, type Listed } from "@/lib/domain/queries";
-import { redactPlain } from "@/lib/domain/redaction";
+import { renameWorld } from "@/lib/domain/world-name";
 import type { PublishedState } from "@/lib/domain/types";
 import { imageFor } from "@/lib/domain/views";
 import { HistoryScroll, HoverDecode, LiveFx, type HistoryItem } from "./client";
@@ -53,10 +53,10 @@ export function Environments({ state, items }: { state: PublishedState; items: I
           <Link href={href(state, r.id)} className="stratum-link no-underline">
             <span className="font-[family-name:var(--font-mono)] text-[0.62rem] text-faint">{String(i + 1).padStart(2, "0")}</span>
             <span className="t-display-m text-text">
-              <Redacted text={r.title} />
+              <WorldText text={r.title} />
             </span>
             <span className="stratum-summary text-sm text-muted">
-              <Redacted text={r.summary} />
+              <WorldText text={r.summary} />
             </span>
           </Link>
         </li>
@@ -92,10 +92,10 @@ export function Places({ state, items: all }: { state: PublishedState; items: It
             <Link href={href(state, r.id)} className="group block border-t border-white/[0.08] py-4 no-underline">
               <span className="tracked block text-[0.56rem] text-faint">{parentTitle(state, r) ?? "The world"}</span>
               <span className="t-title mt-1 block text-text group-hover:text-white">
-                <Redacted text={r.title} />
+                <WorldText text={r.title} />
               </span>
               <span className="mt-1 line-clamp-2 block text-sm text-muted">
-                <Redacted text={r.summary} />
+                <WorldText text={r.summary} />
               </span>
             </Link>
           </li>
@@ -112,8 +112,8 @@ export function History({ state, items }: { state: PublishedState; items: Items 
   const toItem = ({ record: r }: Listed<EntityRecord>): HistoryItem => ({
     id: r.id,
     href: href(state, r.id),
-    title: redactPlain(r.title),
-    summary: r.summary ? redactPlain(r.summary) : null,
+    title: renameWorld(r.title),
+    summary: r.summary ? renameWorld(r.summary) : null,
     label: r.chronology?.label ?? null,
     era: r.era ?? null,
     eraLabel: eraLabel(r.era),
@@ -133,7 +133,7 @@ export function History({ state, items }: { state: PublishedState; items: Items 
             {undated.map(({ record: r }) => (
               <li key={r.id}>
                 <Link href={href(state, r.id)} className="block border-t border-white/[0.08] py-4 text-text no-underline hover:text-white">
-                  <Redacted text={r.title} />
+                  <WorldText text={r.title} />
                 </Link>
               </li>
             ))}
@@ -157,10 +157,10 @@ export function Technology({ state, items }: { state: PublishedState; items: Ite
               <span>{r.canonStatus.toUpperCase()}</span>
             </span>
             <span className="t-display-m mt-6 block text-text group-hover:text-white">
-              <Redacted text={r.title} />
+              <WorldText text={r.title} />
             </span>
             <span className="mt-3 block text-sm leading-relaxed text-muted">
-              <Redacted text={r.summary} />
+              <WorldText text={r.summary} />
             </span>
             <dl className="mt-6 grid grid-cols-[6rem_1fr] gap-y-1 border-t border-dashed border-white/15 pt-4 font-[family-name:var(--font-mono)] text-[0.64rem]">
               <dt className="text-faint">MAKERS</dt>
@@ -189,10 +189,10 @@ export function Relics({ state, items }: { state: PublishedState; items: Items }
             <span aria-hidden="true" className="vitrine-plinth" />
             <span className="vitrine-plaque">
               <span className="t-title block text-text">
-                <Redacted text={r.title} />
+                <WorldText text={r.title} />
               </span>
               <span className="mt-1 block text-xs text-muted">
-                <Redacted text={r.summary} />
+                <WorldText text={r.summary} />
               </span>
             </span>
           </Link>
@@ -227,10 +227,10 @@ export function Phenomena({ state, items }: { state: PublishedState; items: Item
             <span className="relative z-[1] flex h-full flex-col justify-end p-6">
               <span className="tracked text-[0.56rem] text-faint">{eraLabel(r.era) ?? "phenomenon"}</span>
               <span className="t-display-m mt-2 block text-text group-hover:text-white">
-                <Redacted text={r.title} />
+                <WorldText text={r.title} />
               </span>
               <span className="mt-2 line-clamp-2 block text-sm text-muted">
-                <Redacted text={r.summary} />
+                <WorldText text={r.summary} />
               </span>
             </span>
           </Link>
@@ -251,11 +251,11 @@ export function Workings({ state, items }: { state: PublishedState; items: Items
             <span aria-hidden="true" className="circuit-pulse" />
             <span className="font-[family-name:var(--font-mono)] text-[0.62rem] text-faint">RULE {String(i + 1).padStart(2, "0")}</span>
             <span className="t-display-m mt-2 block text-text group-hover:text-white">
-              <Redacted text={r.title} />
+              <WorldText text={r.title} />
             </span>
             {r.aliases?.length ? <span className="tracked mt-1 block text-[0.56rem] text-faint">{r.aliases.join(" · ")}</span> : null}
             <span className="mt-3 block text-sm leading-relaxed text-muted">
-              <Redacted text={r.summary} />
+              <WorldText text={r.summary} />
             </span>
           </Link>
         </li>
@@ -268,7 +268,7 @@ export function Concepts({ state, items }: { state: PublishedState; items: Items
   if (!items.length) return <EmptyRoom>No terms have been recorded yet.</EmptyRoom>;
   const groups = new Map<string, Items>();
   for (const it of items) {
-    const letter = redactPlain(it.record.title).replace(/^(the|a|an)\s+/i, "").normalize("NFKD").charAt(0).toUpperCase();
+    const letter = renameWorld(it.record.title).replace(/^(the|a|an)\s+/i, "").normalize("NFKD").charAt(0).toUpperCase();
     const k = /[A-Z]/.test(letter) ? letter : "#";
     groups.set(k, [...(groups.get(k) ?? []), it]);
   }
@@ -284,12 +284,12 @@ export function Concepts({ state, items }: { state: PublishedState; items: Items
                 <div key={r.id}>
                   <dt>
                     <Link href={href(state, r.id)} className="t-title text-text no-underline hover:text-white">
-                      <HoverDecode text={redactPlain(r.title)} />
+                      <HoverDecode text={renameWorld(r.title)} />
                     </Link>
                     {r.aliases?.length ? <span className="ml-3 font-[family-name:var(--font-display)] italic text-faint">{r.aliases.join(", ")}</span> : null}
                   </dt>
                   <dd className="mt-1 text-sm leading-relaxed text-muted">
-                    <Redacted text={r.summary} />
+                    <WorldText text={r.summary} />
                     <CanonMark status={r.canonStatus} className="ml-2" />
                   </dd>
                 </div>

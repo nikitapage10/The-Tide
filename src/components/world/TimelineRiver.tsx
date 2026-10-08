@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { CanonMark } from "@/components/tide/CanonMark";
 import { ERA_INFO } from "@/components/tide/EraBand";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import type { TimelineEntry } from "@/lib/domain/views";
 
 const CERTAIN: Record<string, string> = { confirmed: "solid", approximate: "dashed", uncertain: "dotted", unknown: "dotted" };
@@ -30,12 +30,12 @@ export function TimelineRiver({ entries, hrefOf }: { entries: TimelineEntry[]; h
                   <Link href={hrefOf(e.id)} className="group block no-underline">
                     <span className="block font-[family-name:var(--font-mono)] text-[0.6rem] tracking-[0.12em] text-faint">{e.label}</span>
                     <span className="t-title mt-1 block text-[1.08rem] text-text group-hover:text-white">
-                      <Redacted text={e.title} />
+                      <WorldText text={e.title} />
                     </span>
                     {e.people ? <span className="tracked mt-1 block text-[0.56rem] text-faint">{e.people}</span> : null}
                     {e.summary ? (
                       <span className="mt-2 line-clamp-3 block text-[0.82rem] leading-snug text-muted">
-                        <Redacted text={e.summary} />
+                        <WorldText text={e.summary} />
                       </span>
                     ) : null}
                     <CanonMark status={e.canon} className="mt-2" />

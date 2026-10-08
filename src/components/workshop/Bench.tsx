@@ -9,7 +9,7 @@ import Link from "next/link";
 import { PrintCard } from "@/components/live/PrintCard";
 import { Reveal } from "@/components/motion/Reveal";
 import { RefLink } from "@/components/records/RefLink";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import { Badge, DemoBadge } from "@/components/ui/Badge";
 import { Markdown } from "@/components/ui/Markdown";
 import { EmptyState } from "@/components/ui/States";
@@ -212,11 +212,11 @@ export async function Bench({ ctx }: { ctx: AppContext }) {
             {questions.map(({ record: q }) => (
               <li key={q.id} className="border-l border-warn/50 pl-4">
                 <h3 className="t-title">
-                  <Redacted text={q.title} />
+                  <WorldText text={q.title} />
                 </h3>
                 {q.summary ? (
                   <p className="mt-1 text-sm text-muted">
-                    <Redacted text={q.summary} />
+                    <WorldText text={q.summary} />
                   </p>
                 ) : null}
                 {q.body ? (

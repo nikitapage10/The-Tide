@@ -8,7 +8,8 @@
  * - `body` is either literal Markdown or a reference to a document (and
  *   optionally one section of it), copied verbatim.
  * - Summaries are short and quiet; the documents hold the detail.
- * - The world's name stays in the text as written; the site redacts it.
+ * - The world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for "light that
+ *   remains"; adjective Ilyrian. (Primus was its working name.)
  */
 import type { CanonStatus, EntityKind, Era, Visibility } from "../src/lib/contract/schema";
 
@@ -92,9 +93,9 @@ export const ENTITIES: EntityEntry[] = [
   {
     name: "world/primus",
     kind: "place",
-    title: "Primus",
+    title: "Ilyr",
     aliases: ["Earth"],
-    summary: "The world of The Tide: Earth, long after, renamed by those who came after. Its name is kept back for now.",
+    summary: "The world of The Tide: Earth, long after. Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for \u201clight that remains\u201d.",
     body: P("tide-101", "Terminology"),
     era: "today",
     tags: ["the world"],
@@ -135,7 +136,7 @@ export const ENTITIES: EntityEntry[] = [
     title: "The Undertow",
     summary: "The first great cataclysm: about nine months of upheaval that drowned coastlines, bent gravity and ended the Shoreborn.",
     body:
-      "The singular cataclysm, circa 2102 B.U., that ended the Shoreborn civilization. For about nine months the planet convulsed: extreme geological upheaval, unprecedented atmospheric phenomena, gravitational anomalies and minor incursions of energies from beyond known reality. Coastlines were redrawn, most of the population perished, and the survivors were irrevocably altered, the beginning of the Primal races.\n\nEach people remembers it differently: the Veigrstorm of the Nyth'rok, the eruptions that buried the Obscarron, the surge that dragged the Teruānga into the abyss, the Song of Unmaking of the Resonara, and the shattering of the moon that made the Umbrasa.",
+      "The singular cataclysm, circa 2102 B.U., that ended the Shoreborn civilization. For about nine months the planet convulsed: extreme geological upheaval, unprecedented atmospheric phenomena, gravitational anomalies and minor incursions of energies from beyond known reality. Coastlines were redrawn, most of the population perished, and the survivors were irrevocably altered, the beginning of the Ilyrian races.\n\nEach people remembers it differently: the Veigrstorm of the Nyth'rok, the eruptions that buried the Obscarron, the surge that dragged the Teruānga into the abyss, the Song of Unmaking of the Resonara, and the shattering of the moon that made the Umbrasa.",
     era: "undertow",
     chronology: { label: "~2102 B.U.", certainty: "approximate", sortKey: 2102 },
     tags: ["cataclysm"],
@@ -235,7 +236,7 @@ export const ENTITIES: EntityEntry[] = [
     title: "The Divergence",
     summary: "The second Consequence: latent powers wake. Gravity, time, matter, minds and energy answer new masters.",
     body:
-      "A poorly understood event, perhaps a wave of cosmic energy or a shift in underlying reality, that unlocked latent potential within the Primal races. It amplified existing traits or granted new abilities tied to fundamental forces (gravity, entropy, quantum effects, electromagnetism), and with them rapid shifts of power and new elites, like the Geomagnus.\n\nThe Nyth'rok gained three branches of quantum power; the Obscarron, magnetism and geothermal force; the Teruānga, pressure and the heat of the deep; the Umbrasa, mass itself; the Resonara, waves of sound, light and thought.",
+      "A poorly understood event, perhaps a wave of cosmic energy or a shift in underlying reality, that unlocked latent potential within the Ilyrian races. It amplified existing traits or granted new abilities tied to fundamental forces (gravity, entropy, quantum effects, electromagnetism), and with them rapid shifts of power and new elites, like the Geomagnus.\n\nThe Nyth'rok gained three branches of quantum power; the Obscarron, magnetism and geothermal force; the Teruānga, pressure and the heat of the deep; the Umbrasa, mass itself; the Resonara, waves of sound, light and thought.",
     era: "tide",
     chronology: { label: "the Tide", certainty: "uncertain", sortKey: 5802 },
     parent: "phenomenon/the-tide",
@@ -427,7 +428,7 @@ export const ENTITIES: EntityEntry[] = [
   { name: "institution/gravitar", kind: "institution", title: "The Gravitar", summary: "Couriers who cross between the moon's shards, trailing light.", parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
   { name: "place/primordial-aukar", kind: "place", title: "The Primordial Aukar", summary: "A small black hole born in the Undertow, holding the moon's fragments in a long, distorted pendant.", body: P("umbrasa", "Origins and Early Evolution (Post-Undertow)"), era: "undertow", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
   { name: "place/lunar-shards", kind: "place", title: "The Lunar Shards", summary: "The broken moon, settled by the Umbrasa through the Age of the Veil.", body: P("umbrasa", "The Age of the Abyssal Veil"), parent: "place/primordial-aukar", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
-  { name: "event/the-return", kind: "event", title: "The Return", summary: "Umbrasa star-barges reach the world's mountain plateaus; the locals name them Laughing Shadows.", body: P("umbrasa", "The Return to Primus (Era of Verdancy)"), era: "verdancy", chronology: { label: "the Era of Verdancy", certainty: "uncertain", sortKey: 3200 }, parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
+  { name: "event/the-return", kind: "event", title: "The Return", summary: "Umbrasa star-barges reach the world's mountain plateaus; the locals name them Laughing Shadows.", body: P("umbrasa", "The Return to Ilyr (Era of Verdancy)"), era: "verdancy", chronology: { label: "the Era of Verdancy", certainty: "uncertain", sortKey: 3200 }, parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
   { name: "technology/helio-regulator", kind: "technology", title: "Helio-Regulator mantles", summary: "Fungal mantles that make helium, so the Umbrasa can live in the world's air.", parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
 
   // ── Resonara ─────────────────────────────────────────────────────────────
@@ -489,8 +490,8 @@ export const QUESTIONS: QuestionEntry[] = [
   {
     name: "question/world-name",
     title: "The world's name",
-    summary: "“Primus” is the working name in every document; the final name is still to be chosen, so the site keeps it redacted.",
-    status: "open",
+    summary: "Settled: the world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for “light that remains”; adjective Ilyrian. The documents' working name was replaced throughout.",
+    status: "resolved",
     related: ["world/primus"],
   },
   {

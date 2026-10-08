@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { CanonMark } from "@/components/tide/CanonMark";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import { SectionIntro } from "@/components/tide/SectionIntro";
 import { Shelf } from "@/components/stories/Shelf";
 import { EmptyState } from "@/components/ui/States";
@@ -64,14 +64,14 @@ export default async function StoriesPage() {
                             <Link href={`/stories/${s.id}`} className="group block border-t border-white/[0.08] py-4 no-underline">
                               <span className="toc-row">
                                 <span className="t-title text-text group-hover:text-white">
-                                  <Redacted text={s.title} />
+                                  <WorldText text={s.title} />
                                 </span>
                                 <span aria-hidden="true" className="toc-fill" />
                                 <span className="font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">{s.demo ? "demo" : (s.draftStatus ?? "").replace("_", " ")}</span>
                               </span>
                               {s.summary ? (
                                 <span className="mt-1 block font-[family-name:var(--font-display)] text-[1.02rem] italic text-muted">
-                                  <Redacted text={s.summary} />
+                                  <WorldText text={s.summary} />
                                 </span>
                               ) : null}
                               <CanonMark status={s.canonStatus} className="mt-2" />

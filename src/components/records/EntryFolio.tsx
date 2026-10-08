@@ -14,14 +14,14 @@ import { CanonMark } from "@/components/tide/CanonMark";
 import { ConsequenceSigil } from "@/components/tide/ConsequenceSigil";
 import { EraBand, eraLabel } from "@/components/tide/EraBand";
 import { Plate } from "@/components/tide/Plate";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import { SectionRail } from "@/components/tide/SectionRail";
 import { Markdown } from "@/components/ui/Markdown";
 import { Notice } from "@/components/ui/States";
 import type { EntityRecord } from "@/lib/contract/schema";
 import { splitBody } from "@/lib/domain/body-sections";
 import { backlinksFor, childrenOf, hrefFor, listRecords, relationsFor, resolveRef } from "@/lib/domain/queries";
-import { redactPlain } from "@/lib/domain/redaction";
+import { renameWorld } from "@/lib/domain/world-name";
 import { ENTITY_KIND_LABEL } from "@/lib/domain/sections";
 import type { PublishedState, RecordState } from "@/lib/domain/types";
 import { belongings, factionsOf, imageFor, isEnclave, timeline } from "@/lib/domain/views";
@@ -70,7 +70,7 @@ function Crumbs({ section, r }: { section: "world" | "people"; r: EntityRecord }
 function Title({ r, className = "t-display-l" }: { r: EntityRecord; className?: string }) {
   return (
     <h1 id="entry-title" className={className}>
-      <Decode text={redactPlain(r.title)} active delay={120} />
+      <Decode text={renameWorld(r.title)} active delay={120} />
     </h1>
   );
 }
@@ -105,7 +105,7 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
           {r.aliases?.length ? <p className="tracked mt-4 text-[0.62rem] text-faint">{r.aliases.join(" · ")}</p> : null}
           {r.summary ? (
             <p className="t-lede mt-6 max-w-2xl">
-              <Redacted text={r.summary} />
+              <WorldText text={r.summary} />
             </p>
           ) : null}
           <div className="mt-6 flex flex-wrap items-center gap-6">
@@ -129,7 +129,7 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
               <Reveal as="div" className="mb-6 flex items-center gap-4">
                 {s.key === "consequences" ? <ConsequenceSigil kind="divergence" size={22} className="text-white/50" /> : <span aria-hidden="true" className="tint-rule h-px w-10" />}
                 <h2 id={`${s.id}-h`} className="t-display-m">
-                  <Redacted text={s.title} />
+                  <WorldText text={s.title} />
                 </h2>
               </Reveal>
               <div className="reading">
@@ -148,11 +148,11 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
                   <li key={f.id}>
                     <Link href={href(f.id)} className="group block border-t border-white/15 pt-4 no-underline">
                       <span className="t-title block text-text group-hover:text-white">
-                        <Redacted text={f.title} />
+                        <WorldText text={f.title} />
                       </span>
                       {f.aliases?.[0] ? <span className="tracked block text-[0.56rem] text-faint">{f.aliases[0]}</span> : null}
                       <span className="mt-2 block text-sm leading-relaxed text-muted">
-                        <Redacted text={f.summary} />
+                        <WorldText text={f.summary} />
                       </span>
                     </Link>
                   </li>
@@ -176,7 +176,7 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
                         <Link href={href(m.id)} className="group block border-t border-white/[0.07] py-3 no-underline">
                           <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-faint">{m.label}</span>
                           <span className="block text-text group-hover:text-white">
-                            <Redacted text={m.title} />
+                            <WorldText text={m.title} />
                           </span>
                         </Link>
                       </li>
@@ -217,7 +217,7 @@ function Specimen({ state, r, section }: { state: PublishedState; r: EntityRecor
           {r.aliases?.length ? <p className="tracked mt-4 text-[0.62rem] text-faint">Also: {r.aliases.join(" · ")}</p> : null}
           {r.summary ? (
             <p className="t-lede mt-6 max-w-2xl">
-              <Redacted text={r.summary} />
+              <WorldText text={r.summary} />
             </p>
           ) : null}
           <div className="mt-6 flex flex-wrap items-center gap-6">
@@ -254,7 +254,7 @@ function Specimen({ state, r, section }: { state: PublishedState; r: EntityRecor
               {sections.map((s) => (
                 <section key={s.id} id={s.id} aria-labelledby={`${s.id}-h`} className="mt-12 scroll-mt-32">
                   <h2 id={`${s.id}-h`} className="t-display-m mb-5">
-                    <Redacted text={s.title} />
+                    <WorldText text={s.title} />
                   </h2>
                   <div className="reading">
                     <Markdown>{s.markdown}</Markdown>
@@ -282,7 +282,7 @@ function Specimen({ state, r, section }: { state: PublishedState; r: EntityRecor
                 <Link href={href(before.id)} className="block border-t border-white/[0.07] py-3 no-underline">
                   <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-faint">Before · {before.label}</span>
                   <span className="text-text">
-                    <Redacted text={before.title} />
+                    <WorldText text={before.title} />
                   </span>
                 </Link>
               ) : null}
@@ -290,7 +290,7 @@ function Specimen({ state, r, section }: { state: PublishedState; r: EntityRecor
                 <Link href={href(after.id)} className="block border-t border-white/[0.07] py-3 no-underline">
                   <span className="block font-[family-name:var(--font-mono)] text-[0.58rem] text-faint">After · {after.label}</span>
                   <span className="text-text">
-                    <Redacted text={after.title} />
+                    <WorldText text={after.title} />
                   </span>
                 </Link>
               ) : null}
@@ -312,11 +312,11 @@ function SmallList({ title, items, href }: { title: string; items: EntityRecord[
           <li key={p.id}>
             <Link href={href(p.id)} className="group block border-t border-white/[0.07] py-3 no-underline">
               <span className="block text-text group-hover:text-white">
-                <Redacted text={p.title} />
+                <WorldText text={p.title} />
               </span>
               {p.summary ? (
                 <span className="line-clamp-2 block text-xs text-faint">
-                  <Redacted text={p.summary} />
+                  <WorldText text={p.summary} />
                 </span>
               ) : null}
             </Link>
@@ -377,10 +377,10 @@ async function Ledger({ ctx, state, r }: { ctx: AppContext; state: PublishedStat
               {questions.map((q) => (
                 <li key={q.record.id} className="border-l border-warn/50 pl-3">
                   <span className="block text-text">
-                    <Redacted text={q.record.title} />
+                    <WorldText text={q.record.title} />
                   </span>
                   <span className="text-xs text-muted">
-                    <Redacted text={q.record.summary} />
+                    <WorldText text={q.record.summary} />
                   </span>
                 </li>
               ))}

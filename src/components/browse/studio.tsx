@@ -13,7 +13,7 @@ import type { CSSProperties } from "react";
 import { TideGlyph } from "@/components/glyphs/TideScript";
 import { ThemePlayer } from "@/components/studio/ThemePlayer";
 import { Plate } from "@/components/tide/Plate";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import type { MediaRecord } from "@/lib/contract/schema";
 import type { Listed } from "@/lib/domain/queries";
 import type { PublishedState } from "@/lib/domain/types";
@@ -47,7 +47,7 @@ export function Music({ items }: { state: PublishedState; items: Items }) {
             <Link href={`/studio/item/${m.id}`} className="tracklist-row group no-underline">
               <span className="font-[family-name:var(--font-mono)] text-[0.66rem] text-faint">{String(i + 2).padStart(2, "0")}</span>
               <span className="t-title text-text group-hover:text-white">
-                <Redacted text={m.title} />
+                <WorldText text={m.title} />
               </span>
               <span className="tracked text-[0.54rem] text-faint">{m.demo ? "demo" : STAGE[m.stage]}</span>
             </Link>
@@ -74,7 +74,7 @@ export function Artwork({ items }: { state: PublishedState; items: Items }) {
             caption={
               <span className="flex items-baseline justify-between gap-3">
                 <span className="text-sm text-text">
-                  <Redacted text={m.title} />
+                  <WorldText text={m.title} />
                 </span>
                 <span className="tracked text-[0.54rem] text-faint">{STAGE[m.stage]}</span>
               </span>
@@ -113,7 +113,7 @@ export function Elements({ items }: { state: PublishedState; items: Items }) {
               <span>{STAGE[m.stage]}</span>
             </span>
             <span className="mt-1 block text-sm text-text">
-              <Redacted text={m.title} />
+              <WorldText text={m.title} />
             </span>
           </Link>
         </li>
@@ -138,7 +138,7 @@ export function Aesthetics({ items }: { state: PublishedState; items: Items }) {
             sizes="20rem"
             caption={
               <span className="text-xs text-muted">
-                <Redacted text={m.title} />
+                <WorldText text={m.title} />
               </span>
             }
           />
@@ -174,7 +174,7 @@ export function Branding({ items }: { state: PublishedState; items: Items }) {
             {items.map(({ record: m }) => (
               <li key={m.id}>
                 <Link href={`/studio/item/${m.id}`} className="block border-t border-white/[0.08] py-3 text-text no-underline hover:text-white">
-                  <Redacted text={m.title} />
+                  <WorldText text={m.title} />
                   <span className="tracked ml-2 text-[0.54rem] text-faint">{STAGE[m.stage]}</span>
                 </Link>
               </li>
@@ -197,10 +197,10 @@ export function Other({ items }: { state: PublishedState; items: Items }) {
           <Link href={`/studio/item/${m.id}`} className="block no-underline">
             <span className="font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">FILE {String(i + 1).padStart(3, "0")}</span>
             <span className="t-title mt-2 block text-text">
-              <Redacted text={m.title} />
+              <WorldText text={m.title} />
             </span>
             <span className="mt-1 block text-sm text-muted">
-              <Redacted text={m.summary} />
+              <WorldText text={m.summary} />
             </span>
           </Link>
         </li>

@@ -370,12 +370,6 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 /* Drift (components/motion/Drift): slow parallax against the scroll. */
 .drift > * { translate: 0 calc((0.5 - var(--drift, 0.5)) * var(--drift-amount, 6%)); }
 
-/* The withheld world name (components/tide/WorldName). */
-.world-name { display: inline-flex; vertical-align: -0.12em; }
-.world-name-cells { display: inline-flex; gap: 0.08em; --glyph-w: 0.78em; --glyph-h: 1em; opacity: 0.85; }
-.world-name-cell { display: inline-flex; animation: world-name-turn 0.5s ease both; }
-@keyframes world-name-turn { from { opacity: 0.2; filter: blur(1px); } to { opacity: 1; filter: none; } }
-
 /* Canon, drawn (components/tide/CanonMark). */
 .canon-rule { display: inline-block; width: 1.6rem; border-top: 1px solid rgba(255,255,255,0.55); }
 [data-canon="provisional"] .canon-rule { border-top-style: dashed; }

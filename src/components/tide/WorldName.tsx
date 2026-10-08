@@ -1,39 +1,16 @@
 "use client";
 /**
- * The withheld world name: a few cells of the Tide's script that keep turning
- * over, slowly, and never settle into English. Same width every time (it does
- * not give away the name's length). Screen readers hear "redacted".
+ * The world's name, arriving the way names do on this site: in the Tide's
+ * script first, then resolving into English. Ilyr, from the Teruānga for
+ * "light that remains".
  */
-import { useEffect, useState } from "react";
-import { TideGlyph } from "@/components/glyphs/TideScript";
-
-const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const CELLS = 5;
-const rnd = (a: number, b: number) => (((a * 2654435761) ^ (b * 2246822519)) >>> 0) / 4294967296;
+import { Decode } from "@/components/glyphs/Decode";
+import { WORLD_NAME, WORLD_NAME_MEANING, WORLD_NAME_PRONUNCIATION } from "@/lib/domain/world-name";
 
 export function WorldName({ className = "" }: { className?: string }) {
-  const [t, setT] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // One cell turns over at a time, unhurried.
-    const id = window.setInterval(() => setT((v) => v + 1), 700);
-    return () => window.clearInterval(id);
-  }, []);
   return (
-    <span className={`world-name ${className}`} title="The world's name is withheld">
-      <span className="sr-only">[redacted]</span>
-      <span aria-hidden="true" className="world-name-cells">
-        {Array.from({ length: CELLS }, (_, i) => {
-          // Each cell changes on its own beat.
-          const beat = Math.floor((t + i * 3) / (CELLS + 1 + (i % 3)));
-          const ch = CHARS[Math.floor(rnd(i + 1, beat + 7) * CHARS.length)]!;
-          return (
-            <span key={`${i}-${beat}`} className="world-name-cell">
-              <TideGlyph ch={ch} />
-            </span>
-          );
-        })}
-      </span>
+    <span className={`world-name-text ${className}`} title={`${WORLD_NAME} (${WORLD_NAME_PRONUNCIATION}): “${WORLD_NAME_MEANING}”`}>
+      <Decode text={WORLD_NAME} active delay={300} />
     </span>
   );
 }

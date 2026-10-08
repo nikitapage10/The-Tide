@@ -12,13 +12,13 @@ Despite the challenges posed by their new reality, the inhabitants of the Norman
 
 ## History
 
-In the wake of The Tide, as Primus staggered to comprehend the breadth of its upheaval, one of the most intriguing Enclaves emerged: The Normandy Enclave.
+In the wake of The Tide, as Ilyr staggered to comprehend the breadth of its upheaval, one of the most intriguing Enclaves emerged: The Normandy Enclave.
 
 It was a cool, moonlit night when the echoes of gunfire and the thunderous roar of engines disrupted the serenity of a quiet shoreline. Along the coast, where the waves lapped against the sand with rhythmic persistence, a rift in space-time tore open, unleashing a torrent of chaos and confusion onto the once tranquil beach. Soldiers, weary and disoriented, stumbled through the rift, their uniforms tattered and their faces etched with shock and disbelief.
 
 These were the brave souls of the Battle of Normandy, plucked from the annals of history and thrust into the bewildering embrace of a world they could scarcely comprehend. Among them were American GIs and German Wehrmacht soldiers, their enmity momentarily forgotten in the face of this new and incomprehensible reality.
 
-As they gathered on the shore, surrounded by the remnants of their shattered past, they found themselves confronted not only by the unfamiliar landscape of Primus but also by the myriad dangers that lurked within it. Strange creatures, born of The Tide's transformative energies, prowled the shadows, their eyes glinting with predatory hunger. For the soldiers of Normandy, survival became their immediate and singular focus, as they struggled to make sense of their newfound existence in a world teetering on the brink of chaos.
+As they gathered on the shore, surrounded by the remnants of their shattered past, they found themselves confronted not only by the unfamiliar landscape of Ilyr but also by the myriad dangers that lurked within it. Strange creatures, born of The Tide's transformative energies, prowled the shadows, their eyes glinting with predatory hunger. For the soldiers of Normandy, survival became their immediate and singular focus, as they struggled to make sense of their newfound existence in a world teetering on the brink of chaos.
 
 In the days that followed, the Normandy Enclave took shape amidst the wreckage of their former lives. Drawing upon the skills and camaraderie forged in the crucible of war, the inhabitants of this makeshift settlement banded together, determined to carve out a place for themselves in this alien landscape.
 
@@ -28,4 +28,4 @@ Yet, even as they sought to rebuild their lives, the specter of their shared his
 
 But despite the challenges they faced, the people of the Normandy Enclave refused to surrender to despair. United by their shared struggle and fueled by the hope of a brighter tomorrow, they stood as a testament to the indomitable spirit of humanity, defiant in the face of adversity.
 
-And so, as the moon rose high above the shores of Primus, casting its silver light upon the world below, the Normandy Enclave endured, a beacon of resilience amidst the tumultuous sea of uncertainty that surrounded them. In the heart of this new world, where the echoes of the past mingled with the promise of the future, they stood as living testament to the enduring power of the human spirit.
+And so, as the moon rose high above the shores of Ilyr, casting its silver light upon the world below, the Normandy Enclave endured, a beacon of resilience amidst the tumultuous sea of uncertainty that surrounded them. In the heart of this new world, where the echoes of the past mingled with the promise of the future, they stood as living testament to the enduring power of the human spirit.

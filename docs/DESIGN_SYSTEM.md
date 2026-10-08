@@ -33,7 +33,7 @@ This document is the design schema for everything on the site: the principles, t
    | Studio | light table | pinned work in stages, from loose inspiration to framed finals |
    | Workshop | workbench | tools on the wall, the press, machines and their queues (GM only) |
 
-6. **The name is withheld.** The world's name (and "Primal") is never shown. It is drawn as a cipher of glyphs that keep turning and never resolve (`WorldName`). The source text keeps the real words; set `NEXT_PUBLIC_TIDE_REVEAL_WORLD_NAME=true` to lift the redaction.
+6. **The name is Ilyr.** The world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for "light that remains"; the adjective is Ilyrian. `WorldName` shows it decoding out of the script, with the pronunciation and meaning as its tooltip. The old working name ("Primus", "Primal") is replaced with Ilyr/Ilyrian wherever it still turns up.
 
 ## Tokens (`src/app/globals.css`)
 
@@ -84,7 +84,7 @@ Everything honours `prefers-reduced-motion` (it shows at once, with no movement)
 | Component | Use |
 | --- | --- |
 | `Callout` | The universal annotation: a ringed point, a hairline leader, a decoding label. Place it on maps, plates and timelines (`x`, `y` in %), or inline. Its leader is drawn by canon status. |
-| `WorldName`, `Redacted` | The withheld name as a cipher. Wrap any title, summary or label that may contain it in `Redacted`; `Markdown` does this automatically. |
+| `WorldName`, `WorldText` | The world's name, decoding from the script. `WorldText` renders any title, summary or label with the old working name replaced by Ilyr; `Markdown` does this automatically. |
 | `CanonMark` | A short rule drawn by canon status (solid, dashed, dotted). |
 | `EraBand` | The long history in one strip, with the current era lit. |
 | `ConsequenceSigil` | The marks of the Drowning, the Divergence and the Drift. |
@@ -94,7 +94,7 @@ Everything honours `prefers-reduced-motion` (it shows at once, with no movement)
 These are reused from before:
 - `Decode` and `TideGlyph` (the script)
 - `PageHeader`
-- `Markdown`, which is sanitised and redacts the name
+- `Markdown`, which is sanitised and renames the old working name to Ilyr
 - `SmokyButton`
 - `ProceduralMark`
 - the hero (`HeroScene`, `HeroDrifters`) and its sound (`heroSound`)
@@ -109,7 +109,7 @@ These are reused from before:
 
 ## Accessibility and performance
 
-- Every decoded label has its English text for screen readers. The cipher reads "redacted".
+- Every decoded label has its English text for screen readers; the world's name reads "Ilyr".
 - Motion is decorative only: nothing important is conveyed by movement alone.
 - WebGL stays on the home page. Other sections use CSS, SVG and small canvases, and pause when off-screen.
 - Pages keep a 16px minimum gutter and never scroll sideways at phone width.

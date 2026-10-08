@@ -8,10 +8,10 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { CanonMark } from "@/components/tide/CanonMark";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import type { StoryRecord } from "@/lib/contract/schema";
 import { partsForStory, sessionsForStory, type Listed } from "@/lib/domain/queries";
-import { redactPlain } from "@/lib/domain/redaction";
+import { renameWorld } from "@/lib/domain/world-name";
 import type { PublishedState } from "@/lib/domain/types";
 import { Tilt } from "./client";
 import { EmptyRoom } from "./GroupHero";
@@ -28,10 +28,10 @@ export function Campaigns({ state, items }: { state: PublishedState; items: Item
           <li key={s.id} className="voyage">
             <Link href={`/stories/${s.id}`} className="group block no-underline">
               <span className="t-display-l block text-text group-hover:text-white">
-                <Redacted text={s.title} />
+                <WorldText text={s.title} />
               </span>
               <span className="t-lede mt-3 block max-w-2xl">
-                <Redacted text={s.summary} />
+                <WorldText text={s.summary} />
               </span>
             </Link>
             <div className="-mx-1 mt-10 overflow-x-auto px-1 pb-2">
@@ -46,7 +46,7 @@ export function Campaigns({ state, items }: { state: PublishedState; items: Item
                       <Link href={`/stories/sessions/${x.id}`} className="mt-3 block no-underline">
                         <span className="block font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">PORT {String(x.sequence ?? i + 1).padStart(2, "0")}</span>
                         <span className="t-title block text-text">
-                          <Redacted text={x.title} />
+                          <WorldText text={x.title} />
                         </span>
                       </Link>
                     </li>
@@ -72,10 +72,10 @@ export function OneShots({ items }: { state: PublishedState; items: Items }) {
           <Link href={`/stories/${s.id}`} className="deck-face group block h-full no-underline">
             <span className="font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">ONE-SHOT · {String(i + 1).padStart(2, "0")}</span>
             <span className="t-display-m mt-auto block text-text">
-              <Redacted text={s.title} />
+              <WorldText text={s.title} />
             </span>
             <span className="mt-3 block text-sm text-muted">
-              <Redacted text={s.summary} />
+              <WorldText text={s.summary} />
             </span>
           </Link>
         </li>
@@ -95,13 +95,13 @@ export function Novels({ state, items }: { state: PublishedState; items: Items }
             <Tilt className="cover-wrap">
               <Link href={`/stories/${s.id}`} className="cover block no-underline">
                 <span aria-hidden="true" className="cover-spine" />
-                <span className="cover-title t-display-m">{redactPlain(s.title)}</span>
+                <span className="cover-title t-display-m">{renameWorld(s.title)}</span>
                 <span aria-hidden="true" className="cover-rule" />
                 <span className="tracked cover-meta text-[0.54rem]">{parts.length ? `${parts.length} parts` : "unwritten"}</span>
               </Link>
             </Tilt>
             <p className="mt-5 text-sm text-muted">
-              <Redacted text={s.summary} />
+              <WorldText text={s.summary} />
             </p>
             <CanonMark status={s.canonStatus} className="mt-2" />
           </li>
@@ -131,12 +131,12 @@ export function ShortFiction({ items }: { state: PublishedState; items: Items })
             <Link href={`/stories/${s.id}`} className="group block border-t border-white/10 py-12 no-underline">
               {line ? (
                 <span className="first-line block">
-                  &ldquo;<Redacted text={line} />&rdquo;
+                  &ldquo;<WorldText text={line} />&rdquo;
                 </span>
               ) : null}
               <span className="tracked mt-6 flex items-center gap-4 text-[0.6rem] text-faint group-hover:text-white">
                 <span aria-hidden="true" className="h-px w-10 bg-white/30" />
-                <Redacted text={s.title} />
+                <WorldText text={s.title} />
                 {s.demo ? <span>· demo</span> : null}
               </span>
             </Link>

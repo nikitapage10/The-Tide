@@ -16,7 +16,7 @@ test("home tells the story of the world; the workshop shows the bench and unreso
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "The Tide" })).toBeVisible();
   await expect(page.getByText("Echoes through the void.").first()).toBeAttached();
-  // The seven chapters of the story, each a heading; the world's name withheld.
+  // The seven chapters of the story, each a heading; the world is Ilyr, never the working name.
   for (const chapter of ["Arrival", "Before", "The Veil", "Verdancy", "The Tide", "The Peoples", "Enter"]) {
     await expect(page.getByRole("heading", { level: 2, name: new RegExp(`${chapter}$`) })).toBeAttached();
   }
@@ -58,9 +58,9 @@ test("filters and two-way relationship navigation", async ({ page }) => {
   await page.goto("/people?tag=the+eight+peoples");
   await expect(page.getByRole("heading", { name: "8 entries matching filters" })).toBeVisible();
   await page.getByRole("link", { name: "Nyth'rok" }).first().click();
-  // The world itself, its name withheld.
-  await page.getByRole("link", { name: "[redacted]" }).first().click();
-  await expect(page.getByRole("heading", { level: 1, name: "[redacted]" })).toBeVisible();
+  // The world itself: Ilyr.
+  await page.getByRole("link", { name: "Ilyr", exact: true }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Ilyr" })).toBeVisible();
   const peoples = page.getByRole("definition").filter({ has: page.getByRole("link", { name: "Umbrasa" }) });
   await expect(peoples.getByRole("link")).toHaveCount(8);
   await page.goto("/world?canon=demo&status=all");
@@ -95,9 +95,9 @@ test("session live state, checklist and GM notes work and appear on the bench", 
   await expect(page.getByText("E2E private note")).toHaveCount(0);
 });
 
-test("each section is its own instrument, accessible, with the world's name withheld", async ({ page }) => {
+test("each section is its own instrument, accessible, with the world named Ilyr", async ({ page }) => {
   const rooms: [string, string][] = [
-    ["/world", "The World"],
+    ["/world", "Ilyr"],
     ["/people", "The Peoples"],
     ["/stories", "The Library"],
     ["/studio", "The Studio"],

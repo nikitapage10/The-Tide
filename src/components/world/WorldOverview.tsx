@@ -7,9 +7,9 @@ import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { ConsequenceSigil } from "@/components/tide/ConsequenceSigil";
 import { EraBand } from "@/components/tide/EraBand";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import { SectionIntro } from "@/components/tide/SectionIntro";
-import { WorldName } from "@/components/tide/WorldName";
+import { WORLD_NAME, WORLD_NAME_MEANING, WORLD_NAME_PRONUNCIATION } from "@/lib/domain/world-name";
 import { hrefFor, listRecords } from "@/lib/domain/queries";
 import { WORLD_KIND_GROUPS } from "@/lib/domain/sections";
 import type { PublishedState } from "@/lib/domain/types";
@@ -28,14 +28,20 @@ export function WorldOverview({ state }: { state: PublishedState }) {
       <SectionIntro
         index="01"
         eyebrow="The World"
-        title="The World"
+        title={WORLD_NAME}
+        size="xl"
         lede={
           <>
-            <WorldName />: the world long after, remade twice. Drowned coasts and mountains adrift; the ruins of the Shoreborn under new
-            peoples&rsquo; cities; rifts that wash in fragments of elsewhere.
+            The world long after, remade twice. Drowned coasts and mountains adrift; the ruins of the Shoreborn under new peoples&rsquo; cities;
+            rifts that wash in fragments of elsewhere.
           </>
         }
       >
+        <p className="tracked flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.62rem] text-faint">
+          <span>{WORLD_NAME_PRONUNCIATION}</span>
+          <span aria-hidden="true" className="tint-rule h-px w-8" />
+          <span>Teruānga: &ldquo;{WORLD_NAME_MEANING}&rdquo;</span>
+        </p>
         <EraBand className="pt-4" />
       </SectionIntro>
 
@@ -90,7 +96,7 @@ export function WorldOverview({ state }: { state: PublishedState }) {
                     </span>
                     <span className="t-display-m mt-6 block text-text">{entry.record.title}</span>
                     <span className="mt-3 block text-sm leading-relaxed text-muted">
-                      <Redacted text={entry.record.summary} />
+                      <WorldText text={entry.record.summary} />
                     </span>
                   </Link>
                 </li>
@@ -137,11 +143,11 @@ function PlaceList({ items, href }: { items: { id: string; title: string; summar
             <span aria-hidden="true" className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full border border-white/60 group-hover:border-white" data-canon={p.canonStatus} />
             <span className="min-w-0">
               <span className="block text-text group-hover:text-white">
-                <Redacted text={p.title} />
+                <WorldText text={p.title} />
               </span>
               {p.summary ? (
                 <span className="line-clamp-1 block text-xs text-faint">
-                  <Redacted text={p.summary} />
+                  <WorldText text={p.summary} />
                 </span>
               ) : null}
             </span>

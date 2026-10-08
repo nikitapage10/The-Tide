@@ -83,14 +83,14 @@ Records that existed before this scheme keep their IDs: the eight peoples, the D
 
 **Images.** GPT Actions can't upload files, so a `media` record points at a `url`. That is either an `https://` address, or a path to an image shipped with the site (`/lore/peoples/teruanga.webp`). Portraits from documents are extracted by `scripts/build-lore-docs.py`.
 
-## Audiences and the withheld name
+## Audiences and the world's name
 
 - **Who sees what.** Each record's `visibility` decides who sees it once tiered viewing is on (`TIDE_PUBLIC_SCOPE=tiered`):
   - `gm_only` is for the GM alone.
   - `player_safe` adds signed-in players (project members with role `player`).
   - `public` adds everyone.
   - Until tiered viewing is on, the project's open preview shows visitors everything published, read-only, as before.
-- **The withheld name.** Write the world's name as it is. The site withholds "Primus" and "Primal" everywhere and draws them as a cipher. When the name is chosen, update the texts and set `NEXT_PUBLIC_TIDE_REVEAL_WORLD_NAME=true`.
+- **The world's name.** The world is **Ilyr** (ih-LEER, /ɪˈliːr/), from the Teruānga for "light that remains"; the adjective is **Ilyrian**. Write it that way. Any leftover "Primus"/"Primal" (the old working name) is shown as Ilyr/Ilyrian automatically.
 
 ## Rebuilding the seed from the Word documents
 

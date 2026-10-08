@@ -8,7 +8,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { CanonMark } from "@/components/tide/CanonMark";
 import { ConsequenceSigil } from "@/components/tide/ConsequenceSigil";
 import { Plate } from "@/components/tide/Plate";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import { SectionIntro } from "@/components/tide/SectionIntro";
 import type { EntityRecord } from "@/lib/contract/schema";
 import { hrefFor, listRecords } from "@/lib/domain/queries";
@@ -78,10 +78,10 @@ export function PeopleGallery({ state }: { state: PublishedState }) {
               <li key={e.id}>
                 <Link href={href(e.id)} className="group block border-t border-white/15 pt-4 no-underline">
                   <span className="t-title block text-text group-hover:text-white">
-                    <Redacted text={e.title} />
+                    <WorldText text={e.title} />
                   </span>
                   <span className="mt-2 block text-sm leading-relaxed text-muted">
-                    <Redacted text={e.summary} />
+                    <WorldText text={e.summary} />
                   </span>
                   <CanonMark status={e.canonStatus} className="mt-3" />
                 </Link>
@@ -119,7 +119,7 @@ export function PeopleGallery({ state }: { state: PublishedState }) {
                   caption={
                     <>
                       <span className="block text-sm text-text">
-                        <Redacted text={c.title} />
+                        <WorldText text={c.title} />
                       </span>
                       <span className="tracked text-[0.56rem] text-faint">{c.kind}</span>
                     </>
@@ -160,13 +160,13 @@ function PlateCaption({ p, n }: { p: EntityRecord; n: number }) {
     <span className="block">
       <span className="flex items-baseline justify-between gap-3">
         <span className="t-title text-text">
-          <Redacted text={p.title} />
+          <WorldText text={p.title} />
         </span>
         <span className="font-[family-name:var(--font-mono)] text-[0.6rem] text-faint">{String(n).padStart(2, "0")}</span>
       </span>
       {p.aliases?.[0] ? <span className="tracked block text-[0.56rem] text-faint">{p.aliases[0]}</span> : null}
       <span className="mt-2 line-clamp-3 block text-[0.82rem] leading-snug text-muted">
-        <Redacted text={p.summary} />
+        <WorldText text={p.summary} />
       </span>
       <CanonMark status={p.canonStatus} className="mt-2" />
     </span>

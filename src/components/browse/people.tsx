@@ -11,10 +11,10 @@ import type { CSSProperties } from "react";
 import { Constellation } from "@/components/people/Constellation";
 import { CanonMark } from "@/components/tide/CanonMark";
 import { Plate } from "@/components/tide/Plate";
-import { Redacted } from "@/components/tide/Redacted";
+import { WorldText } from "@/components/tide/WorldText";
 import type { EntityRecord } from "@/lib/contract/schema";
 import { hrefFor, listRecords, type Listed } from "@/lib/domain/queries";
-import { redactPlain } from "@/lib/domain/redaction";
+import { renameWorld } from "@/lib/domain/world-name";
 import type { PublishedState } from "@/lib/domain/types";
 import { factionsOf, imageFor, isEnclave } from "@/lib/domain/views";
 import { HoverDecode, PeoplesCarousel, Tilt } from "./client";
@@ -32,12 +32,12 @@ export function Peoples({ state, items }: { state: PublishedState; items: Items 
       peoples={ordered.map(({ record: p }, i) => ({
         id: p.id,
         href: href(state, p.id),
-        title: redactPlain(p.title),
+        title: renameWorld(p.title),
         epithet: isEnclave(p) ? "An enclave · arrived with the Drift" : (p.aliases?.[0] ?? null),
-        summary: p.summary ? redactPlain(p.summary) : null,
+        summary: p.summary ? renameWorld(p.summary) : null,
         portrait: imageFor(state, p.id),
         palette: p.palette ?? null,
-        factions: factionsOf(state, p.id).map((f) => redactPlain(f.record.title)),
+        factions: factionsOf(state, p.id).map((f) => renameWorld(f.record.title)),
         index: i + 1,
       }))}
     />
@@ -53,8 +53,8 @@ export function Characters({ state, items }: { state: PublishedState; items: Ite
           <Link href={href(state, c.id)} className="mosaic-tile group block no-underline">
             <Plate src={imageFor(state, c.id)} alt={c.title} seed={c.id} ratio={i % 5 === 0 ? "4 / 3" : "3 / 4"} sizes="24rem" palette={c.palette} />
             <span className="mosaic-name">
-              <HoverDecode text={redactPlain(c.title)} className="t-title text-white" />
-              {c.parentId ? <span className="tracked block text-[0.54rem] text-faint">{redactPlain(titleOf(state, c.parentId))}</span> : null}
+              <HoverDecode text={renameWorld(c.title)} className="t-title text-white" />
+              {c.parentId ? <span className="tracked block text-[0.54rem] text-faint">{renameWorld(titleOf(state, c.parentId))}</span> : null}
             </span>
           </Link>
         </li>
@@ -83,10 +83,10 @@ export function Creatures({ state, items }: { state: PublishedState; items: Item
               <span className="font-[family-name:var(--font-mono)] text-[0.62rem] text-faint">SPECIMEN {String(i + 1).padStart(3, "0")}</span>
               <span>
                 <span className="t-display-m block text-text">
-                  <Redacted text={c.title} />
+                  <WorldText text={c.title} />
                 </span>
                 <span className="mt-2 block text-sm text-muted">
-                  <Redacted text={c.summary} />
+                  <WorldText text={c.summary} />
                 </span>
                 <CanonMark status={c.canonStatus} showLabel className="mt-3" />
               </span>
@@ -124,11 +124,11 @@ export function Factions({ state, items }: { state: PublishedState; items: Items
                 <li key={f.id}>
                   <Link href={href(state, f.id)} className="banner group block no-underline">
                     <span className="t-title block text-text group-hover:text-white">
-                      <Redacted text={f.title} />
+                      <WorldText text={f.title} />
                     </span>
                     {f.aliases?.[0] ? <span className="tracked block text-[0.54rem] text-faint">{f.aliases[0]}</span> : null}
                     <span className="mt-2 block text-sm text-muted">
-                      <Redacted text={f.summary} />
+                      <WorldText text={f.summary} />
                     </span>
                   </Link>
                 </li>
@@ -144,10 +144,10 @@ export function Factions({ state, items }: { state: PublishedState; items: Items
                 <li key={f.id}>
                   <Link href={href(state, f.id)} className="banner group block no-underline">
                     <span className="t-title block text-text">
-                      <Redacted text={f.title} />
+                      <WorldText text={f.title} />
                     </span>
                     <span className="mt-2 block text-sm text-muted">
-                      <Redacted text={f.summary} />
+                      <WorldText text={f.summary} />
                     </span>
                   </Link>
                 </li>
@@ -171,13 +171,13 @@ export function Institutions({ state, items }: { state: PublishedState; items: I
               <span className="font-[family-name:var(--font-mono)] text-[0.66rem] text-faint">№ {String(i + 1).padStart(3, "0")}</span>
               <span className="min-w-0">
                 <span className="t-display-m block text-text group-hover:text-white">
-                  <Redacted text={r.title} />
+                  <WorldText text={r.title} />
                 </span>
                 <span className="mt-1 block text-sm text-muted">
-                  <Redacted text={r.summary} />
+                  <WorldText text={r.summary} />
                 </span>
               </span>
-              <span className="tracked text-right text-[0.56rem] text-faint">{r.parentId ? redactPlain(titleOf(state, r.parentId)) : "—"}</span>
+              <span className="tracked text-right text-[0.56rem] text-faint">{r.parentId ? renameWorld(titleOf(state, r.parentId)) : "—"}</span>
             </Link>
           </Tilt>
         </li>

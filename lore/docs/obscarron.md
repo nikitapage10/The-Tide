@@ -29,7 +29,7 @@ The Obscarron believed they had been **forged by the core**, the molten heart of
 
 ## The Age of the Abyssal Veil
 
-After the chaotic events of the **Shatterbirth**, the Obscarron emerged into a world darkened by ash and seismic instability, a period known as the **Abyssal Veil**. The surface of Primus was marred by the aftermath of the Undertow’s destruction, with many races struggling to survive the new reality. For the Obscarron, however, this age of darkness provided an opportunity for rebuilding and rediscovery, as they began to carve out their place in this new, chaotic world.
+After the chaotic events of the **Shatterbirth**, the Obscarron emerged into a world darkened by ash and seismic instability, a period known as the **Abyssal Veil**. The surface of Ilyr was marred by the aftermath of the Undertow’s destruction, with many races struggling to survive the new reality. For the Obscarron, however, this age of darkness provided an opportunity for rebuilding and rediscovery, as they began to carve out their place in this new, chaotic world.
 
 ### Uncovering the Past
 
@@ -57,7 +57,7 @@ The **Elders of the Core**, who guided these rituals, were seen as both the spir
 
 ### The Molten Cities and Technological Development
 
-As the Obscarron transitioned from their early religious fervor into a more advanced society, they began to construct their great **Molten Cities**. These cities were a testament to their mastery of **geothermal energy** and **magnetic forces**, built upon the volcanic regions of Primus where the core’s energy flowed closest to the surface. Drawing from the architectural styles of the ancient ruins they uncovered, the Obscarron’s cities were a blend of **Aztec-inspired pyramids**, **obsidian structures**, and **metallic spires**.
+As the Obscarron transitioned from their early religious fervor into a more advanced society, they began to construct their great **Molten Cities**. These cities were a testament to their mastery of **geothermal energy** and **magnetic forces**, built upon the volcanic regions of Ilyr where the core’s energy flowed closest to the surface. Drawing from the architectural styles of the ancient ruins they uncovered, the Obscarron’s cities were a blend of **Aztec-inspired pyramids**, **obsidian structures**, and **metallic spires**.
 
 In the heart of each city flowed rivers of **magma and lava**, which powered their advanced technologies. The Obscarron’s **control over geothermal energy** allowed them to channel the molten rock into power grids, heating systems, and even the mechanisms that powered their transportation. These cities, while seemingly dangerous due to the constant flow of molten materials, were marvels of innovation—centers of both **energy production** and **technological advancement**.
 
@@ -73,11 +73,11 @@ While still enigmatic, the Obscarron’s reputation gradually shifted from one o
 
 ## Impact of the Tide’s Three Consequences
 
-The **Tide** was an event that reshaped the world of Primus, bringing three cataclysmic changes: **The Drowning**, **The Divergence**, and **The Drift**. For the Obscarron, each of these Consequences had profound effects on their civilization, testing their mastery over the earth’s core and magnetic fields and forcing them to evolve in unexpected ways.
+The **Tide** was an event that reshaped the world of Ilyr, bringing three cataclysmic changes: **The Drowning**, **The Divergence**, and **The Drift**. For the Obscarron, each of these Consequences had profound effects on their civilization, testing their mastery over the earth’s core and magnetic fields and forcing them to evolve in unexpected ways.
 
 ### The Drowning: The Frozen Flow
 
-The first and most devastating consequence of the Tide for the Obscarron was **The Drowning**. Massive floods, triggered by the sudden and catastrophic melting of polar ice and rising sea levels, engulfed the coastal regions of Primus. Though the Obscarron lived far from the oceans, the relentless waters reached even their **Molten Cities**, sweeping inland and disrupting the carefully maintained balance of their geothermal systems.
+The first and most devastating consequence of the Tide for the Obscarron was **The Drowning**. Massive floods, triggered by the sudden and catastrophic melting of polar ice and rising sea levels, engulfed the coastal regions of Ilyr. Though the Obscarron lived far from the oceans, the relentless waters reached even their **Molten Cities**, sweeping inland and disrupting the carefully maintained balance of their geothermal systems.
 
 As the floodwaters collided with the **lava flows** and **molten metal rivers** that powered their cities, the once-flowing lifeblood of their civilization began to **cool and solidify**. The molten rivers, which had been the foundation of their power, froze into **blackened veins of stone and metal**, paralyzing entire cities. The energy flows that had once sustained them were suddenly cut off, and their **electromagnetic grids** and **geothermal power sources** began to fail.
 
@@ -93,7 +93,7 @@ But they did not lose hope. Their deep connection to the core meant they could s
 
 ### The Divergence: The Rise of the Geomagnus
 
-During the **Divergence**, when the natural forces of Primus were fundamentally altered, the Obscarron experienced a profound shift. Already attuned to the **magnetic fields** and **geothermal energies** of the planet’s core, some individuals within their society began to develop enhanced abilities tied to these forces. These individuals, now known as the **Geomagnus**, quickly rose to positions of authority within Obscarron society, driven by their power to control both **magnetic forces** and the **thermal energy** of the earth.
+During the **Divergence**, when the natural forces of Ilyr were fundamentally altered, the Obscarron experienced a profound shift. Already attuned to the **magnetic fields** and **geothermal energies** of the planet’s core, some individuals within their society began to develop enhanced abilities tied to these forces. These individuals, now known as the **Geomagnus**, quickly rose to positions of authority within Obscarron society, driven by their power to control both **magnetic forces** and the **thermal energy** of the earth.
 
 However, the rise of the Geomagnus was not without consequence. While their powers were invaluable for the rapid rebuilding of the **Molten Cities**, they also introduced new societal imbalances. The Geomagnus became an **authoritarian elite**, their mastery over the forces of the earth leading to a deep division within Obscarron society.
 
@@ -125,7 +125,7 @@ The **Geomagnus** were not content to simply restore the cities—they sought to
 
 ### The Drift: The Conquistador Brotherhood and the Hunt
 
-When the **Drift** fractured the boundaries between dimensions, pulling enclaves from Earth’s history into the world of Primus, the **Conquistador Brotherhood** found themselves in an unfamiliar and hostile world. The once-feared Conquistadors, with their **iron armor**, **muskets**, and **swords**, were completely outmatched by the advanced powers of the **Geomagnus**, the authoritarian elite of the Obscarron. What had once made the Conquistadors mighty—steel weapons and colonial tactics—was now **obsolete** against the **magnetic** and **geothermal** powers wielded by the Obscarron.
+When the **Drift** fractured the boundaries between dimensions, pulling enclaves from Earth’s history into the world of Ilyr, the **Conquistador Brotherhood** found themselves in an unfamiliar and hostile world. The once-feared Conquistadors, with their **iron armor**, **muskets**, and **swords**, were completely outmatched by the advanced powers of the **Geomagnus**, the authoritarian elite of the Obscarron. What had once made the Conquistadors mighty—steel weapons and colonial tactics—was now **obsolete** against the **magnetic** and **geothermal** powers wielded by the Obscarron.
 
 The **Obscarron**, unaware of the Conquistadors’ history as conquerors and colonizers, viewed these strange armored invaders with disdain and disgust. The **Geomagnus** saw them as an **inferior plague**—primitive creatures who had no place in their advanced society, and whose presence threatened the balance of the core. Thus, the **Geomagnus** declared the Conquistadors as **vermin to be exterminated**.
 
@@ -203,4 +203,4 @@ The **Obscarron** are primarily found in the **Molten Cities**, sprawling urban 
 
 Their habitat extends deep into the earth, where they have carved out **underground tunnels** and **chambers** to access the planet’s core energy. These subterranean areas are considered sacred, often used for religious ceremonies and rituals that honor the core. Above ground, the Obscarron’s cities are characterized by their **pyramidal architecture** and structures designed to channel and store **geothermal energy**, giving their cities a glowing, molten appearance.
 
-The Obscarron are deeply tied to the **geothermal hotspots** of Primus, and their survival depends on maintaining their connection to these energy sources. They are skilled at harnessing the earth’s power, and their habitat reflects their unique ability to live in harmony with the volatile forces of nature that would otherwise be deadly to others.
+The Obscarron are deeply tied to the **geothermal hotspots** of Ilyr, and their survival depends on maintaining their connection to these energy sources. They are skilled at harnessing the earth’s power, and their habitat reflects their unique ability to live in harmony with the volatile forces of nature that would otherwise be deadly to others.
