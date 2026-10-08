@@ -19,3 +19,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   - Run `npm run publish:lore` (rebuilds `fixtures/publication/lore-release.json` from `lore/`, then publishes it), or `npm run publish:bundle -- <bundle.json>` for any other bundle.
   - Both read `SUPABASE_URL` and `SUPABASE_SECRET_KEY` from the session's environment (set in the cloud environment's settings). Never write the key into a file or commit.
   - Publishing validates first, stops on errors, and every release can be rolled back in Workshop → Publishing.
+- **One branch.** Work, commit and push directly on the repository's default branch (currently `claude/lucid-mccarthy-493lvy`; `main` once renamed). Don't create session or feature branches, and if a session is assigned one, use the default branch instead. The GM has asked for this.
