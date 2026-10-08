@@ -11,7 +11,8 @@
  *   release a soft, deep pulse, deeper and longer the stronger the charge.
  * - Under it all, quietly, the Tide's theme on a loop (streamed, fading in;
  *   it steps back while a well charges, so the effects carry).
- * - Everything falls silent while a narration plays (`tide:narration`).
+ * - Everything falls silent while a narration plays (`tide:narration`), and
+ *   whenever the hero is out of view: the theme belongs to the hero alone.
  */
 
 /** Written by the hero scene each frame; read by the sound engine. */
@@ -309,12 +310,38 @@ export class HeroSound {
     src.stop(t + 3.7);
   }
 
+  private narrating = false;
+  private inView = true;
+  private pauseTimer = 0;
+
   /** Fall silent (or return) while a narration speaks. */
   duck(on: boolean) {
-    this.master.gain.setTargetAtTime(on ? 0 : 0.42, this.ctx.currentTime, on ? 0.15 : 0.8);
+    this.narrating = on;
+    this.mix();
+  }
+
+  /** The hero scrolled out of view (or back): the sound leaves with it. */
+  setInView(v: boolean) {
+    this.inView = v;
+    this.mix();
+  }
+
+  private mix() {
+    const quiet = this.narrating || !this.inView;
+    this.master.gain.setTargetAtTime(quiet ? 0 : 0.42, this.ctx.currentTime, quiet ? 0.25 : 0.8);
+    window.clearTimeout(this.pauseTimer);
+    if (!this.inView) {
+      // Once faded, stop the theme outright (it resumes, fading in, on return).
+      this.pauseTimer = window.setTimeout(() => this.music.pause(), 1500);
+    } else if (this.music.paused) {
+      void this.music.play().catch(() => {
+        /* blocked: the generated sound still plays */
+      });
+    }
   }
 
   dispose() {
+    window.clearTimeout(this.pauseTimer);
     cancelAnimationFrame(this.raf);
     window.removeEventListener("pointermove", this.onMove);
     const t = this.ctx.currentTime;

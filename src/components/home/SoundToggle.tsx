@@ -23,6 +23,7 @@ export function SoundToggle({ className }: { className?: string }) {
       if (!engine.current) {
         engine.current = new HeroSound();
         if (narrating.current) engine.current.duck(true);
+        if (!inView.current) engine.current.setInView(false);
       }
       setOn(true);
     };
@@ -31,6 +32,24 @@ export function SoundToggle({ className }: { className?: string }) {
   }, []);
 
   useEffect(() => () => engine.current?.dispose(), []);
+
+  // The theme belongs to the hero: the sound follows the hero in and out of view.
+  const button = useRef<HTMLButtonElement | null>(null);
+  const inView = useRef(true);
+  useEffect(() => {
+    const hero = button.current?.closest(".hero-track");
+    if (!hero) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        inView.current = !!e?.isIntersecting;
+        engine.current?.setInView(inView.current);
+      },
+      // In view while the hero still holds the middle of the screen.
+      { rootMargin: "-35% 0px -35% 0px" },
+    );
+    io.observe(hero);
+    return () => io.disconnect();
+  }, []);
 
   // Silent while a narration speaks (and if sound is turned on mid-narration).
   useEffect(() => {
@@ -47,6 +66,7 @@ export function SoundToggle({ className }: { className?: string }) {
     if (next && !engine.current) {
       engine.current = new HeroSound();
       if (narrating.current) engine.current.duck(true);
+      if (!inView.current) engine.current.setInView(false);
     }
     if (!next) {
       engine.current?.dispose();
@@ -61,7 +81,7 @@ export function SoundToggle({ className }: { className?: string }) {
   };
 
   return (
-    <button type="button" onClick={toggle} aria-pressed={on} className={className}>
+    <button ref={button} type="button" onClick={toggle} aria-pressed={on} className={className}>
       <span aria-hidden="true" className="flex h-3 items-end gap-[2px]">
         {[0, 1, 2, 3].map((i) => (
           <span key={i} className={`sound-bar block w-px bg-current ${on ? "sound-bar-on" : ""}`} style={{ animationDelay: `${i * 0.13}s` }} />
