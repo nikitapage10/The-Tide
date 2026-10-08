@@ -3,12 +3,13 @@
  * Things in orbit and passing through, once the planet is revealed. Each moves
  * as what it is, seen with real perspective (larger near the camera, a few
  * pixels by the horizon, where they fade):
- * - Satellites and stations orbit low, all the same way round: each comes in
- *   from the right side of the screen, arcs left over the planet's upper face
- *   (nearest the camera, largest), curves down the left side into the horizon
- *   (shrinking and fading) and slips behind. Each orbit differs a little in
- *   height, tilt and where it meets the horizon; crossing takes about two
- *   minutes. Most hold their attitude; the ring station turns, the sounder spins.
+ * - Satellites and stations orbit low, all the same way round: each starts at
+ *   the centre-right or lower right of the screen, climbs up and across the
+ *   planet's face, arcs over, and comes down to the left horizon at about
+ *   mid-height. It grows until the middle of the pass (nearest the camera),
+ *   then shrinks to a speck at the horizon, where it slips behind and fades.
+ *   Passes differ in start, height and where they meet the horizon (a third
+ *   take a lower, flatter line); each takes about two minutes. Most hold their attitude; the ring station turns, the sounder spins.
  * - A moon fragment surfaces out of the dark, is caught, and spirals in to be
  *   lost behind the planet.
  * - Since the Tide nothing leaves: the atmosphere cannot be crossed, so ships
@@ -70,7 +71,7 @@ interface Motion {
   mode: Mode;
   t0: number;
   life: number;
-  // Orbit: radius (planet radii), inclination, node angle, start angle, angular speed (rad/ms).
+  // Captured fragment: radius (planet radii), inclination, node angle, start angle, angular speed (rad/ms).
   R: number;
   inc: number;
   node: number;
@@ -78,6 +79,8 @@ interface Motion {
   w: number;
   // Arrival / drift: start, control and end points on the artwork (fractions), quadratic path.
   p: [number, number, number, number, number, number];
+  /** Orbit: a cubic path relative to the planet's centre, in planet radii. */
+  q: number[];
   /** Long side as a fraction of the artwork's width. */
   size: number;
   rot0: number;
@@ -126,6 +129,27 @@ function driftPath(): [number, number, number, number, number, number] {
   return [sx, sy, (sx + ex) / 2 - Math.sin(a) * bend, (sy + ey) / 2 + Math.cos(a) * bend * 1.6, ex, ey];
 }
 
+/**
+ * A satellite's pass (relative to the planet's centre, in planet radii; y down):
+ * it starts at the centre-right or lower right of the screen, climbs up and
+ * across the planet's face, arcs over and comes down to the left horizon. Most
+ * arch high; about a third take a lower, flatter line into the horizon further
+ * down. Every pass differs in start, height and where it meets the horizon.
+ */
+function orbitPath(): number[] {
+  const low = Math.random() < 0.33;
+  // Where it meets the horizon (screen angle from the centre, y down): high
+  // passes at about mid-height, low ones a little further down.
+  const th = (Math.PI / 180) * (low ? rand(162, 171) : rand(172, 186));
+  const ex = Math.cos(th), ey = Math.sin(th);
+  const sx = rand(-0.24, -0.08);
+  const sy = low ? rand(0.2, 0.35) : rand(0.05, 0.35);
+  const arch = low ? rand(0.4, 0.55) : rand(0.65, 0.95);
+  // The second control point sits low enough that the descent into the
+  // horizon is gradual (not squeezed into the last moments).
+  return [sx, sy, sx - rand(0.12, 0.28), sy - arch * 1.25, ex + rand(0.3, 0.42), ey - arch * 0.45, ex, ey];
+}
+
 /** Camera distance from the planet's centre (planet radii): sets the perspective. */
 const CAM = 2.1;
 const perspective = (z: number) => CAM / Math.max(0.3, CAM - z);
@@ -165,33 +189,23 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       if (recent.length > 5) recent.shift();
       const id = nextId++;
       const [title, line] = prof.labels[Math.floor(Math.random() * prof.labels.length)]!;
-      // Orbits: low, just above the atmosphere; each a little different in
-      // height, tilt and where it meets the horizon.
-      const R = d.name === "orb" ? rand(1.16, 1.22) : rand(1.06, 1.14);
-      // Half an orbit (right side round to the left horizon): slow.
-      const half = rand(100000, 130000);
-      const a0 = mode === "capture" ? 0.45 : first ? rand(0.7, 1.5) : rand(0.4, 0.55);
       const m: Motion = {
         mode,
         t0: now,
-        // Orbiters stay one orbit (leaving while behind the planet); an arrival
-        // takes under a minute; debris a couple of minutes.
-        // Orbiters leave once they are behind the planet again.
-        life: mode === "orbit" ? ((Math.PI + 0.3 - a0) / Math.PI) * half : mode === "capture" ? rand(120000, 150000) : mode === "arrival" ? rand(75000, 95000) : rand(70000, 95000),
-        // A captured fragment starts well out and spirals in (R shrinks over its life).
-        R: mode === "capture" ? rand(1.8, 2.0) : R,
-        // Tilt: how high the near half arches (cos = arch / radius). Chosen so
-        // the whole arc stays on screen: its high point near the top right,
-        // over the planet, curving down the left to the horizon at mid-height.
-        inc: Math.acos(mode === "capture" ? rand(0.5, 0.6) : rand(0.55, 0.68)),
-        // Where the orbit meets the horizon on the left (screen angle, y down).
+        // How long each takes: a satellite's pass, the fragment's fall, an
+        // arrival, a piece of debris surfacing and sinking back.
+        life: mode === "orbit" ? rand(95000, 130000) : mode === "capture" ? rand(120000, 150000) : mode === "arrival" ? rand(75000, 95000) : rand(70000, 95000),
+        // The captured fragment: a tilted circular orbit, starting well out and
+        // shrinking as it falls in, lost behind the planet's left horizon.
+        R: rand(1.8, 2.0),
+        inc: Math.acos(rand(0.5, 0.6)),
         node: (Math.PI / 180) * rand(182, 196),
-        a0,
-        w: mode === "capture" ? 0 : Math.PI / half,
-        // Arrivals: from the far side of space (off the left edge) down a gentle
-        // curve into the planet's limb (pulled in by it). Debris: a slow drift
-        // in from the far side, nearly level.
+        a0: 0.45,
+        w: 0,
+        // Arrivals: from far out in the dark down a gentle curve into the
+        // planet's limb. Debris: surfaces out of the dark and drifts a little.
         p: mode === "arrival" ? arrivalPath() : driftPath(),
+        q: orbitPath(),
         // Sizes at the planet's distance (perspective scales them from there):
         // small things, a few pixels by the horizon.
         size: mode === "arrival" ? rand(0.009, 0.012) : mode === "orbit" ? rand(0.0055, 0.0075) : mode === "capture" ? rand(0.006, 0.008) : rand(0.006, 0.009),
@@ -203,6 +217,8 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       // Labels sit on the side with more open space.
       const side = mode === "drift" ? "right" : "left";
       if (mode === "capture") m.w = (Math.PI + 0.3 - m.a0) / m.life;
+      // The first satellite is already partway along when the planet is revealed.
+      if (mode === "orbit" && first) m.t0 = now - m.life * rand(0.12, 0.3);
       setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side }]);
     };
 
@@ -260,12 +276,22 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         let rot = m.rot0 + m.spin * age;
         // Arrivals: heat as they meet the atmosphere (flare, then lost).
         let heat = 0;
-        if (m.mode === "orbit" || m.mode === "capture") {
-          // A tilted circular orbit: from the right side of the screen it arcs
-          // over the planet's upper face (its near half: nearest the camera and
-          // largest), curves down the left into the horizon at about mid-height,
-          // and passes behind there, fading. A captured fragment's orbit shrinks as
-          // it falls in, and it is lost behind the same way.
+        if (m.mode === "orbit") {
+          // From the centre-right or lower right of the screen, up and across
+          // the planet's face, over the top of its arc, and down to the left
+          // horizon at about mid-height. It is nearest (and largest) around the
+          // middle of the pass, then shrinks steadily to a speck at the horizon,
+          // where it passes behind and fades.
+          const q = m.q;
+          const v = u;
+          const b0 = (1 - v) ** 3, b1 = 3 * (1 - v) ** 2 * v, b2 = 3 * (1 - v) * v * v, b3 = v ** 3;
+          x = pcx + pr * (b0 * q[0]! + b1 * q[2]! + b2 * q[4]! + b3 * q[6]!);
+          y = pcy + pr * (b0 * q[1]! + b1 * q[3]! + b2 * q[5]! + b3 * q[7]!);
+          depth = u < 0.5 ? 0.85 + 0.75 * smooth(0, 0.5, u) : 1.6 - 1.35 * Math.pow((u - 0.5) / 0.5, 1.15);
+          z = depth - 1;
+        } else if (m.mode === "capture") {
+          // A captured fragment: a tilted circular orbit that shrinks as it falls
+          // in; it is lost behind the planet.
           const t = m.a0 + m.w * age;
           const R = m.mode === "capture" ? m.R - (m.R - 1.06) * smooth(0, 1, u) : m.R;
           const ax = Math.cos(m.node), ay = Math.sin(m.node);
@@ -343,7 +369,7 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
                 : smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
         const px = m.base * k;
         // Orbiters fade out as they pass the horizon (going behind).
-        const past = m.mode === "orbit" || m.mode === "capture" ? smooth(-0.18, 0.04, z) : 1;
+        const past = m.mode === "capture" ? smooth(-0.18, 0.04, z) : m.mode === "orbit" ? 1 - smooth(0.94, 1, u) : 1;
         el.style.opacity = (fade * past * 0.85 * smooth(3, 11, px)).toFixed(3);
         // The callout follows the object; it hides while the object is behind.
         const tag = el.lastElementChild as HTMLElement | null;

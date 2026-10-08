@@ -7,11 +7,12 @@
  *   speed, with a rare soft blip when moving fast.
  * - Over the planet (once it is revealed): an airy cloud swish instead.
  * - A storm surge (click on the planet): rolling thunder.
- * - A gravitational disturbance (click in open space): a soft, deep pulse.
+ * - A gravity well (hold in open space): a low hum rising as it charges; on
+ *   release a soft, deep pulse, deeper and longer the stronger the charge.
  */
 
 /** Written by the hero scene each frame; read by the sound engine. */
-export const heroSignal = { overPlanet: false, surgeAt: 0, gravAt: 0 };
+export const heroSignal = { overPlanet: false, surgeAt: 0, gravAt: 0, gravStrength: 0, charging: false, charge: 0 };
 
 export class HeroSound {
   private ctx: AudioContext;
@@ -29,6 +30,7 @@ export class HeroSound {
   private raf = 0;
   private lastSurge = 0;
   private lastGrav = 0;
+  private hum2: { o: OscillatorNode; g: GainNode } | null = null;
   private lastGlitch = 0;
 
   constructor() {
@@ -120,9 +122,30 @@ export class HeroSound {
       this.lastSurge = heroSignal.surgeAt;
       this.thunder();
     }
+    // Charging a well: a low hum that rises with the charge.
+    if (heroSignal.charging && !this.hum2) {
+      const o = this.ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.value = 30;
+      const g = this.ctx.createGain();
+      g.gain.value = 0;
+      o.connect(g).connect(this.master);
+      o.start();
+      this.hum2 = { o, g };
+    }
+    if (this.hum2) {
+      const c = heroSignal.charging ? heroSignal.charge : 0;
+      this.hum2.o.frequency.setTargetAtTime(30 + 34 * c, t, 0.2);
+      this.hum2.g.gain.setTargetAtTime(heroSignal.charging ? 0.04 + 0.16 * c : 0, t, heroSignal.charging ? 0.3 : 0.05);
+      if (!heroSignal.charging) {
+        const h = this.hum2;
+        this.hum2 = null;
+        h.o.stop(t + 0.4);
+      }
+    }
     if (heroSignal.gravAt && heroSignal.gravAt !== this.lastGrav) {
       this.lastGrav = heroSignal.gravAt;
-      this.pulse();
+      this.pulse(heroSignal.gravStrength);
     }
     this.raf = requestAnimationFrame(this.tick);
   };
@@ -147,35 +170,37 @@ export class HeroSound {
     o.stop(t + 0.2);
   }
 
-  /** A deep, soft pulse: a low sine falling in pitch, with a breath of air. */
-  private pulse() {
+  /** A deep, soft pulse: a low sine falling in pitch, with a breath of air;
+   *  deeper, louder and longer the stronger the well was charged (0..1). */
+  private pulse(strength = 0.3) {
     const ctx = this.ctx;
     const t = ctx.currentTime;
+    const len = 1.2 + 2.2 * strength;
     const o = ctx.createOscillator();
     o.type = "sine";
-    o.frequency.setValueAtTime(72, t);
-    o.frequency.exponentialRampToValueAtTime(28, t + 1.6);
+    o.frequency.setValueAtTime(78 - 18 * strength, t);
+    o.frequency.exponentialRampToValueAtTime(26 - 6 * strength, t + len * 0.75);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.32, t + 0.12);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+    g.gain.linearRampToValueAtTime(0.16 + 0.3 * strength, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, t + len);
     o.connect(g).connect(this.master);
     o.start(t);
-    o.stop(t + 2.3);
+    o.stop(t + len + 0.1);
     const src = this.ctx.createBufferSource();
     src.buffer = this.noise;
     const bp = ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.setValueAtTime(300, t + 0.8);
-    bp.frequency.exponentialRampToValueAtTime(90, t + 2.4);
+    bp.frequency.setValueAtTime(300, t + 0.05);
+    bp.frequency.exponentialRampToValueAtTime(90, t + len);
     bp.Q.value = 0.8;
     const gn = ctx.createGain();
-    gn.gain.setValueAtTime(0, t + 0.8);
-    gn.gain.linearRampToValueAtTime(0.06, t + 1.0);
-    gn.gain.exponentialRampToValueAtTime(0.001, t + 2.6);
+    gn.gain.setValueAtTime(0, t + 0.05);
+    gn.gain.linearRampToValueAtTime(0.03 + 0.07 * strength, t + 0.25);
+    gn.gain.exponentialRampToValueAtTime(0.001, t + len + 0.3);
     src.connect(bp).connect(gn).connect(this.master);
-    src.start(t + 0.8, Math.random());
-    src.stop(t + 2.7);
+    src.start(t + 0.05, Math.random());
+    src.stop(t + len + 0.4);
   }
 
   /** A short burst of filtered noise (a crackle or the strike's crack). */

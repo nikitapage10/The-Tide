@@ -137,7 +137,8 @@ uniform sampler2D uFlow;          // planet: weather flow (z: where the clouds w
 uniform sampler2D uMasks;         // planet: baked masks (R land, G light streams on the disc)
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
 uniform vec4 uPull;               // planet: where the cursor left the planet (CSS px x, y), age s, on
-uniform vec4 uGrav[2];            // planet: disturbances you set off in space (CSS px x, y, age s, on)
+uniform vec4 uWell;               // planet: a gravity well being charged (CSS px x, y, charge 0..1, on)
+uniform vec4 uGrav[2];            // planet: released wells (CSS px x, y, age s, charge; 0 = none)
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
 uniform sampler2D uCentFar, uCentNear;   // meteors: each rock pixel's rock centre + movable flag
 uniform sampler2D uStateFar, uStateNear; // meteors: rock bodies (offsets, spins, search hints), 64×64
@@ -806,43 +807,54 @@ void main() {
   float cs = cos(twist), sn = sin(twist);
   vec2 dRot = vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
   vec2 warped = uM + dRot - dir * pull;
-  // A gravitational disturbance (a click in open space). First a small dark
-  // core with a thin ring of bent light (an Einstein ring) appears; space pinches
-  // and swirls into it. Then it collapses, and a lensing shockwave runs outward,
-  // visibly bending the stars and the streams of light behind it.
+  // A gravity well you charge by holding in open space (uWell): a small dark
+  // core with a thin ring of bent light (an Einstein ring) forms and deepens,
+  // and space pinches and swirls into it, more the longer you hold. Let go and
+  // it collapses into a lensing shockwave (uGrav) whose reach, strength and
+  // length follow the charge, bending the stars and streams behind it.
   float gRing = 0.0;
   float gCore = 0.0;
   float gEin = 0.0;
+  if (uWell.w > 0.5) {
+    float c = uWell.z;
+    vec2 gd = sp - uWell.xy;
+    float gr = length(gd);
+    vec2 gdir = gr > 0.001 ? gd / gr : vec2(0.0);
+    float core = smoothstep(0.0, 0.12, c);
+    // A faint tremor once it is strongly charged.
+    float coreR = (6.0 + 14.0 * c) * (1.0 + 0.05 * c * c * sin(uT * 23.0));
+    float reach = 60.0 + 130.0 * c;
+    float well = core * exp(-gr * gr / (reach * reach));
+    float sw = (0.3 + 1.2 * c) * well;
+    float cs2 = cos(sw), sn2 = sin(sw);
+    vec2 rel = warped - uWell.xy;
+    warped = uWell.xy + vec2(cs2 * rel.x - sn2 * rel.y, sn2 * rel.x + cs2 * rel.y);
+    warped -= gdir * (10.0 + 42.0 * c) * well * (1.0 - exp(-gr / (12.0 + 10.0 * c)));
+    gCore = max(gCore, core * (1.0 - smoothstep(coreR * 0.55, coreR, gr)));
+    float ein = (gr - coreR * 1.45) / (1.8 + 1.4 * c);
+    gEin = max(gEin, core * (0.45 + 0.55 * c) * exp(-ein * ein));
+  }
   for (int k = 0; k < 2; k++) {
-    if (uGrav[k].w < 0.5) continue;
-    float ga = uGrav[k].z;
-    if (ga < 0.0 || ga > 3.6) continue;
+    float c = uGrav[k].w;
+    if (c <= 0.0) continue;
+    float sa = uGrav[k].z;
+    float dur = 1.6 + 2.4 * c;
+    if (sa < 0.0 || sa > dur) continue;
     vec2 gd = sp - uGrav[k].xy;
     float gr = length(gd);
     vec2 gdir = gr > 0.001 ? gd / gr : vec2(0.0);
-    // The core: grows in, holds, then collapses at about 0.9 s.
-    float core = smoothstep(0.0, 0.25, ga) * (1.0 - smoothstep(0.75, 1.0, ga));
-    float coreR = 10.0 + 6.0 * smoothstep(0.0, 0.5, ga);
-    // Pinch and swirl toward the core while it lives.
-    float well = core * exp(-gr * gr / (110.0 * 110.0));
-    float sw = 0.9 * well;
-    float cs2 = cos(sw), sn2 = sin(sw);
-    vec2 rel = warped - uGrav[k].xy;
-    warped = uGrav[k].xy + vec2(cs2 * rel.x - sn2 * rel.y, sn2 * rel.x + cs2 * rel.y);
-    warped -= gdir * 34.0 * well * (1.0 - exp(-gr / 18.0));
-    gCore = max(gCore, core * (1.0 - smoothstep(coreR * 0.55, coreR, gr)));
-    float ein = (gr - coreR * 1.45) / 2.2;
-    gEin = max(gEin, core * exp(-ein * ein));
-    // The shockwave after the collapse.
-    float sa = ga - 0.85;
-    if (sa > 0.0) {
-      float amp = smoothstep(0.0, 0.08, sa) * pow(1.0 - sa / 2.75, 2.0);
-      float rr = 16.0 + 260.0 * pow(sa, 0.7);
-      float w = 10.0 + 22.0 * sa;
-      float q = (gr - rr) / w;
-      warped += gdir * amp * 22.0 * q * exp(-q * q);
-      gRing += amp * exp(-q * q);
-    }
+    // The core collapses in a moment...
+    float coreR = 6.0 + 14.0 * c;
+    float core = smoothstep(0.12, 0.0, sa) * smoothstep(0.0, 0.12, c);
+    gCore = max(gCore, core * (1.0 - smoothstep(coreR * 0.3, coreR * 0.8, gr)));
+    // ...and the shockwave runs out: farther, stronger and longer with charge.
+    float u = sa / dur;
+    float amp = smoothstep(0.0, 0.06, sa) * pow(1.0 - u, 2.0);
+    float rr = 14.0 + (140.0 + 560.0 * c) * pow(u, 0.7);
+    float w = 10.0 + (14.0 + 26.0 * c) * u;
+    float q = (gr - rr) / w;
+    warped += gdir * amp * (8.0 + 34.0 * c) * q * exp(-q * q);
+    gRing += amp * (0.5 + 0.9 * c) * exp(-q * q);
   }
   if (uLayer == 0) {
     // The lens bends space, not the planet: no warp over the planet's disc (its
@@ -1154,7 +1166,7 @@ export function HeroScene({
   /** A storm was planted at this point (CSS px, relative to the canvas). */
   onStorm?: (x: number, y: number) => void;
   /** A disturbance was set off in open space at this point (CSS px, relative to the canvas). */
-  onGravity?: (x: number, y: number) => void;
+  onGravity?: (x: number, y: number, strength: number) => void;
   /** Element placed at the ribbons' tip (the cursor in space) while they show. */
   tip?: { current: HTMLElement | null };
   /** Marked spots on the artwork (percent), where the cursor's strands start. */
@@ -1230,7 +1242,7 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), pull: u("uPull"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), well: u("uWell"), pull: u("uPull"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
@@ -1256,7 +1268,13 @@ export function HeroScene({
       let nextStorm = 0;
       const stormData = new Float32Array(12);
       // Disturbances set off by clicking open space (up to two at once).
-      const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9 }));
+      const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9, c: 0 }));
+      // The well being charged (held in open space), if any.
+      const well = { on: false, x: 0, y: 0, t: 0 };
+      const chargeOf = (now: number) => {
+        const h = Math.min(1, (now - well.t) / 3000);
+        return h * h * (3 - 2 * h);
+      };
       let nextGrav = 0;
       const gravData = new Float32Array(8);
       // Where the cursor last left the planet for space (see uPull).
@@ -1561,8 +1579,11 @@ export function HeroScene({
           gl.uniform4f(U.pull, pull.x, pull.y, (now - pull.t) / 1000, now - pull.t < 2400 ? 1 : 0);
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
           gl.uniform4fv(U.storm, stormData);
-          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 3700 ? 1 : 0], k * 4));
+          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 4200 ? Math.max(0.05, gv.c) : 0], k * 4));
           gl.uniform4fv(U.grav, gravData);
+          const wc = well.on ? chargeOf(now) : 0;
+          heroSignal.charge = wc;
+          gl.uniform4f(U.well, well.x, well.y, wc, well.on ? 1 : 0);
         }
         if (fieldFar && fieldNear) {
           // Before scrolling, the pointer is a soft reverse singularity among the rocks.
@@ -1708,13 +1729,12 @@ export function HeroScene({
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
           if (y < 0 || y > rect.height) return;
-          const gv = gravs[nextGrav]!;
-          nextGrav = (nextGrav + 1) % gravs.length;
-          gv.x = x;
-          gv.y = y;
-          gv.t = performance.now();
-          heroSignal.gravAt = gv.t;
-          onGravity?.(x, y);
+          // Start charging a well here; it is released when the press ends.
+          well.on = true;
+          well.x = x;
+          well.y = y;
+          well.t = performance.now();
+          heroSignal.charging = true;
           return;
         }
         const st = storms[nextStorm]!;
@@ -1728,10 +1748,34 @@ export function HeroScene({
         stormPuffs?.spawn(mx, my);
         onStorm?.(e.clientX - rect.left, e.clientY - rect.top);
       };
+      // Letting go releases the well: a shockwave as strong as its charge.
+      const onUp = () => {
+        if (!well.on) return;
+        const now = performance.now();
+        const c = chargeOf(now);
+        well.on = false;
+        heroSignal.charging = false;
+        const gv = gravs[nextGrav]!;
+        nextGrav = (nextGrav + 1) % gravs.length;
+        gv.x = well.x;
+        gv.y = well.y;
+        gv.t = now;
+        gv.c = c;
+        heroSignal.gravAt = now;
+        heroSignal.gravStrength = c;
+        onGravity?.(well.x, well.y, c);
+      };
       window.addEventListener("pointermove", onMove, { passive: true });
       window.addEventListener("pointerdown", onDown, { passive: true });
+      window.addEventListener("pointerup", onUp, { passive: true });
+      window.addEventListener("pointercancel", onUp, { passive: true });
+      window.addEventListener("blur", onUp);
       return () => {
         window.removeEventListener("pointerdown", onDown);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        window.removeEventListener("blur", onUp);
+        heroSignal.charging = false;
         cancelAnimationFrame(raf);
         ro.disconnect();
         io.disconnect();

@@ -97,15 +97,16 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
     });
     window.setTimeout(() => setStormNote((n) => (n && n.id === id ? null : n)), 6000);
   }, []);
-  // A disturbance in open space gets the same kind of short-lived callout.
-  const onGravity = useCallback((x: number, y: number) => {
-    const kinds: [string, string][] = [
-      ["Gravity well", "Formed, collapsed"],
-      ["Mass shadow", "Source unseen"],
-      ["Lensing event", "Light bent, briefly"],
-      ["Singularity", "Brief, local"],
+  // A released gravity well gets the same kind of short-lived callout, named
+  // for how strongly it was charged.
+  const onGravity = useCallback((x: number, y: number, strength: number) => {
+    const kinds: [string, string][][] = [
+      [["Lensing event", "Light bent, briefly"], ["Mass shadow", "Source unseen"]],
+      [["Gravity well", "Formed, collapsed"], ["Tidal shear", "Passing"]],
+      [["Singularity", "Collapsed"], ["Deep well", "Released"]],
     ];
-    const [title, line] = kinds[Math.floor(Math.random() * kinds.length)]!;
+    const tier = kinds[strength < 0.25 ? 0 : strength < 0.7 ? 1 : 2]!;
+    const [title, line] = tier[Math.floor(Math.random() * tier.length)]!;
     const id = Date.now();
     setStormNote({ id, x, y, left: x > window.innerWidth * 0.62, title, line });
     window.setTimeout(() => setStormNote((n) => (n && n.id === id ? null : n)), 5000);
@@ -306,8 +307,8 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         </div>
         {/* A faint hint, once the planet is revealed: the scene can be touched. */}
         <span aria-hidden="true" className="hero-hint tracked pointer-events-none absolute bottom-[2.35rem] right-[9.5rem] hidden text-[0.56rem] text-white/35 sm:right-[11.5rem] sm:block">
-          <span className="hint-fine">Click the planet, or the dark</span>
-          <span className="hint-coarse">Tap the planet, or the dark</span>
+          <span className="hint-fine">Click the planet · hold in the dark</span>
+          <span className="hint-coarse">Tap the planet · hold in the dark</span>
         </span>
         <SoundToggle className="tracked pointer-events-auto absolute bottom-7 right-4 flex min-h-10 items-center gap-2 px-2 text-[0.6rem] text-white/60 hover:text-white sm:right-10" />
       </div>
