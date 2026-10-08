@@ -677,3 +677,15 @@ a.tracklist-row:hover { background: rgba(255,255,255,0.03); }
 .narration-close { display: grid; place-items: center; width: 2rem; height: 2rem; flex-shrink: 0; color: var(--faint); }
 .narration-close:hover { color: #fff; }
 @media (prefers-reduced-motion: reduce) { .narration-ring[data-playing]::after, .narration-bar { animation: none; } }
+
+/* Read-along (components/audio/karaoke): the words wait in shadow, each one
+   flares as it is spoken (a white bloom, a horizontal lens streak, a star at
+   its heart) and settles to ordinary reading once said. */
+[data-reading] .rw { color: rgba(220, 220, 223, 0.38); transition: color 0.9s ease, text-shadow 0.9s ease; }
+[data-reading] .rw-said { color: #dcdcdf; }
+[data-reading] .rw-now { position: relative; color: #fff; transition: none; text-shadow: 0 0 6px rgba(255,255,255,0.95), 0 0 18px rgba(196,218,255,0.7), 0 0 44px rgba(160,190,255,0.35); }
+[data-reading] .rw-now::after { content: ""; position: absolute; left: 50%; top: 54%; width: calc(100% + 3.2em); height: 1px; translate: -50% -50%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(220,232,255,0.25) 22%, #fff 50%, rgba(220,232,255,0.25) 78%, transparent); box-shadow: 0 0 6px 0.5px rgba(200,220,255,0.55); animation: rw-streak 0.75s cubic-bezier(.2,.7,.1,1) both; }
+[data-reading] .rw-now::before { content: ""; position: absolute; left: 50%; top: 52%; width: 0.7em; height: 0.7em; translate: -50% -50%; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: radial-gradient(circle, #fff 0, rgba(255,255,255,0.55) 22%, rgba(190,210,255,0.18) 48%, transparent 70%); animation: rw-star 0.75s ease-out both; }
+@keyframes rw-streak { from { opacity: 0; scale: 0.15 1; } 35% { opacity: 1; } to { opacity: 0.6; scale: 1 1; } }
+@keyframes rw-star { from { opacity: 0; scale: 0.3; } 30% { opacity: 1; scale: 1.25; } to { opacity: 0.55; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { [data-reading] .rw-now::after, [data-reading] .rw-now::before { animation: none; } }

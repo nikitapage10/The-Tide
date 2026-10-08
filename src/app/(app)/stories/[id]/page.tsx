@@ -117,14 +117,14 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
       {/* The Arrival can be heard as well as read. */}
       {s.slug === "arrival" ? (
         <div className="mx-auto mb-14 flex max-w-[64ch] justify-center">
-          <Narration />
+          <Narration follow="story-text" />
         </div>
       ) : null}
 
       {/* The text. */}
       <section aria-label="Text" className="mx-auto mb-20 max-w-[64ch]">
         {s.body ? (
-          <div className="reading drop-cap">
+          <div id="story-text" className="reading drop-cap">
             <Markdown>{s.body}</Markdown>
           </div>
         ) : (

@@ -55,6 +55,15 @@ test("the Arrival can be heard: on the home story and on its Library page", asyn
   await expect(page.getByRole("heading", { level: 1, name: "Arrival" })).toBeVisible();
   await page.getByRole("button", { name: "Listen to the arrival, read aloud" }).click();
   await expect(page.getByRole("region", { name: "Narration" })).toBeVisible();
+  // The page reads along: words wrapped, and one lit as it is spoken.
+  const text = page.locator("#story-text");
+  await expect(text).toHaveAttribute("data-reading", "");
+  await expect(text.locator(".rw").first()).toBeAttached();
+  await page.evaluate(() => {
+    const a = document.querySelector("audio")!;
+    a.currentTime = 95;
+  });
+  await expect(text.locator(".rw-now")).toHaveCount(1, { timeout: 10_000 });
 });
 
 test("keyboard: skip link first, visible focus, search by Unicode-insensitive name", async ({ page }) => {

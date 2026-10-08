@@ -4,19 +4,25 @@
  * chapter and on the Arrival page in the Library. Once it
  * starts, a slim bar docks to the foot of the screen (so the story can be
  * scrolled while it plays) with the line being spoken, a seek line and the
- * time. Never plays on its own. The hero's sound steps back while it speaks
- * (`tide:narration`).
+ * time. Never plays on its own. Other sound on the page falls silent while it
+ * speaks (`tide:narration`).
+ *
+ * With `follow` (the id of the text being read), the page reads along: each
+ * word lights as it is spoken, and the page keeps the word in view unless
+ * the reader has just scrolled away themselves.
  */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { readAlong, wordAt, type ReadAlong, type TimedWord } from "./karaoke";
 
 const SRC = "/audio/ilyr-narration.mp3";
 const CAPTIONS = "/audio/ilyr-narration.vtt";
+const WORDS = "/audio/ilyr-narration.words.json";
 const LENGTH = 438; // seconds, until the file's own duration is known
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-export function Narration() {
+export function Narration({ follow }: { follow?: string } = {}) {
   const audio = useRef<HTMLAudioElement | null>(null);
   const [docked, setDocked] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -55,6 +61,99 @@ export function Narration() {
       track?.removeEventListener("cuechange", cue);
     };
   }, []);
+
+  // Read-along: built the first time the narration starts, then driven each frame while it plays.
+  const along = useRef<ReadAlong | null>(null);
+  useEffect(() => {
+    if (!follow || !docked || along.current) return;
+    const root = document.getElementById(follow);
+    if (!root) return;
+    let cancelled = false;
+    void fetch(WORDS)
+      .then((r) => r.json() as Promise<TimedWord[]>)
+      .then((timed) => {
+        if (cancelled || along.current) return;
+        along.current = readAlong(root, timed);
+        root.dataset.reading = "";
+      })
+      .catch(() => {
+        /* no timings: the narration still plays */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [follow, docked]);
+  useEffect(() => {
+    if (!follow) return;
+    const root = document.getElementById(follow);
+    if (!docked) {
+      // Closed: the text goes back to plain reading.
+      if (root) delete root.dataset.reading;
+      along.current?.words.forEach((w) => w.classList.remove("rw-said", "rw-now"));
+      return;
+    }
+    if (root && along.current) root.dataset.reading = "";
+  }, [follow, docked]);
+  useEffect(() => {
+    if (!follow || !playing) return;
+    const a = audio.current;
+    if (!a) return;
+    // Start clean (after a pause or a seek): the first frame marks what has been said.
+    along.current?.words.forEach((w) => w.classList.remove("rw-now", "rw-said"));
+    let raf = 0;
+    let shown = -1;
+    let lit = false;
+    let userScrolledAt = -Infinity;
+    let ourScroll = 0;
+    const onScroll = () => {
+      if (performance.now() - ourScroll > 900) userScrolledAt = performance.now();
+    };
+    window.addEventListener("wheel", onScroll, { passive: true });
+    window.addEventListener("touchmove", onScroll, { passive: true });
+    window.addEventListener("keydown", onScroll);
+    const frame = () => {
+      raf = requestAnimationFrame(frame);
+      const r = along.current;
+      if (!r) return;
+      const t = a.currentTime;
+      const i = wordAt(r, t);
+      if (i !== shown) {
+        // Everything before the word has been said; everything after hasn't.
+        // (Going forward, the word that was lit is now said too.)
+        const [from, to, on] = i > shown ? [shown, i, true] : [i + 1, shown + 1, false];
+        for (let k = Math.max(0, from); k < to; k++) r.words[k]!.classList.toggle("rw-said", on);
+        if (shown >= 0) r.words[shown]!.classList.remove("rw-now");
+        lit = false;
+        shown = i;
+      }
+      // The flare holds while the word is spoken (and a breath after), then settles.
+      const word = r.words[i];
+      const speaking = !!word && t < r.ends[i]! + 0.35;
+      if (word && speaking !== lit) {
+        word.classList.toggle("rw-now", speaking);
+        word.classList.toggle("rw-said", !speaking);
+        lit = speaking;
+        if (speaking && performance.now() - userScrolledAt > 4000) {
+          const box = word.getBoundingClientRect();
+          const vh = window.innerHeight;
+          if (box.top < vh * 0.22 || box.bottom > vh * 0.68) {
+            ourScroll = performance.now();
+            const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            // Glide to the next line; jump after a seek (a long glide would trail the voice).
+            const far = Math.abs(box.top - vh / 2) > vh * 1.2;
+            word.scrollIntoView({ block: "center", behavior: reduce || far ? "auto" : "smooth" });
+          }
+        }
+      }
+    };
+    raf = requestAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("wheel", onScroll);
+      window.removeEventListener("touchmove", onScroll);
+      window.removeEventListener("keydown", onScroll);
+    };
+  }, [follow, playing]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("tide:narration", { detail: { playing } }));
