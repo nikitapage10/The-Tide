@@ -3,11 +3,12 @@
  * Things in orbit and passing through, once the planet is revealed. Each moves
  * as what it is, seen with real perspective (larger near the camera, a few
  * pixels by the horizon, where they fade):
- * - Satellites and stations orbit like moons: one shared plane (the planet's
- *   equator, seen nearly edge-on with a slight tilt), all the same way round,
- *   sweeping right to left across the front of the planet, round its left side,
- *   then behind it (hidden by its disc). Outer orbits are slower; an orbit takes
- *   minutes. Most hold their attitude; the ring station turns, the sounder spins.
+ * - Satellites and stations orbit low, all the same way round: each comes in
+ *   from the right side of the screen, arcs left over the planet's upper face
+ *   (nearest the camera, largest), curves down the left side into the horizon
+ *   (shrinking to almost nothing) and slips behind. Each orbit differs a little
+ *   in height, tilt and where it meets the horizon; crossing takes about a
+ *   minute. Most hold their attitude; the ring station turns, the sounder spins.
  * - A moon fragment surfaces out of the dark, is caught, and spirals in to be
  *   lost behind the planet.
  * - Since the Tide nothing leaves: the atmosphere cannot be crossed, so ships
@@ -129,9 +130,6 @@ function driftPath(): [number, number, number, number, number, number] {
 const CAM = 2.1;
 const perspective = (z: number) => CAM / Math.max(0.3, CAM - z);
 
-/** The shared orbital plane: nearly edge-on, tilted slightly. */
-const PLANE_INC = 1.36;
-const PLANE_NODE = -0.14;
 /** Never more than this many things in motion at once. */
 const MAX_TOTAL = 3;
 
@@ -154,6 +152,10 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
     let nextId = 1;
     const recent: string[] = [];
     const labelOn = new Set<number>();
+    // Label placement, per object: which side it is on, and how long it has
+    // been crowded / clear (so it changes side or hides only after a moment,
+    // never flickering).
+    const place = new Map<number, { side: "left" | "right"; bad: number; good: number; hidden: boolean }>();
     // Fixed callouts and notes on screen (refreshed now and then): a moving
     // object's label stays quiet while it passes near one, so they never overlap.
     let busy: DOMRect[] = [];
@@ -167,25 +169,27 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       if (recent.length > 5) recent.shift();
       const id = nextId++;
       const [title, line] = prof.labels[Math.floor(Math.random() * prof.labels.length)]!;
-      // Orbits: keep apart from the other orbiter's radius; outer ones slower (Kepler).
-      const taken = [...motionMap.values()].filter((o) => o.mode === "orbit").map((o) => o.R);
-      let R = d.name === "orb" ? rand(1.6, 1.8) : rand(1.18, 1.6);
-      for (let tries = 0; tries < 8 && taken.some((r) => Math.abs(r - R) < 0.14); tries++) R = rand(1.18, 1.6);
-      const period = 300000 * Math.pow(R / 1.35, 1.5);
+      // Orbits: low, just above the atmosphere; each a little different in
+      // height, tilt and where it meets the horizon.
+      const R = d.name === "orb" ? rand(1.18, 1.26) : rand(1.04, 1.14);
+      // Time to cross the planet's face (half an orbit): slow.
+      const half = rand(45000, 62000);
+      const a0 = mode === "capture" ? 0.45 : first ? rand(0.7, 1.5) : 0.04;
       const m: Motion = {
         mode,
         t0: now,
         // Orbiters stay one orbit (leaving while behind the planet); an arrival
         // takes under a minute; debris a couple of minutes.
-        life: mode === "orbit" ? period : mode === "capture" ? rand(70000, 90000) : mode === "arrival" ? rand(40000, 55000) : rand(45000, 65000),
+        // Orbiters leave once they are behind the planet again.
+        life: mode === "orbit" ? ((Math.PI + 0.35 - a0) / Math.PI) * half : mode === "capture" ? rand(70000, 90000) : mode === "arrival" ? rand(40000, 55000) : rand(45000, 65000),
         // A captured fragment starts well out and spirals in (R shrinks over its life).
-        R: mode === "capture" ? rand(2.1, 2.4) : R,
-        inc: PLANE_INC + rand(-0.03, 0.03),
-        node: PLANE_NODE + rand(-0.02, 0.02),
-        // The first is already crossing the visible side; later ones come round
-        // from behind the planet, off screen to the right.
-        a0: mode === "capture" ? rand(1.7, 2.1) : first ? rand(1.0, 1.9) : rand(-0.3, -0.1),
-        w: mode === "capture" ? 0 : (Math.PI * 2) / period,
+        R: mode === "capture" ? rand(1.8, 2.0) : R,
+        // Tilt: how high the orbit arches over the face (cos = arch / radius).
+        inc: Math.acos(mode === "capture" ? rand(0.32, 0.42) : rand(0.36, 0.54)),
+        // Where the orbit meets the horizon on the left (screen angle, y down).
+        node: (Math.PI / 180) * rand(150, 172),
+        a0,
+        w: mode === "capture" ? 0 : Math.PI / half,
         // Arrivals: from the far side of space (off the left edge) down a gentle
         // curve into the planet's limb (pulled in by it). Debris: a slow drift
         // in from the far side, nearly level.
@@ -200,7 +204,7 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       motionMap.set(id, m);
       // Labels sit on the side with more open space.
       const side = mode === "drift" ? "right" : "left";
-      if (mode === "capture") m.w = 2.05 / m.life;
+      if (mode === "capture") m.w = (Math.PI + 0.3 - m.a0) / m.life;
       setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side }]);
     };
 
@@ -263,17 +267,25 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         // Arrivals: heat as they meet the atmosphere (flare, then lost).
         let heat = 0;
         if (m.mode === "orbit" || m.mode === "capture") {
-          // A tilted circular orbit seen from the front: the near half crosses
-          // in front of the planet, the far half passes behind it. A captured
-          // fragment's orbit shrinks as it falls in, and it is lost behind.
+          // A tilted circular orbit: it comes in from the right side of the
+          // screen, arcs left over the planet's upper face (its near half,
+          // nearest the camera and largest), curves down the left side into
+          // the horizon, and slips behind. A captured fragment's orbit shrinks
+          // as it falls in, and it is lost behind the same way.
           const t = m.a0 + m.w * age;
-          const R = m.mode === "capture" ? m.R - (m.R - 1.12) * smooth(0, 1, u) : m.R;
-          const ox = Math.cos(t);
-          const oy = Math.sin(t) * Math.cos(m.inc);
+          const R = m.mode === "capture" ? m.R - (m.R - 1.06) * smooth(0, 1, u) : m.R;
+          const ax = Math.cos(m.node), ay = Math.sin(m.node);
+          let bx = -ay, by = ax;
+          if (by > 0) {
+            bx = -bx;
+            by = -by;
+          }
+          const ci = Math.cos(m.inc);
+          const ox = -Math.cos(t) * ax + Math.sin(t) * ci * bx;
+          const oy = -Math.cos(t) * ay + Math.sin(t) * ci * by;
           z = R * Math.sin(t) * Math.sin(m.inc);
-          const cn = Math.cos(m.node), sn = Math.sin(m.node);
-          x = pcx + pr * R * (ox * cn - oy * sn);
-          y = pcy + pr * R * (ox * sn + oy * cn);
+          x = pcx + pr * R * ox;
+          y = pcy + pr * R * oy;
           behind = z < 0;
           // Perspective: larger crossing in front, a few pixels by the horizon.
           depth = perspective(z);
@@ -345,13 +357,37 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           const vis = fade > 0.6 && px > 7 && hidden < 0.5 && x > 8 && x < rect.width - 8 && y > 8 && y < rect.height - 8;
           tag.style.opacity = vis ? "1" : "0";
           tag.style.setProperty("--r", `${r.toFixed(1)}px`);
-          // The label's area (beside the object, on its side); hide its text if a
-          // fixed callout is there. The leader line stays.
-          const lx0 = tag.dataset.side === "left" ? x - 230 : x - 10;
-          const lx1 = tag.dataset.side === "left" ? x + 10 : x + 230;
-          const crowded = busy.some((b) => b.right - rect.left > lx0 - 12 && b.left - rect.left < lx1 + 12 && b.bottom - rect.top > y - 36 && b.top - rect.top < y + 36);
+          // Where the label would go on each side: it must stay clear of the
+          // screen's edges (with a margin) and of the fixed callouts. If its side
+          // stops fitting, it moves to the other side; only if neither fits does
+          // its text hide. Both only after a moment, so nothing flickers.
+          const PAD = 24;
+          const fits = (sd: "left" | "right") => {
+            const lx0 = sd === "left" ? x - 250 : x - 10;
+            const lx1 = sd === "left" ? x + 10 : x + 250;
+            if (lx0 < PAD || lx1 > rect.width - PAD || y < 40 + PAD || y > rect.height - PAD - 20) return false;
+            return !busy.some((b) => b.right - rect.left > lx0 - 12 && b.left - rect.left < lx1 + 12 && b.bottom - rect.top > y - 36 && b.top - rect.top < y + 36);
+          };
+          const pl = place.get(id) ?? { side: (tag.dataset.side as "left" | "right") ?? "left", bad: 0, good: 0, hidden: false };
+          place.set(id, pl);
+          const okHere = fits(pl.side);
+          const other = pl.side === "left" ? "right" : "left";
+          if (okHere) {
+            pl.bad = 0;
+            pl.good += 16;
+          } else {
+            pl.bad += 16;
+            pl.good = 0;
+          }
+          if (pl.bad > 500 && fits(other)) {
+            pl.side = other;
+            pl.bad = 0;
+            setItems((xs) => xs.map((it) => (it.id === id ? { ...it, side: other } : it)));
+          }
+          if (!pl.hidden && pl.bad > 500) pl.hidden = true;
+          if (pl.hidden && pl.good > 1000) pl.hidden = false;
           const text = tag.lastElementChild as HTMLElement | null;
-          if (text) text.style.opacity = crowded ? "0" : "1";
+          if (text) text.style.opacity = pl.hidden ? "0" : "1";
           // Each label decodes once, the first time its object is clearly in view.
           if (vis && !labelOn.has(id)) {
             labelOn.add(id);

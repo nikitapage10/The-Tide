@@ -334,6 +334,6 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .hint-coarse { display: none; }
 @media (pointer: coarse) { .hint-fine { display: none; } .hint-coarse { display: inline; } }
 /* Callout effects (components/home/CalloutFx): centred on the callout's point. */
-.callout-fx { position: absolute; left: -50px; top: -50px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
+.callout-fx { position: absolute; left: -60px; top: -60px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
 .callout-fx-on { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .callout-fx { display: none; } }

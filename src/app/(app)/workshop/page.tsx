@@ -16,6 +16,7 @@ export default async function WorkshopPage() {
     publishing: project.releaseCount ? `v${project.releaseCount}` : "no releases",
     sources: "",
     "cloud-lab": "lab",
+    "alphabet-lab": "lab",
     settings: ctx.mode === "demo" ? "demo" : "connected",
   };
   return (

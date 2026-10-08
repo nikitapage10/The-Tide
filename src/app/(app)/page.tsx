@@ -12,26 +12,26 @@ import { HomeHero, type HeroCallout, type HeroObservation } from "@/components/h
 const SPOTS = { a: { x: 68, y: 28 }, b: { x: 78, y: 42 }, c: { x: 70, y: 60 }, d: { x: 84, y: 76 } };
 
 /**
- * Rotating notes, in four slots that run at once (two on the planet, two out in
- * space), so with the one fixed callout there are always three to five on
- * screen. Each slot keeps to its own spots, so notes never land on each other.
- * Each note has a small effect at its point, matched to what it names.
+ * Rotating notes, in three slots that run at once (two on the planet, one out
+ * in space), so with the one fixed callout there are three or four on screen. Each slot keeps to its own spots, so notes never land on each other.
+ * Each note has a small effect at its point, matched to what it names. Planet
+ * notes sit to the left of their spots (toward open space), clear of the edge.
  */
 const OBSERVATIONS: HeroObservation[][] = [
   [
-    { ...SPOTS.c, side: "right", title: "Storm cell", line: "Atmosphere unstable", fx: "lightning" },
-    { ...SPOTS.a, side: "right", title: "The Drowning", line: "Shorelines that no longer hold", fx: "ripple" },
-    { ...SPOTS.c, side: "right", title: "The Undertow", line: "Before the Veil", fx: "sink" },
-    { ...SPOTS.a, side: "right", title: "Age of the Veil", line: "Records scarce", fx: "veil" },
-    { ...SPOTS.c, side: "right", title: "Dark coast", line: "Lights failing", fx: "flicker" },
-    { ...SPOTS.a, side: "right", title: "Survey", line: "Incomplete", fx: "grid" },
+    { ...SPOTS.c, side: "left", title: "Storm cell", line: "Atmosphere unstable", fx: "lightning" },
+    { ...SPOTS.a, side: "left", title: "The Drowning", line: "Shorelines that no longer hold", fx: "ripple" },
+    { ...SPOTS.c, side: "left", title: "The Undertow", line: "Before the Veil", fx: "sink" },
+    { ...SPOTS.a, side: "left", title: "Age of the Veil", line: "Records scarce", fx: "veil" },
+    { ...SPOTS.c, side: "left", title: "Dark coast", line: "Lights failing", fx: "flicker" },
+    { ...SPOTS.a, side: "left", title: "Survey", line: "Incomplete", fx: "grid" },
   ],
   [
-    { ...SPOTS.b, side: "right", title: "The Divergence", line: "Something woke", fx: "split" },
+    { ...SPOTS.b, side: "left", title: "The Divergence", line: "Something woke", fx: "split" },
     { ...SPOTS.d, side: "left", title: "The Drift", line: "Arrivals from elsewhere", fx: "drift" },
-    { ...SPOTS.b, side: "right", title: "Era of Verdancy", line: "Present, for now", fx: "bloom" },
+    { ...SPOTS.b, side: "left", title: "Era of Verdancy", line: "Present, for now", fx: "bloom" },
     { ...SPOTS.d, side: "left", title: "Entry unknown", line: "Designation withheld", fx: "brackets" },
-    { ...SPOTS.b, side: "right", title: "Pressure front", line: "Building slowly", fx: "isobars" },
+    { ...SPOTS.b, side: "left", title: "Pressure front", line: "Building slowly", fx: "isobars" },
     { ...SPOTS.d, side: "left", title: "Tide line", line: "Rising", fx: "tideline" },
   ],
 ];
@@ -40,14 +40,12 @@ const OBSERVATIONS: HeroObservation[][] = [
 const SPACE_NOTES: HeroObservation[][] = [
   [
     { x: 30, y: 57, side: "right", title: "Gravitic stream", line: "Flowing in · flowing out", fx: "stream" },
-    { x: 24, y: 64, side: "right", title: "Debris field", line: "Drifting, slowly", fx: "orbit" },
-    { x: 33, y: 61, side: "right", title: "Cold spot", line: "Below background", fx: "cold" },
-    { x: 27, y: 54, side: "right", title: "Echo", line: "Returning late", fx: "echo" },
-  ],
-  [
     { x: 54, y: 19, side: "left", title: "Light bending", line: "Source unknown", fx: "glint" },
+    { x: 24, y: 64, side: "right", title: "Debris field", line: "Drifting, slowly", fx: "orbit" },
     { x: 53, y: 25, side: "left", title: "Signal", line: "Faint · repeating", fx: "wave" },
+    { x: 33, y: 61, side: "right", title: "Cold spot", line: "Below background", fx: "cold" },
     { x: 57, y: 22, side: "left", title: "Lensing arc", line: "Steady", fx: "arc" },
+    { x: 27, y: 54, side: "right", title: "Echo", line: "Returning late", fx: "echo" },
     { x: 52, y: 17, side: "left", title: "Sweep", line: "No return", fx: "scan" },
   ],
 ];

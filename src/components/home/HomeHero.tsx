@@ -200,13 +200,13 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
                 <Callout c={c} active={revealed} delay={i * 450} />
               </div>
             ))}
-            {/* Rotating notes: several slots at once, staggered so they never all
-                change together (three to five callouts on screen at any time). */}
+            {/* Rotating notes: a few slots at once, slow and staggered so they
+                never change together (three or four callouts on screen). */}
             {observations.map((slot, i) => (
-              <Observations key={`p${i}`} items={slot} active={revealed} startDelay={1600 + i * 2300} hold={6600 + i * 900} />
+              <Observations key={`p${i}`} items={slot} active={revealed} startDelay={1600 + i * 4200} hold={11000 + i * 1500} />
             ))}
             {spaceNotes.map((slot, i) => (
-              <Observations key={`s${i}`} items={slot} active={revealed} startDelay={3400 + i * 2700} hold={7200 + i * 700} calc />
+              <Observations key={`s${i}`} items={slot} active={revealed} startDelay={3600 + i * 2700} hold={13000 + i * 700} calc />
             ))}
           </div>
           {/* Top-right note from the mockup. */}
@@ -325,7 +325,7 @@ function Observations({ items, active, startDelay = 1600, hold = 6200, calc = fa
       t1 = window.setTimeout(() => {
         if (!alive) return;
         setShown(false);
-        t2 = window.setTimeout(() => alive && cycle((i + 1) % items.length), 900);
+        t2 = window.setTimeout(() => alive && cycle((i + 1) % items.length), 1400);
       }, hold);
     };
     const t0 = window.setTimeout(() => cycle(index), startDelay);
@@ -343,7 +343,7 @@ function Observations({ items, active, startDelay = 1600, hold = 6200, calc = fa
   const on = active && shown;
   return (
     <div aria-hidden="true" className={`hero-pin obs ${on ? "obs-on" : ""}`} style={pin(o.x, o.y)}>
-      <CalloutFx key={`fx${index}`} kind={o.fx} on={on} />
+      <CalloutFx key={`fx${index}`} kind={o.fx} on={on} space={calc} />
       <span className="obs-ping absolute -left-2 -top-2 h-4 w-4 rounded-full border border-white/70" />
       <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />
       <span className={`obs-line absolute top-0 h-px bg-white/50 ${o.side === "right" ? "left-2 origin-left" : "right-2 origin-right"}`} />

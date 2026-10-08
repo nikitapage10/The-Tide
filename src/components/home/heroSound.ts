@@ -178,9 +178,52 @@ export class HeroSound {
     src.stop(t + 2.7);
   }
 
+  /** A short burst of filtered noise (a crackle or the strike's crack). */
+  private crack(at: number, gain: number, dur: number, freq: number) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(gain, at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0008, at + dur);
+    src.connect(hp).connect(g).connect(this.master);
+    src.start(at, Math.random() * 1.5);
+    src.stop(at + dur + 0.02);
+  }
+
+  /** A deep hit: a low sine dropping in pitch, with a soft (not clipped) attack. */
+  private hit(at: number, gain: number) {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(64, at);
+    o.frequency.exponentialRampToValueAtTime(32, at + 0.7);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(gain, at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.001, at + 0.9);
+    o.connect(g).connect(this.master);
+    o.start(at);
+    o.stop(at + 1);
+  }
+
   private thunder() {
     const ctx = this.ctx;
     const t = ctx.currentTime;
+    // The strike: a crack and a deep hit, crackles running on for a moment,
+    // a second (softer) hit, then the rolling rumble below.
+    this.crack(t, 0.22, 0.14, 1800);
+    this.hit(t + 0.01, 0.42);
+    for (let i = 0; i < 9; i++) {
+      const at = t + 0.08 + Math.random() * 0.9 * (i / 9 + 0.1);
+      this.crack(at, 0.03 + Math.random() * 0.06, 0.02 + Math.random() * 0.05, 2500 + Math.random() * 3000);
+    }
+    this.hit(t + 0.7 + Math.random() * 0.4, 0.26);
+    this.crack(t + 0.72 + Math.random() * 0.3, 0.1, 0.1, 1400);
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     const lp = ctx.createBiquadFilter();

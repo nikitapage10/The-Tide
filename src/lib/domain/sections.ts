@@ -78,6 +78,7 @@ export const SECTIONS: SectionDef[] = [
       { slug: "publishing", label: "Publishing", description: "Import, preview, publish and roll back lore releases." },
       { slug: "sources", label: "Sources", description: "Source references and their access metadata." },
       { slug: "cloud-lab", label: "Cloud lab", description: "Try cloud and weather simulations by hand." },
+      { slug: "alphabet-lab", label: "Alphabet lab", description: "Ways for the Tide's script to translate into English." },
       { slug: "settings", label: "Connection & settings", description: "Data mode and configuration status." },
     ],
   },

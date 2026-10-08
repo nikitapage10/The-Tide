@@ -136,6 +136,7 @@ uniform sampler2D uPlanet, uFar, uNear;
 uniform sampler2D uFlow;          // planet: weather flow (z: where the clouds were brushed thin)
 uniform sampler2D uMasks;         // planet: baked masks (R land, G light streams on the disc)
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
+uniform vec4 uPull;               // planet: where the cursor left the planet (CSS px x, y), age s, on
 uniform vec4 uGrav[2];            // planet: disturbances you set off in space (CSS px x, y, age s, on)
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
 uniform sampler2D uCentFar, uCentNear;   // meteors: each rock pixel's rock centre + movable flag
@@ -888,6 +889,29 @@ void main() {
     vec3 prism = vec3(1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5), 1.0, 1.0 + 0.25 * sin(rF * 0.08 - uT * 1.5 + 2.0));
     col *= 1.0 + e * pointerInSpace * (0.9 * lensRing * prism - 0.0);
     col += vec3(0.72, 0.8, 0.95) * exp(-rF * rF / (R * R * 0.02)) * 0.05 * e * pointerInSpace * (0.6 + 0.4 * smoothstep(0.02, 0.2, lit0));
+    // Leaving the planet: the halo is drawn out of the atmosphere. A point on
+    // the limb flares where the cursor left; a thread of light is pulled from it
+    // to the cursor (a pulse running along it); and the halo's ring fills in
+    // around the cursor from the side facing the planet, then settles.
+    if (uPull.w > 0.5 && uPull.z < 2.4) {
+      float pa = uPull.z;
+      vec2 ex = uPull.xy;
+      vec2 seg = uM - ex;
+      float segL = max(length(seg), 1.0);
+      float h = clamp(dot(sp - ex, seg) / (segL * segL), 0.0, 1.0);
+      float dl = length(sp - ex - seg * h);
+      float life = 1.0 - smoothstep(0.6, 2.2, pa);
+      float wTh = mix(3.2, 1.0, h);
+      float thread = exp(-dl * dl / (wTh * wTh)) * (0.35 + 0.65 * h) * life;
+      float packet = exp(-pow((h - clamp(pa / 0.7, 0.0, 1.2)) / 0.12, 2.0)) * exp(-dl * dl / 16.0) * (1.0 - smoothstep(0.7, 1.0, pa));
+      float flare = exp(-dot(sp - ex, sp - ex) / 260.0) * (1.0 - smoothstep(0.0, 1.4, pa));
+      vec2 toEx = normalize(ex - uM + 1e-4);
+      float ang = acos(clamp(dot(normalize(dmF + 1e-4), toEx), -1.0, 1.0));
+      float sweep = 1.0 - smoothstep(0.0, 0.25, ang / 3.1416 - smoothstep(0.15, 1.1, pa));
+      float fill = exp(-pow((rF - R * 0.32) / (R * 0.07), 2.0)) * sweep * (1.0 - smoothstep(1.0, 2.4, pa));
+      col += vec3(0.78, 0.86, 1.0) * (thread * 0.16 + packet * 0.45 + flare * 0.35 + fill * 0.22) * pointerInSpace;
+      col += vec3(0.78, 0.86, 1.0) * flare * 0.25 * (1.0 - pointerInSpace);
+    }
     // Strands of energy drawn off the planet toward the cursor: a few curved
     // filaments leave the limb nearest the pointer, bending and swaying as if
     // stretched and pulled, with light flowing outward along them. Mild, cool
@@ -1202,7 +1226,7 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), pull: u("uPull"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
@@ -1231,6 +1255,8 @@ export function HeroScene({
       const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9 }));
       let nextGrav = 0;
       const gravData = new Float32Array(8);
+      // Where the cursor last left the planet for space (see uPull).
+      const pull = { x: 0, y: 0, t: -1e9, inside: false };
 
       // Small data textures (weather flow, gravity fields), updated in place.
       const dataTex = new Map<number, WebGLTexture>();
@@ -1518,6 +1544,17 @@ export function HeroScene({
           }
           prevSim.disc = [mx, my];
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
+          // Leaving the planet for space: remember where (the halo is drawn
+          // out of the atmosphere there); going back in cancels it.
+          const insideNow = hasPointer && mx * mx + my * my < 1.0;
+          if (pull.inside && !insideNow && hasPointer && p > 0.6) {
+            pull.x = pointer.x;
+            pull.y = pointer.y;
+            pull.t = now;
+          }
+          if (insideNow) pull.t = -1e9;
+          pull.inside = insideNow;
+          gl.uniform4f(U.pull, pull.x, pull.y, (now - pull.t) / 1000, now - pull.t < 2400 ? 1 : 0);
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
           gl.uniform4fv(U.storm, stormData);
           gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 3700 ? 1 : 0], k * 4));
