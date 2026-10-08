@@ -41,10 +41,12 @@ const zMarkdown = z.string().max(LIMITS.maxMarkdown).nullable().optional();
 /** URLs are syntax-checked here; protocol/credential safety is enforced by the semantic validator. */
 const zUrl = z.string().max(LIMITS.maxUrl);
 
-export const VISIBILITIES = ["gm_only", "player_safe"] as const;
+export const VISIBILITIES = ["gm_only", "player_safe", "public"] as const;
 /**
- * "player_safe" only marks a record as a candidate for a future, server-side
- * player projection. It never makes anything public on its own.
+ * Three audiences, in layers: "gm_only" (the default) is seen by the GM alone;
+ * "player_safe" may also be shown to signed-in players; "public" may also be
+ * shown to anyone, when the project allows public viewing. A wider tier never
+ * hides anything from a narrower audience.
  */
 export const zVisibility = z.enum(VISIBILITIES);
 
@@ -127,10 +129,36 @@ export const zChronology = z.strictObject({
   notes: zNullableText(LIMITS.maxNote),
 });
 
+/** Where something sits in the world's long history (the eras of Tide 101). */
+export const ERAS = ["before_undertow", "undertow", "veil", "verdancy", "tide", "today"] as const;
+
+/**
+ * A place on the atlas. Either normalised coordinates on a named map (0..1
+ * from the top-left), or latitude/longitude on the globe. Optional: places
+ * without one are listed as uncharted.
+ */
+export const zLocation = z.union([
+  z.strictObject({
+    map: z.string().regex(/^[a-z0-9-]{1,40}$/),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  }),
+  z.strictObject({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }),
+]);
+
 export const zEntity = z.strictObject({
   ...baseFields,
   type: z.literal("entity"),
   kind: z.enum(ENTITY_KINDS),
+  /** The era this belongs to (for the timeline); null or absent when unknown. */
+  era: z.enum(ERAS).nullable().optional(),
+  location: zLocation.nullable().optional(),
+  /** An accent colour for this entry's page (e.g. a people's glow), "#rrggbb". */
+  palette: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/, "palette must be a lowercase hex colour like #c8a24a")
+    .nullable()
+    .optional(),
   /** Optional nesting: a broader entry this one sits under (e.g. a place within an environment). */
   parentId: zId.nullable().optional(),
   aliases: z.array(zText(200)).max(30).optional(),
@@ -224,11 +252,15 @@ export const zAssetRef = z.strictObject({
     .refine((p) => !p.includes("..") && !p.startsWith("/"), "asset path must be relative without '..'"),
 });
 
+/** How a page may use an image: a portrait, a banner, a map, an emblem or a gallery piece. */
+export const MEDIA_ROLES = ["portrait", "hero", "map", "emblem", "gallery"] as const;
+
 export const zMedia = z.strictObject({
   ...baseFields,
   type: z.literal("media"),
   mediaType: z.enum(MEDIA_TYPES),
   stage: z.enum(MEDIA_STAGES),
+  role: z.enum(MEDIA_ROLES).nullable().optional(),
   url: zUrl.nullable().optional(),
   asset: zAssetRef.nullable().optional(),
   attribution: z
@@ -357,3 +389,6 @@ export type Visibility = (typeof VISIBILITIES)[number];
 export type CanonStatus = (typeof CANON_STATUSES)[number];
 export type SourceRef = z.infer<typeof zSourceRef>;
 export type Chronology = z.infer<typeof zChronology>;
+export type Era = (typeof ERAS)[number];
+export type Location = z.infer<typeof zLocation>;
+export type MediaRole = (typeof MEDIA_ROLES)[number];
