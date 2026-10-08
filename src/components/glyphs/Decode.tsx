@@ -14,9 +14,19 @@ const TICK = 30;
 const CALC_TICKS = 20;
 const HOLD_TICKS = 9;
 
+/**
+ * The pace of a decode (ms per step): titles take their time; longer text
+ * (a line, a sentence) quickens with its length so it never drags, down to
+ * a floor where the glyphs can still be seen.
+ */
+const TITLE_CHARS = 24;
+export function paceFor(text: string) {
+  return text.length <= TITLE_CHARS ? TICK : Math.max(12, Math.round((TICK * TITLE_CHARS) / text.length));
+}
+
 /** How long a decode takes (ms), for staggering what follows it. */
 export function decodeMs(text: string, calc = false) {
-  return ((calc ? CALC_TICKS : 0) + text.length * 2 + HOLD_TICKS + ROLL_TICKS) * TICK;
+  return ((calc ? CALC_TICKS : 0) + text.length * 2 + HOLD_TICKS + ROLL_TICKS) * paceFor(text);
 }
 
 /** Ticks a glyph spends rolling before it locks. */
@@ -42,10 +52,16 @@ function working(step: number) {
   return `${op(1)} ${num(2)} ${["·", "×", "→"][Math.floor(rnd(step, 3) * 3)]} ${op(4)} ${num(5)}`;
 }
 
-export function Decode({ text, active, delay = 0, calc = false }: { text: string; active: boolean; delay?: number; calc?: boolean }) {
+/**
+ * `tick` (ms per step) and `hold` (steps the glyphs hold before resolving) set
+ * the pace: by default titles take their time and longer text quickens
+ * (paceFor); a narrated word sets its own, to land within the moment it is
+ * spoken.
+ */
+export function Decode({ text, active, delay = 0, calc = false, tick = paceFor(text), hold = HOLD_TICKS }: { text: string; active: boolean; delay?: number; calc?: boolean; tick?: number; hold?: number }) {
   const [step, setStep] = useState(-1);
   const C = calc ? CALC_TICKS : 0;
-  const total = C + text.length * 2 + HOLD_TICKS + ROLL_TICKS;
+  const total = C + text.length * 2 + hold + ROLL_TICKS;
   useEffect(() => {
     if (!active) return;
     const instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -61,13 +77,13 @@ export function Decode({ text, active, delay = 0, calc = false }: { text: string
         s += 1;
         setStep(s);
         if (s >= total) window.clearInterval(timer);
-      }, TICK);
+      }, tick);
     }, delay);
     return () => {
       window.clearTimeout(start);
       window.clearInterval(timer);
     };
-  }, [active, text, delay, total]);
+  }, [active, text, delay, total, tick]);
 
   const st = active ? step : -1;
   const n = text.length;
@@ -95,7 +111,7 @@ export function Decode({ text, active, delay = 0, calc = false }: { text: string
               {[...w].map((ch, ci) => {
                 const i = at + ci;
                 const typed = st >= C + arrive[i]! + 1;
-                const resolved = st >= C + n + ROLL_TICKS + HOLD_TICKS + settle[i]! + 1;
+                const resolved = st >= C + n + ROLL_TICKS + hold + settle[i]! + 1;
                 if (!hasGlyph(ch)) {
                   return (
                     <span key={i} className={typed ? "" : "invisible"}>

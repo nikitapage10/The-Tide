@@ -128,7 +128,7 @@ export function SpokenStage({ children }: { children: ReactNode }) {
           <p key={`l${at.line}`} className="spoken-line">
             {line.words.map((w, k) => (
               <span key={k} className={`spoken-word ${k <= at.word ? "spoken-said" : ""} ${k === at.word && at.lit ? "spoken-now" : ""}`}>
-                <Decode text={w} active={k <= at.word} />{" "}
+                <Decode text={w} active={k <= at.word} tick={12} hold={3} />{" "}
               </span>
             ))}
           </p>
