@@ -24,6 +24,14 @@ export function paceFor(text: string) {
   return text.length <= TITLE_CHARS ? TICK : Math.max(12, Math.round((TICK * TITLE_CHARS) / text.length));
 }
 
+/**
+ * When a decode, once started, has fully resolved (ms): its last letter turns
+ * at step 2n + roll + hold, one step after the decode begins.
+ */
+export function decodeDoneMs(text: string, tick = paceFor(text), hold = HOLD_TICKS) {
+  return (text.length * 2 + ROLL_TICKS + hold + 1) * tick;
+}
+
 /** How long a decode takes (ms), for staggering what follows it. */
 export function decodeMs(text: string, calc = false) {
   return ((calc ? CALC_TICKS : 0) + text.length * 2 + HOLD_TICKS + ROLL_TICKS) * paceFor(text);

@@ -12,13 +12,14 @@
  * `tide:narration` event, so this can sit anywhere on the page.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Decode } from "@/components/glyphs/Decode";
+import { Decode, decodeDoneMs } from "@/components/glyphs/Decode";
 import { timeWords, wordAt, type TimedWord } from "./karaoke";
 
 const CAPTIONS = "/audio/ilyr-narration.vtt";
 const WORDS = "/audio/ilyr-narration.words.json";
-/** Words begin a beat before they are heard, so each is legible as it is spoken (s). */
-const LEAD = 0.18;
+/** The pace of a spoken word's decode (ms a step, steps held). */
+const TICK = 8;
+const HOLD = 1;
 
 interface Line {
   start: number;
@@ -26,6 +27,8 @@ interface Line {
   words: string[];
   starts: number[];
   ends: number[];
+  /** When each word begins to decode: its own decode time before it is heard, so every word resolves as it is spoken, short or long. */
+  shows: number[];
 }
 
 const seconds = (stamp: string) => stamp.split(":").reduce((s, part) => s * 60 + Number(part), 0);
@@ -50,7 +53,9 @@ export function buildLines(cues: { start: number; end: number; text: string }[],
     const words = c.text.split(/\s+/).filter(Boolean);
     const near = timed.filter((t) => t[0] >= c.start - 0.4 && t[0] <= c.end + 0.2);
     const { starts, ends } = near.length ? timeWords(words, near, c.start) : { starts: words.map((_, i) => c.start + ((c.end - c.start) * i) / words.length), ends: words.map((_, i) => c.start + ((c.end - c.start) * (i + 0.8)) / words.length) };
-    return { start: c.start, end: c.end, words, starts, ends };
+    const shows = words.map((w, i) => starts[i]! - decodeDoneMs(w, TICK, HOLD) / 1000);
+    for (let i = 1; i < shows.length; i++) if (shows[i]! < shows[i - 1]!) shows[i] = shows[i - 1]!;
+    return { start: c.start, end: c.end, words, starts, ends, shows };
   });
 }
 
@@ -59,7 +64,7 @@ export function SpokenStage({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<{ all: Line[]; starts: number[] } | null>(null);
   const [on, setOn] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [at, setAt] = useState<{ line: number; word: number; lit: boolean }>({ line: -1, word: -1, lit: false });
+  const [at, setAt] = useState<{ line: number; word: number; lit: number }>({ line: -1, word: -1, lit: -1 });
 
   // The narration announces itself (and its audio element) when it plays or stops.
   useEffect(() => {
@@ -69,7 +74,7 @@ export function SpokenStage({ children }: { children: ReactNode }) {
       setPlaying(d.playing);
       if (d.open === false) {
         setOn(false);
-        setAt({ line: -1, word: -1, lit: false });
+        setAt({ line: -1, word: -1, lit: -1 });
       } else if (d.playing) setOn(true);
     };
     window.addEventListener("tide:narration", onNarration);
@@ -84,7 +89,8 @@ export function SpokenStage({ children }: { children: ReactNode }) {
       .then(([vtt, timed]) => {
         if (cancelled) return;
         const all = buildLines(parseVtt(vtt), timed);
-        setLines({ all, starts: all.map((l) => l.start) });
+        // A line opens when its first word starts decoding.
+        setLines({ all, starts: all.map((l) => l.shows[0] ?? l.start) });
       })
       .catch(() => {
         /* no timings: the chapter keeps its own text */
@@ -104,10 +110,13 @@ export function SpokenStage({ children }: { children: ReactNode }) {
       if (!a) return;
       const t = a.currentTime;
       // The line being spoken (or the last one, through the pause after it).
-      const line = wordAt(lines, t + LEAD);
+      // A line opens as its first word begins to decode.
+      const line = wordAt(lines, t);
       const l = lines.all[line];
-      const word = l ? wordAt(l, t + LEAD) : -1;
-      const lit = !!l && word >= 0 && t < l.ends[word]! + 0.3;
+      // Words shown: those whose decode has begun. The flare: the word being heard.
+      const word = l ? wordAt({ starts: l.shows }, t) : -1;
+      const heard = l ? wordAt(l, t) : -1;
+      const lit = !!l && heard >= 0 && t < l.ends[heard]! + 0.3 ? heard : -1;
       setAt((p) => (p.line === line && p.word === word && p.lit === lit ? p : { line, word, lit }));
     };
     raf = requestAnimationFrame(frame);
@@ -129,8 +138,8 @@ export function SpokenStage({ children }: { children: ReactNode }) {
         {line ? (
           <p key={`l${at.line}`} className="spoken-line">
             {line.words.map((w, k) => (
-              <span key={k} className={`spoken-word ${k <= at.word ? "spoken-said" : ""} ${k === at.word && at.lit ? "spoken-now" : ""}`}>
-                <Decode text={w} active={k <= at.word} tick={8} hold={1} />{" "}
+              <span key={k} className={`spoken-word ${k <= at.word ? "spoken-said" : ""} ${k === at.lit ? "spoken-now" : ""}`}>
+                <Decode text={w} active={k <= at.word} tick={TICK} hold={HOLD} />{" "}
               </span>
             ))}
           </p>
