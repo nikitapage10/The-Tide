@@ -258,6 +258,73 @@
     {
       "op": "upsert",
       "record": {
+        "id": "05f04b13-a938-5770-a6eb-cbdf1365b722",
+        "type": "media",
+        "title": "Irridosai, portrait",
+        "summary": null,
+        "mediaType": "artwork",
+        "stage": "approved",
+        "role": "portrait",
+        "url": "/lore/peoples/irridosai.webp",
+        "linkedIds": [
+          "8c61dc8d-c5d7-4371-b63e-72b07166f509"
+        ],
+        "canonStatus": "unverified",
+        "visibility": "public",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "0af2bcc8-bc20-53a5-8b0d-f2fc18fe0811"
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "id": "c1108f62-ddc4-5150-87ef-7b110de5e24a",
+        "type": "media",
+        "title": "Blightmourn, portrait",
+        "summary": null,
+        "mediaType": "artwork",
+        "stage": "approved",
+        "role": "portrait",
+        "url": "/lore/peoples/blightmourn.webp",
+        "linkedIds": [
+          "dabef000-c21e-451e-a73e-33401893896e"
+        ],
+        "canonStatus": "unverified",
+        "visibility": "public",
+        "demo": false,
+        "sourceRefs": [
+          {
+            "sourceId": "0af2bcc8-bc20-53a5-8b0d-f2fc18fe0811"
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
+        "id": "7a589f4e-3dcc-5d13-9e5f-2c8dfad08b67",
+        "type": "media",
+        "title": "Syntherion, portrait",
+        "summary": null,
+        "mediaType": "artwork",
+        "stage": "approved",
+        "role": "portrait",
+        "url": "/lore/peoples/syntherion.webp",
+        "linkedIds": [
+          "91026a63-0ca2-4cc3-bf1e-22f80a4cbc08"
+        ],
+        "canonStatus": "unverified",
+        "visibility": "public",
+        "demo": false
+      }
+    },
+    {
+      "op": "upsert",
+      "record": {
         "id": "263af39c-3500-41ef-b891-5f3bbcdf45f2",
         "type": "entity",
         "kind": "place",
@@ -861,6 +928,9 @@
           {
             "sourceId": "0af2bcc8-bc20-53a5-8b0d-f2fc18fe0811"
           }
+        ],
+        "mediaIds": [
+          "05f04b13-a938-5770-a6eb-cbdf1365b722"
         ]
       }
     },
@@ -884,6 +954,9 @@
           {
             "sourceId": "0af2bcc8-bc20-53a5-8b0d-f2fc18fe0811"
           }
+        ],
+        "mediaIds": [
+          "c1108f62-ddc4-5150-87ef-7b110de5e24a"
         ]
       }
     },
@@ -902,6 +975,9 @@
         "demo": false,
         "tags": [
           "the eight peoples"
+        ],
+        "mediaIds": [
+          "7a589f4e-3dcc-5d13-9e5f-2c8dfad08b67"
         ]
       }
     },

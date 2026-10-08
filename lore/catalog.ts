@@ -368,6 +368,7 @@ export const ENTITIES: EntityEntry[] = [
     canon: "unverified",
     visibility: "public",
     source: "tide-101",
+    portrait: "/lore/peoples/irridosai.webp",
   },
   {
     name: "people/blightmourn",
@@ -378,6 +379,7 @@ export const ENTITIES: EntityEntry[] = [
     canon: "unverified",
     visibility: "public",
     source: "tide-101",
+    portrait: "/lore/peoples/blightmourn.webp",
   },
   {
     name: "people/syntherion",
@@ -387,6 +389,7 @@ export const ENTITIES: EntityEntry[] = [
     tags: ["the eight peoples"],
     canon: "unverified",
     visibility: "public",
+    portrait: "/lore/peoples/syntherion.webp",
   },
 
   // ── Nyth'rok ─────────────────────────────────────────────────────────────
