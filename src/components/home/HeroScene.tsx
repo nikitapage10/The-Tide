@@ -137,6 +137,7 @@ uniform sampler2D uFlow;          // planet: weather flow (z: where the clouds w
 uniform sampler2D uMasks;         // planet: baked masks (R land, G light streams on the disc)
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
 uniform vec4 uPull;               // planet: where the cursor left the planet (CSS px x, y), age s, on
+uniform vec3 uZoom;               // planet: zoom toward a forming black hole (CSS px x, y, zoom >= 1)
 uniform vec4 uWell;               // planet: a gravity well being charged (CSS px x, y, charge 0..1, on)
 uniform vec4 uGrav[2];            // planet: released wells (CSS px x, y, age s, charge; 0 = none)
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
@@ -793,6 +794,8 @@ vec4 scene(vec2 sp) {
 
 void main() {
   vec2 sp = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uDpr;
+  // Zooming in on a forming black hole (a long hold in open space).
+  if (uZoom.z > 1.0001) sp = uZoom.xy + (sp - uZoom.xy) / uZoom.z;
   vec2 res = uRes / uDpr;
   float R = 0.14 * min(res.x, res.y);
 
@@ -819,6 +822,9 @@ void main() {
   float gCore = 0.0;
   float gEin = 0.0;
   float gFlash = 0.0;
+  float gDiskF = 0.0;
+  float gDiskB = 0.0;
+  float gArc = 0.0;
   if (uWell.w > 0.5) {
     float c = uWell.z;
     vec2 gd = sp - uWell.xy;
@@ -837,6 +843,33 @@ void main() {
     gCore = max(gCore, core * (1.0 - smoothstep(coreR * 0.55, coreR, gr)));
     float ein = (gr - coreR * 1.45) / (1.6 + 1.8 * c);
     gEin = max(gEin, core * (0.35 + 0.65 * c) * exp(-ein * ein));
+    // After about five seconds it becomes a black hole forming: a wider black
+    // horizon, a tilted accretion disk swirling round it (faster inside,
+    // brighter on the side turning toward us; its near half crosses in front
+    // of the horizon, its far half is hidden behind it), and the far side's
+    // light lensed up over the top as a thin arc. Greys only (it is in space).
+    float bh = smoothstep(0.33, 0.75, c);
+    if (bh > 0.0) {
+      float hR = coreR * (1.0 + 0.45 * bh);
+      gCore = max(gCore, bh * (1.0 - smoothstep(hR * 0.75, hR, gr)));
+      float tl = -0.32;
+      vec2 dd = vec2(cos(tl) * gd.x + sin(tl) * gd.y, -sin(tl) * gd.x + cos(tl) * gd.y);
+      float flat2 = 0.26;
+      float rd = length(vec2(dd.x, dd.y / flat2));
+      float inner = hR * 1.6, outer = hR * 4.6;
+      float band = smoothstep(inner, inner * 1.18, rd) * (1.0 - smoothstep(outer * 0.65, outer, rd));
+      float a2 = atan(dd.y / flat2, dd.x);
+      float swirl = a2 + uT * 2.4 * inner / max(rd, 1.0);
+      float tex = 0.5 + 0.5 * fbm(vec2(swirl * 2.2, rd * 0.09 - uT * 0.3));
+      float dop = 1.0 + 0.6 * cos(a2);
+      float disk = band * tex * dop * bh;
+      gDiskF = max(gDiskF, disk * step(0.0, dd.y));
+      gDiskB = max(gDiskB, disk * (1.0 - step(0.0, dd.y)));
+      float ar = (gr - hR * 1.85) / (1.2 + 1.6 * bh);
+      gArc = max(gArc, bh * exp(-ar * ar) * smoothstep(0.15, -0.55, gdir.y) * (0.6 + 0.4 * tex));
+      // A deeper lensing pull around it.
+      warped -= gdir * 18.0 * bh * exp(-pow((gr - hR * 2.2) / (hR * 1.5), 2.0));
+    }
   }
   for (int k = 0; k < 2; k++) {
     float c = uGrav[k].w;
@@ -1041,6 +1074,10 @@ void main() {
     // The disturbance: a dark core, its thin ring of light, and the shockwave
     // catching a little light (cool on its leading edge) as it passes.
     col *= 1.0 - 0.92 * gCore * pointerInSpace;
+    // The black hole's disk: the far half and the lensed arc only where the
+    // horizon does not hide them; the near half in front of everything.
+    col += vec3(0.9, 0.92, 0.95) * (gDiskB * (1.0 - gCore) * 0.42 + gArc * 0.5) * pointerInSpace;
+    col += vec3(0.92, 0.94, 0.97) * gDiskF * 0.5 * pointerInSpace;
     col += vec3(0.86, 0.9, 1.0) * gEin * 0.55 * pointerInSpace;
     col += vec3(0.74, 0.82, 0.98) * gRing * 0.05 * pointerInSpace;
     col += vec3(0.86, 0.9, 1.0) * min(gFlash, 1.0) * 0.35;
@@ -1268,7 +1305,7 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), well: u("uWell"), pull: u("uPull"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), well: u("uWell"), zoom: u("uZoom"), pull: u("uPull"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
@@ -1297,6 +1334,7 @@ export function HeroScene({
       const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9, c: 0 }));
       // The well being charged (held in open space), if any.
       const well = { on: false, x: 0, y: 0, t: 0 };
+      const zoom = { x: 0, y: 0, z: 1 };
       // The charge builds slowly (an ease-in), full at ten seconds.
       const chargeOf = (now: number) => Math.pow(Math.min(1, (now - well.t) / 10000), 1.6);
       let nextGrav = 0;
@@ -1608,6 +1646,16 @@ export function HeroScene({
           const wc = well.on ? chargeOf(now) : 0;
           heroSignal.charge = wc;
           gl.uniform4f(U.well, well.x, well.y, wc, well.on ? 1 : 0);
+          // Zoom toward a forming black hole (from about five seconds), and back
+          // out gently after the release.
+          const bh = smooth(0.33, 0.75, wc);
+          const zTarget = 1 + 0.32 * bh;
+          zoom.z += (zTarget - zoom.z) * (zTarget > zoom.z ? 0.04 : 0.05);
+          if (well.on) {
+            zoom.x = well.x;
+            zoom.y = well.y;
+          }
+          gl.uniform3f(U.zoom, zoom.x, zoom.y, zoom.z);
         }
         if (fieldFar && fieldNear) {
           // Before scrolling, the pointer is a soft reverse singularity among the rocks.

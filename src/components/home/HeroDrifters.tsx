@@ -27,6 +27,7 @@ import { useEffect, useRef, useState } from "react";
 import { Decode } from "@/components/glyphs/Decode";
 import { DRIFTERS } from "./drifters";
 import { frameGeometry } from "./HeroScene";
+import { heroSignal } from "./heroSound";
 
 type Mode = "orbit" | "capture" | "arrival" | "drift";
 
@@ -222,11 +223,24 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side }]);
     };
 
-    const frame = (now: number) => {
+    // Their own clock: it slows almost to a stop (and they dim) while a black
+    // hole is forming (a long hold in open space), so the scene steps back.
+    let clockNow = 0;
+    let lastReal = 0;
+    let hush = 0;
+    const frame = (real: number) => {
       raf = requestAnimationFrame(frame);
-      if (!visible || document.hidden) return;
+      if (!visible || document.hidden) {
+        lastReal = 0;
+        return;
+      }
+      hush += (smooth(0.33, 0.75, heroSignal.charge) - hush) * 0.05;
+      clockNow += lastReal ? Math.min(100, real - lastReal) * (1 - 0.9 * hush) : 0;
+      if (!clockNow) clockNow = real;
+      lastReal = real;
+      const now = clockNow;
       const p = progress.current;
-      root.style.opacity = String(smooth(0.72, 0.92, p));
+      root.style.opacity = String(smooth(0.72, 0.92, p) * (1 - 0.7 * hush));
       const on = p >= 0.72;
       const all = [...motionMap.values()];
       // Always one or two things in view: when fewer than one is clearly in

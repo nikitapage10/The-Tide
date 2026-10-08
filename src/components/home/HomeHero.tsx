@@ -15,6 +15,7 @@ import { Decode, decodeMs } from "@/components/glyphs/Decode";
 import { CalloutFx, type FxKind } from "./CalloutFx";
 import { HeroDrifters } from "./HeroDrifters";
 import { HeroScene } from "./HeroScene";
+import { heroSignal } from "./heroSound";
 import { SoundToggle } from "./SoundToggle";
 
 export interface HeroCallout {
@@ -131,6 +132,23 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
       };
       requestAnimationFrame(shake);
     }
+  }, []);
+
+  // While a black hole is forming (a long hold in open space), the callouts and
+  // notes fade most of the way down, so the scene steps back around it.
+  useEffect(() => {
+    let raf = 0;
+    let hush = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const c = heroSignal.charge;
+      const target = c <= 0.33 ? 0 : Math.min(1, (c - 0.33) / 0.42);
+      hush += (target - hush) * 0.05;
+      const el = ui.current;
+      if (el) el.style.opacity = hush > 0.005 ? String(1 - 0.75 * hush) : "";
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   useEffect(() => {
