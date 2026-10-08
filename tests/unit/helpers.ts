@@ -22,7 +22,8 @@ export function uuid(n?: number): string {
 }
 
 export async function setup(opts: MemoryStoreOptions = {}) {
-  const store = await createSeededMemoryStore(opts);
+  // The seed release only; tests that need the lore release publish it themselves.
+  const store = await createSeededMemoryStore({ ...opts, withLore: false });
   const publication = new PublicationService(store, PROJECT);
   const operations = new OperationsService({ store, projectId: PROJECT, getPublishedState: () => store.getActiveState() });
   return { store, publication, operations };

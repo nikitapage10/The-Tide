@@ -19,7 +19,9 @@ export default async function PublishingPage() {
     ctx.publicationStore.listReleases(),
     ctx.publicationStore.listPublicationEvents(20),
   ]);
-  const example = ctx.mode === "demo" ? await readFile(path.join(process.cwd(), "fixtures/publication/example-minimal.json"), "utf8").catch(() => null) : null;
+  // The demo example, prepared against whichever release is active now.
+  const exampleRaw = ctx.mode === "demo" ? await readFile(path.join(process.cwd(), "fixtures/publication/example-minimal.json"), "utf8").catch(() => null) : null;
+  const example = exampleRaw ? JSON.stringify({ ...JSON.parse(exampleRaw), baseReleaseId: project.activeReleaseId }, null, 2) : null;
   return (
     <>
       <PageHeader

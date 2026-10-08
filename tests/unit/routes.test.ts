@@ -7,7 +7,14 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import lore from "@fixtures/publication/lore-release.json";
 import { ID } from "./helpers";
+
+/** The demo store holds the seed and the lore release; examples are prepared against the latter. */
+const example = () => {
+  const b = JSON.parse(readFileSync(path.join(process.cwd(), "fixtures/publication/example-minimal.json"), "utf8"));
+  return JSON.stringify({ ...b, baseReleaseId: lore.releaseId });
+};
 
 const ORIGIN = "http://localhost:3000";
 const TOKEN = "machine-publisher-token-for-tests-only-abcdef";
@@ -78,13 +85,13 @@ describe("demo mode API", () => {
   });
 
   it("validates without writing, then publishes, with no-store caching", async () => {
-    const bundle = readFileSync(path.join(process.cwd(), "fixtures/publication/example-minimal.json"), "utf8");
+    const bundle = example();
     const v = await (await import("@/app/api/v1/publications/validate/route")).POST(req("/api/v1/publications/validate", "POST", bundle));
     expect(v.status).toBe(200);
     expect(v.headers.get("cache-control")).toContain("no-store");
     expect((await v.json()).preview.ok).toBe(true);
     const before = readFileSync(process.env.TIDE_DEMO_STATE_FILE!, "utf8");
-    expect(JSON.parse(before).project.releaseCount).toBe(1);
+    expect(JSON.parse(before).project.releaseCount).toBe(2);
 
     const p = await (await import("@/app/api/v1/publications/publish/route")).POST(req("/api/v1/publications/publish", "POST", bundle));
     expect(p.status).toBe(201);
@@ -94,7 +101,7 @@ describe("demo mode API", () => {
   });
 
   it("machine publisher: rejected when unconfigured or wrong, accepted with the configured token", async () => {
-    const bundle = readFileSync(path.join(process.cwd(), "fixtures/publication/example-minimal.json"), "utf8");
+    const bundle = example();
     const call = async (auth: string) => (await import("@/app/api/v1/publications/publish/route")).POST(req("/api/v1/publications/publish", "POST", bundle, { authorization: auth, origin: "" }));
     expect((await call(`Bearer ${TOKEN}`)).status).toBe(401);
     process.env.TIDE_PUBLISHER_TOKEN_SHA256 = createHash("sha256").update(TOKEN).digest("hex");

@@ -305,6 +305,11 @@ export function applyBundle(bundle: Bundle, state: PublishedState, projectId: st
   return { records, issues, changes };
 }
 
+/** A same-site path: starts with one "/", no "..", no whitespace or control characters. */
+export function isSitePath(value: string): boolean {
+  return /^\/(?!\/)[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/.test(value) && !value.split("/").includes("..");
+}
+
 function checkRecordContent(rec: PublishedRecord, projectId: string, path: string, issues: Issue[]) {
   const urlFields: [string, string | null | undefined][] = [];
   const mdFields: [string, string | null | undefined][] = [];
@@ -320,6 +325,8 @@ function checkRecordContent(rec: PublishedRecord, projectId: string, path: strin
   if (rec.type === "session") mdFields.push(["prep", rec.prep], ["recap", rec.recap]);
   for (const [field, value] of urlFields) {
     if (!value) continue;
+    // A media file shipped with the site itself ("/lore/peoples/teruanga.webp").
+    if (rec.type === "media" && field === "url" && isSitePath(value)) continue;
     const check = checkExternalUrl(value);
     if (!check.ok) issues.push(issue("error", "UNSAFE_URL", `${field}: ${check.reason}`, `${path}.${field}`, rec.id));
     else if (check.warning) issues.push(issue("warning", "INSECURE_URL", `${field}: ${check.warning}`, `${path}.${field}`, rec.id));
