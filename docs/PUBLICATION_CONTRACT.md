@@ -38,7 +38,12 @@ Every operation names a **stable target ID**. Each ID may appear in at most one 
 
 ### Record types
 
-All records have `id` (lowercase UUID), `type`, `demo` (boolean, required) and `visibility` (`gm_only` by default, or `player_safe`, which only marks a record as eligible for a future player view and never publishes it). Titled records also have `slug?` (display only), `title`, `summary?`, `body?` (Markdown), `tags?`, `canonStatus` (`confirmed` | `provisional` | `unverified` | `non_canon`), `sourceRefs?` and `conflicts?`.
+All records have `id` (lowercase UUID), `type`, `demo` (boolean, required) and `visibility`. Visibility has three layers:
+- `gm_only` (the default) is seen by the GM alone.
+- `player_safe` is also seen by signed-in players.
+- `public` is also seen by anyone.
+
+The layers apply when the site runs with `TIDE_PUBLIC_SCOPE=tiered`; until then the project's open preview shows visitors everything published, read-only. Titled records also have `slug?` (display only), `title`, `summary?`, `body?` (Markdown), `tags?`, `canonStatus` (`confirmed` | `provisional` | `unverified` | `non_canon`), `sourceRefs?` and `conflicts?`.
 
 | `type` | Extra fields |
 | --- | --- |
@@ -51,7 +56,18 @@ All records have `id` (lowercase UUID), `type`, `demo` (boolean, required) and `
 | `source` | `title` (null if not supplied), `url?`, `documentId?`, `revision?`, `contentHash?`, `access` (public, private, restricted, unknown), `notes?` |
 | `open_question` | `status` (open, resolved), `relatedIds?` |
 
-Section placement is derived from `kind` / `format` / `mediaType` (`src/lib/domain/sections.ts`); the contract has no UI fields.
+Section placement is derived from `kind` / `format` / `mediaType` (`src/lib/domain/sections.ts`).
+
+**Optional fields for the redesigned pages.** All are optional, so bundles written before them stay valid.
+
+| Field | On | Meaning |
+| --- | --- | --- |
+| `era` | entity | `before_undertow`, `undertow`, `veil`, `verdancy`, `tide` or `today`; places it on the era band. |
+| `location` | entity | `{ "lat", "lon" }` on the globe, or `{ "map", "x", "y" }` (0..1) on a named map; without it a place is "uncharted". |
+| `palette` | entity | `"#rrggbb"`, the accent colour a people's page is lit by. |
+| `role` | media | `portrait`, `hero`, `map`, `emblem` or `gallery`: how pages use the image. |
+
+A media `url` may also be a path to an image shipped with the site (`/lore/peoples/teruanga.webp`). Long entries use the documents' template as `##` headings in `body` (see `docs/DESIGN_SYSTEM.md`).
 
 ### Source references and honesty about unknowns
 
@@ -93,7 +109,9 @@ You do **not** need to supply `bundleHash`; the server always computes and recor
 6. **Audit**: every applied, replayed and rejected attempt is recorded with its outcome, code, actor and counts. No content, tokens or URLs are logged.
 7. **Rollback** creates a *new* release (higher version, `kind: "rollback"`) whose content equals an earlier snapshot. Records created after the target are archived (not deleted), tombstones stay tombstoned, and live records are never touched.
 
-## Authoring guide (for the later ChatGPT-managed publisher)
+## Authoring guide (for the ChatGPT publisher)
+
+The automatic setup (a custom GPT with an Action) is described in [CONTENT_PIPELINE.md](CONTENT_PIPELINE.md). Its instructions are in [gpt/publisher-instructions.md](gpt/publisher-instructions.md). Stable IDs: UUIDv5 of the project ID and a name such as `people/teruanga` (`src/lib/contract/ids.ts`).
 
 Producing a bundle does not require knowing the UI.
 
@@ -128,7 +146,7 @@ Producing a bundle does not require knowing the UI.
 
 Note that `upsert` **replaces** the whole record. Send every field you want to keep, not just the changed ones.
 
-## Connecting the later publisher
+## Connecting the publisher
 
 The app-owned endpoints are `POST /api/v1/publications/validate` and `POST /api/v1/publications/publish` ([API.md](API.md)). For machine access:
 
@@ -137,4 +155,10 @@ The app-owned endpoints are `POST /api/v1/publications/validate` and `POST /api/
 3. The publisher sends `Authorization: Bearer <token>` and `Content-Type: application/json`.
 4. Recommended flow: validate → show the preview to the GM → publish only on approval.
 
-The token check lives in `src/lib/server/publisher-auth.ts` and can be swapped for signed requests or OAuth without touching the publication service. The machine publisher can validate and publish, but cannot roll back or write live records.
+The token check lives in `src/lib/server/publisher-auth.ts` and can be swapped for signed requests or OAuth without touching the publication service.
+
+The machine publisher can:
+- read `GET /api/v1/publications/active`, `/api/v1/records/index` and `/api/v1/records/{id}`;
+- validate and publish.
+
+It cannot tombstone (refused with `FORBIDDEN`), roll back, or write live records. It is limited to 60 requests per 10 minutes (`RATE_LIMITED`). Its OpenAPI document is `GET /api/v1/openapi.json`.

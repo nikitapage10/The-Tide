@@ -83,6 +83,16 @@ describe("machine publisher endpoints (demo adapter)", () => {
     expect(body.records[0]).not.toHaveProperty("body");
   });
 
+  it("returns one record in full", async () => {
+    const index = await (await (await import("@/app/api/v1/records/index/route")).GET(bearer("/api/v1/records/index"))).json();
+    const entity = index.records.find((r: { type: string }) => r.type === "entity");
+    const res = await (await import("@/app/api/v1/records/[id]/route")).GET(bearer(`/api/v1/records/${entity.id}`), { params: Promise.resolve({ id: entity.id }) });
+    expect(res.status).toBe(200);
+    expect((await res.json()).record.id).toBe(entity.id);
+    const missing = await (await import("@/app/api/v1/records/[id]/route")).GET(bearer("/api/v1/records/x"), { params: Promise.resolve({ id: "x" }) });
+    expect(missing.status).toBe(404);
+  });
+
   it("refuses a wrong token on the read endpoints", async () => {
     process.env.TIDE_PUBLISHER_TOKEN_SHA256 = createHash("sha256").update("something-else-entirely-0123456789").digest("hex");
     const res = await (await import("@/app/api/v1/records/index/route")).GET(bearer("/api/v1/records/index"));

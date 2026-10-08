@@ -58,7 +58,8 @@ export default async function SettingsPage() {
             <Row label="Server secret key (machine publisher only)" ok={c.serviceKeySet} />
             <Row label="Machine publisher token hash" ok={c.machinePublisherConfigured} okText="Configured" missingText="Not configured" />
             <Row label="Private asset storage" ok={ctx.mode === "supabase"} okText={`Bucket ${c.storageBucket}`} missingText="Unavailable in demo" />
-            <Row label="Space Pages / ChatGPT sync" ok={false} missingText="Not available (manual publication only)" />
+            <Row label="ChatGPT publisher (custom GPT Action)" ok={c.machinePublisherConfigured && c.serviceKeySet} okText="Ready: /api/v1/openapi.json" missingText="Needs the token hash and server key (docs/CONTENT_PIPELINE.md)" />
+            <Row label="Tiered viewing (GM · players · public)" ok={process.env.TIDE_PUBLIC_SCOPE === "tiered"} okText="On" missingText="Off: open preview (TIDE_PUBLIC_SCOPE=tiered to turn on)" />
             <Row label="Realtime updates" ok={false} missingText="Off (pages refetch after each change)" />
           </dl>
           <p className="mt-3 text-xs text-faint">Values are never displayed; only whether they are set.</p>

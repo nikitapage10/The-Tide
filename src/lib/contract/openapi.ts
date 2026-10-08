@@ -13,7 +13,7 @@ export function publisherOpenApi(origin: string) {
       title: "The Tide publisher",
       version: "1.0.0",
       description:
-        "Publish lore to The Tide. Flow: getActiveRelease → listRecords (reuse existing IDs) → validateBundle (fix every issue) → publishBundle. Bundles follow tide.publication.v1 (see /contract/tide.publication.v1.schema.json and docs/PUBLICATION_CONTRACT.md). The publisher cannot tombstone; archive instead.",
+        "Publish lore to The Tide. Flow: getActiveRelease → listRecords (reuse existing IDs; getRecord before changing one) → validateBundle (fix every issue) → publishBundle. Bundles follow tide.publication.v1 (see /contract/tide.publication.v1.schema.json and docs/PUBLICATION_CONTRACT.md). The publisher cannot tombstone; archive instead.",
     },
     servers: [{ url: origin }],
     paths: {
@@ -29,6 +29,14 @@ export function publisherOpenApi(origin: string) {
           operationId: "listRecords",
           summary: "Every published record's ID, type, kind, title, slug and aliases (no bodies). Reuse these IDs to update.",
           responses: { "200": { description: "{ projectId, activeReleaseId, records[] }" } },
+        },
+      },
+      "/api/v1/records/{id}": {
+        get: {
+          operationId: "getRecord",
+          summary: "One record in full. An upsert replaces the whole record, so read it first and send it back with your changes.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "{ activeReleaseId, lifecycle, record }" }, "404": { description: "Not found" } },
         },
       },
       "/api/v1/publications/validate": {

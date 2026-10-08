@@ -63,6 +63,23 @@ Body: a bundle. Auth: GM or machine publisher.
 Body: `{ "releaseId": "<new uuid>", "targetReleaseId": "<uuid>", "expectedActiveReleaseId": "<uuid>|null" }`. GM only (bearer refused).
 Creates a new release that restores the target's published content. Idempotent per `releaseId`. Returns 201/200 like publish; 409 `STALE_BASE` if the active release moved; 404 if the target is unknown.
 
+### `GET /api/v1/publications/active`
+The active release, for a bundle's `baseReleaseId`. Auth: GM or machine publisher.
+Returns `200 { projectId, activeReleaseId, version }`.
+
+### `GET /api/v1/records/index`
+Every record's identity, without bodies, so the publisher reuses IDs. Auth: GM or machine publisher.
+Returns `200 { projectId, activeReleaseId, records: [{ id, type, lifecycle, title, slug?, kind?, aliases?, parentId?, format?, mediaType?, role?, visibility, demo }] }`.
+
+### `GET /api/v1/records/{id}`
+One record in full (an upsert replaces the whole record, so read it before changing part of it). Auth: GM or machine publisher.
+Returns `200 { activeReleaseId, lifecycle, record, tombstone }`, or `404`.
+
+### `GET /api/v1/openapi.json`
+The publisher's OpenAPI 3.1 document, for a ChatGPT custom GPT Action. Public; it holds no secrets.
+
+Machine requests are limited to 60 per 10 minutes (`429 RATE_LIMITED`), and a machine bundle containing `tombstone` is refused (`403 FORBIDDEN`).
+
 ### `GET /api/v1/publications/releases`
 GM only. `200 { activeReleaseId, releases[], events[] }` (release history and the last 50 audit events).
 
