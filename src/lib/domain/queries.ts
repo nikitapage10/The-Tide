@@ -73,7 +73,7 @@ export function hrefFor(rs: RecordState | undefined): string | null {
     case "media":
       return `/studio/item/${r.id}`;
     case "open_question":
-      return `/#open-questions`;
+      return `/workshop#open-questions`;
     case "source":
       return `/workshop/sources#source-${r.id}`;
     default:

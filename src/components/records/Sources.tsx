@@ -24,7 +24,7 @@ export function SourceRefs({ refs, state }: { refs: SourceRef[] | undefined; sta
               </>
             ) : null}
             <span className="block text-xs text-faint">
-              Revision: {src.revision ?? "not supplied"} · Content hash: {src.contentHash ?? "not supplied"} · Access: {src.access}
+              Revision: {src.revision ?? "not supplied"} · Content hash: <span className="break-all">{src.contentHash ?? "not supplied"}</span> · Access: {src.access}
             </span>
           </li>
         );

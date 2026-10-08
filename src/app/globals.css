@@ -361,7 +361,7 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 /* Reading: the library's measure, a serif body, a dropped capital. */
 .reading { max-width: 64ch; font-family: var(--font-display); font-size: 1.22rem; line-height: 1.75; color: #dcdcdf; }
 .reading.prose-tide p, .reading .prose-tide p { margin: 0 0 1.1em; }
-.drop-cap > .prose-tide > p:first-child::first-letter { float: left; font-size: 3.6em; line-height: 0.82; padding: 0.06em 0.12em 0 0; font-weight: 300; color: #fff; }
+.drop-cap > .prose-tide > p:first-of-type::first-letter { float: left; font-size: 3.6em; line-height: 0.82; padding: 0.06em 0.12em 0 0; font-weight: 300; color: #fff; }
 
 /* Reveal (components/motion/Reveal): up out of the dark, once. */
 .reveal { opacity: 0; translate: 0 14px; filter: blur(2px); transition: opacity 1.1s ease, translate 1.1s cubic-bezier(.2,.7,.1,1), filter 1.1s ease; }
@@ -426,3 +426,83 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 /* The gallery corridor (components/people/PeopleGallery). */
 .corridor { scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
 .corridor > li { scroll-snap-align: start; }
+
+/* The library shelf (components/stories/Shelf). */
+.spine { background: linear-gradient(90deg, #0e0e11, #17171b 40%, #0f0f12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); transition: transform .5s cubic-bezier(.2,.7,.1,1), background .5s ease; }
+.spine[data-format="campaign"] { background: linear-gradient(90deg, #0d1013, #151a1f 40%, #0e1114); }
+.spine[data-format="short_fiction"] { background: linear-gradient(90deg, #121110, #1c1a17 40%, #121110); }
+.spine:hover, .spine:focus-visible { transform: translateY(-0.9rem); background: linear-gradient(90deg, #141418, #1f1f24 40%, #141418); }
+.spine-title { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--font-display); font-size: 0.98rem; letter-spacing: 0.14em; color: #d9d9dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 75%; }
+.spine-band { background: rgba(255,255,255,0.28); }
+.spine:hover .spine-title { color: #fff; }
+/* A table of contents with dotted leaders. */
+.toc-row { display: flex; align-items: baseline; gap: 0.75rem; }
+.toc-row .toc-fill { flex: 1; border-bottom: 1px dotted rgba(255,255,255,0.2); translate: 0 -0.3em; }
+.reading blockquote { border: 0; margin: 0 0 2.4em; padding: 0; text-align: center; font-style: italic; color: var(--muted); }
+
+/* The bench (components/workshop/Bench). */
+.tool { background: linear-gradient(180deg, rgba(160,190,200,0.035), transparent 70%); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); transition: box-shadow .3s ease, background .3s ease; }
+.tool:hover { box-shadow: inset 0 0 0 1px hsl(var(--tint) / 0.5); }
+.pegboard { background-image: radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1.5px); background-size: 18px 18px; padding: 12px; }
+
+/* The story of the world (components/home/WorldStory). Without JS, or with
+   reduced motion, chapters stack and read in order; with JS the track is tall
+   and the chapters cross-fade on one pinned stage. */
+.world-story { position: relative; width: 100vw; margin-left: calc(50% - 50vw); }
+.story-chapter { position: relative; min-height: 100svh; display: flex; align-items: center; overflow: hidden; --t: 1; }
+.story-chapter-inner { position: relative; z-index: 1; width: 100%; display: flex; flex-direction: column; gap: 1.6rem; padding-block: 6rem; }
+.world-story[data-live] { height: calc(var(--chapters) * 120svh); }
+.world-story[data-live] .world-story-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
+.world-story[data-live] .story-chapter { position: absolute; inset: 0; opacity: 0; visibility: hidden; }
+.story-text { max-width: 40rem; font-family: var(--font-display); font-size: clamp(1.1rem, 1rem + 0.4vw, 1.35rem); line-height: 1.6; color: var(--muted); }
+.story-line { color: #fff; }
+.story-more { align-self: flex-start; }
+
+/* I: dust drifting in the dark. */
+.story-dust { position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(rgba(255,255,255,0.5) 1px, transparent 1.4px); background-size: 140px 140px; opacity: 0.25; translate: 0 calc(var(--t) * -60px); mask-image: radial-gradient(80% 70% at 60% 50%, #000, transparent); }
+
+/* II: the years, then the flood rising with the scroll. */
+.story-years { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.2rem; max-width: 60rem; border-top: 1px solid rgba(255,255,255,0.18); }
+.story-years li { padding-top: 0.9rem; opacity: clamp(0.15, calc(var(--t) * 5 - var(--k) * 0.7), 1); }
+.story-years li:last-child span:last-child { color: #fff; }
+.story-flood { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 40svh; fill: rgba(200,212,226,0.05); stroke: rgba(220,230,240,0.35); stroke-width: 1; translate: 0 calc((1 - var(--t)) * 28svh); z-index: 0; }
+@media (max-width: 640px) { .story-years { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* III: sleepers in the fog. */
+.story-sleepers { display: flex; gap: 1rem; }
+.story-sleeper { position: relative; width: clamp(3.5rem, 9vw, 8rem); aspect-ratio: 3 / 4; overflow: hidden; filter: grayscale(1) blur(calc((1 - var(--t)) * 6px + 1px)) brightness(0.5); opacity: calc(0.25 + var(--t) * 0.4); }
+.story-fog { position: absolute; inset: -20%; z-index: 0; pointer-events: none; background: radial-gradient(40% 30% at 30% 60%, rgba(200,210,220,0.09), transparent 70%), radial-gradient(35% 25% at 70% 40%, rgba(200,210,220,0.07), transparent 70%); translate: calc(var(--t) * -6%) 0; }
+
+/* IV: the cliff, five swimmers, routes drawn across the sea. */
+.story-routes { width: min(100%, 40rem); max-height: 32svh; height: auto; fill: none; }
+.story-cliff { stroke: rgba(255,255,255,0.35); stroke-width: 1; fill: rgba(255,255,255,0.03); }
+.story-swimmer { fill: #e8d48a; opacity: clamp(0, calc(var(--t) * 4 - 0.4), 1); }
+.story-route { stroke: rgba(255,255,255,0.5); stroke-width: 0.8; stroke-dasharray: 600; stroke-dashoffset: calc(600 - clamp(0, var(--t) * 1.6 - var(--k, 0) * 0.15, 1) * 600); }
+
+/* V: the Three Consequences in turn. */
+.story-consequences { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem; max-width: 64rem; }
+.story-consequences li { opacity: clamp(0.1, calc(var(--t) * 4 - var(--k) * 1), 1); translate: 0 calc((1 - clamp(0, var(--t) * 4 - var(--k), 1)) * 20px); }
+@media (max-width: 760px) { .story-consequences { grid-template-columns: 1fr; gap: 1.5rem; } }
+
+/* VI: the peoples, passing by. */
+.story-procession { display: flex; gap: 1.4rem; translate: calc((0.5 - var(--t)) * 30vw) 0; }
+.story-procession li { width: clamp(7rem, 13vw, 11rem); flex-shrink: 0; }
+.story-portrait { position: relative; display: block; aspect-ratio: 3 / 4; overflow: hidden; background: #08080a; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
+.story-portrait img { filter: grayscale(0.5) brightness(0.85); }
+.story-portrait-empty { position: absolute; inset: 30% 25%; border: 1px dashed rgba(255,255,255,0.2); border-radius: 50%; }
+
+/* VII: the doors. */
+.story-doors { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); max-width: 80rem; border-top: 1px solid rgba(255,255,255,0.1); border-left: 1px solid rgba(255,255,255,0.1); }
+.story-doors li { border-right: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); opacity: clamp(0.15, calc(var(--t) * 5 - var(--k) * 0.5), 1); }
+.story-door { padding: 1.6rem 1.4rem 2.2rem; transition: background .4s ease; }
+.story-door:hover { background: rgba(255,255,255,0.03); }
+@media (max-width: 1023px) { .story-doors { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .story-doors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .story-door { padding: 1rem 0.9rem 1.2rem; }
+  .story-door .t-display-m { margin-top: 0.6rem; font-size: 1.3rem; }
+  .story-door span:last-child { display: none; }
+  .story-chapter-inner { gap: 1.1rem; padding-block: 5.5rem 2rem; }
+}
+.story-planet { position: absolute; inset: 0; pointer-events: none; opacity: calc(0.22 - var(--sp, 0) * 0.12); filter: grayscale(0.7) brightness(0.6); translate: calc(var(--sp, 0) * 12%) 0; scale: calc(1 + var(--sp, 0) * 0.15); mask-image: linear-gradient(90deg, transparent 30%, #000 75%); }
+.world-story:not([data-live]) .story-planet { display: none; }

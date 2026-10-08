@@ -12,6 +12,8 @@ import { ProceduralMark } from "@/components/ui/ProceduralMark";
 import { Notice } from "@/components/ui/States";
 import { safeHref } from "@/lib/contract/safety";
 import { resolveRef } from "@/lib/domain/queries";
+import { isImageUrl } from "@/lib/domain/views";
+import { Plate } from "@/components/tide/Plate";
 import { requirePageContext } from "@/lib/server/page-context";
 
 export default async function StudioItemPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +26,7 @@ export default async function StudioItemPage({ params }: { params: Promise<{ id:
   const href = safeHref(m.url);
   const notes = await ctx.operationalStore.listGmNotes(id);
   return (
-    <article>
+    <article data-section="studio">
       <PageHeader
         crumbs={[{ href: "/studio", label: "The Studio" }]}
         eyebrow={MEDIA_TYPE_LABEL[m.mediaType]}
@@ -42,10 +44,16 @@ export default async function StudioItemPage({ params }: { params: Promise<{ id:
           <Card as="section" aria-labelledby="h-asset">
             <SectionHeading id="h-asset">Item</SectionHeading>
             <div className="flex flex-wrap items-start gap-4">
-              <div>
-                <ProceduralMark seed={m.id} size={120} />
-                <p className="mt-1 w-[120px] text-[0.7rem] text-faint">Placeholder pattern. The linked item is not loaded automatically.</p>
-              </div>
+              {m.url && isImageUrl(m.url) ? (
+                <div className="w-full max-w-md">
+                  <Plate src={m.url} alt={m.title} seed={m.id} ratio={m.role === "portrait" ? "3 / 4" : "4 / 3"} sizes="28rem" />
+                </div>
+              ) : (
+                <div>
+                  <ProceduralMark seed={m.id} size={120} />
+                  <p className="mt-1 w-[120px] text-[0.7rem] text-faint">Placeholder pattern. The linked item is not loaded automatically.</p>
+                </div>
+              )}
               <div className="space-y-3 text-sm">
                 {href ? (
                   <p>

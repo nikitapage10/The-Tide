@@ -153,7 +153,10 @@ operations.push({
     title: "Arrival",
     slug: "arrival",
     summary: "Breathe, little spark. An introduction for those who wash ashore.",
-    body: doc("intro").trim(),
+    // The haiku stands as an epigraph, its lines kept.
+    body: doc("intro")
+      .trim()
+      .replace(/^(.+)\n(.+)\n(.+)\n/, "> $1  \n> $2  \n> $3\n"),
     draftStatus: "complete",
     relatedIds: [idOf("phenomenon/the-tide"), idOf("world/primus")],
     canonStatus: "provisional",

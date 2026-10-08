@@ -1,41 +1,23 @@
-import Link from "next/link";
-import { PageHeader } from "@/components/shell/PageHeader";
-import { Badge } from "@/components/ui/Badge";
-import { SECTIONS } from "@/lib/domain/sections";
+import { SectionIntro } from "@/components/tide/SectionIntro";
+import { Notice } from "@/components/ui/States";
+import { Bench } from "@/components/workshop/Bench";
+import { publicScope } from "@/lib/domain/audience";
 import { requirePageContext } from "@/lib/server/page-context";
 
 export const metadata = { title: "The Workshop" };
 
 export default async function WorkshopPage() {
   const ctx = await requirePageContext();
-  const [prints, builds, project] = await Promise.all([ctx.operationalStore.listPrintJobs(), ctx.operationalStore.listBuilds(), ctx.publicationStore.getProject()]);
-  const def = SECTIONS.find((s) => s.key === "workshop")!;
-  const counts: Record<string, string> = {
-    prints: `${prints.filter((p) => !["complete", "canceled"].includes(p.status)).length} open`,
-    builds: `${builds.filter((b) => !["done", "abandoned"].includes(b.status)).length} active`,
-    publishing: project.releaseCount ? `v${project.releaseCount}` : "no releases",
-    sources: "",
-    "cloud-lab": "lab",
-    "alphabet-lab": "lab",
-    "orbit-lab": "lab",
-    settings: ctx.mode === "demo" ? "demo" : "connected",
-  };
+  // The bench is the GM's (visitors see it only in the open preview).
+  const closed = ctx.audience !== "gm" && publicScope() === "tiered";
   return (
-    <>
-      <PageHeader eyebrow="Section" title={def.label} description="Physical creations and building, the 3D print queue, code, logic and the dashboard itself, including publishing. Artistic concepts live in The Studio." />
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {def.subsections.map((s) => (
-          <li key={s.slug}>
-            <Link href={`/workshop/${s.slug}`} className="block h-full rounded-[var(--radius)] border border-border bg-surface p-5 no-underline hover:border-border-strong">
-              <span className="flex items-center justify-between">
-                <span className="font-[family-name:var(--font-display)] text-xl text-text">{s.label}</span>
-                {counts[s.slug] ? <Badge>{counts[s.slug]}</Badge> : null}
-              </span>
-              <span className="mt-1 block text-sm text-muted">{s.description}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </>
+    <div data-section="workshop">
+      <SectionIntro index="05" eyebrow="Workshop" title="The Workshop" lede="The bench: sessions and prep, the print queue and builds, the press that publishes the lore, and the labs." />
+      {closed ? (
+        <Notice title="The GM's workshop">Sign in as the GM to use the workshop.</Notice>
+      ) : (
+        <Bench ctx={ctx} />
+      )}
+    </div>
   );
 }
