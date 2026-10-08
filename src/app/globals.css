@@ -337,3 +337,70 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .callout-fx { position: absolute; left: -60px; top: -60px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
 .callout-fx-on { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .callout-fx { display: none; } }
+
+/* ── The Tide language (docs/DESIGN_SYSTEM.md) ─────────────────────────────
+   Each section is an instrument with its own faint tint; a people's page is
+   lit by its own colour (--accent-glow, from the record's palette). */
+[data-section] { --tint: 0 0% 100%; --accent-glow: #dfe5ec; }
+[data-section="world"] { --tint: 210 30% 78%; }      /* cool slate: the atlas */
+[data-section="people"] { --tint: 36 22% 82%; }      /* warm bone: the gallery */
+[data-section="stories"] { --tint: 40 18% 86%; }     /* ink and paper: the library */
+[data-section="studio"] { --tint: 220 6% 84%; }      /* light-table grey */
+[data-section="workshop"] { --tint: 190 14% 70%; }   /* oxidised steel: the bench */
+.tint-wash { background: radial-gradient(120% 70% at 50% 0%, hsl(var(--tint) / 0.06), transparent 60%); }
+.tint-text { color: hsl(var(--tint)); }
+.tint-rule { background: hsl(var(--tint) / 0.22); }
+
+/* Type scale. */
+.t-display-xl { font-family: var(--font-display); font-weight: 300; font-size: clamp(2.8rem, 2rem + 4.2vw, 6.4rem); line-height: 0.98; letter-spacing: 0.04em; text-wrap: balance; }
+.t-display-l { font-family: var(--font-display); font-weight: 300; font-size: clamp(2.2rem, 1.6rem + 2.6vw, 4.2rem); line-height: 1.04; letter-spacing: 0.03em; text-wrap: balance; }
+.t-display-m { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.6rem, 1.3rem + 1.2vw, 2.4rem); line-height: 1.12; text-wrap: balance; }
+.t-title { font-family: var(--font-display); font-weight: 500; font-size: 1.35rem; line-height: 1.25; }
+.t-lede { font-family: var(--font-display); font-style: italic; font-size: clamp(1.15rem, 1rem + 0.5vw, 1.45rem); line-height: 1.55; color: var(--muted); }
+
+/* Reading: the library's measure, a serif body, a dropped capital. */
+.reading { max-width: 64ch; font-family: var(--font-display); font-size: 1.22rem; line-height: 1.75; color: #dcdcdf; }
+.reading.prose-tide p, .reading .prose-tide p { margin: 0 0 1.1em; }
+.drop-cap > .prose-tide > p:first-child::first-letter { float: left; font-size: 3.6em; line-height: 0.82; padding: 0.06em 0.12em 0 0; font-weight: 300; color: #fff; }
+
+/* Reveal (components/motion/Reveal): up out of the dark, once. */
+.reveal { opacity: 0; translate: 0 14px; filter: blur(2px); transition: opacity 1.1s ease, translate 1.1s cubic-bezier(.2,.7,.1,1), filter 1.1s ease; }
+.reveal[data-shown] { opacity: 1; translate: none; filter: none; }
+@media (scripting: none) { .reveal { opacity: 1; translate: none; filter: none; } }
+/* Drift (components/motion/Drift): slow parallax against the scroll. */
+.drift > * { translate: 0 calc((0.5 - var(--drift, 0.5)) * var(--drift-amount, 6%)); }
+
+/* The withheld world name (components/tide/WorldName). */
+.world-name { display: inline-flex; vertical-align: -0.12em; }
+.world-name-cells { display: inline-flex; gap: 0.08em; --glyph-w: 0.78em; --glyph-h: 1em; opacity: 0.85; }
+.world-name-cell { display: inline-flex; animation: world-name-turn 0.5s ease both; }
+@keyframes world-name-turn { from { opacity: 0.2; filter: blur(1px); } to { opacity: 1; filter: none; } }
+
+/* Canon, drawn (components/tide/CanonMark). */
+.canon-rule { display: inline-block; width: 1.6rem; border-top: 1px solid rgba(255,255,255,0.55); }
+[data-canon="provisional"] .canon-rule { border-top-style: dashed; }
+[data-canon="unverified"] .canon-rule { border-top-style: dotted; border-top-width: 2px; opacity: 0.8; }
+[data-canon="non_canon"] .canon-rule { border-top-style: dashed; opacity: 0.35; }
+
+/* Eras (components/tide/EraBand). */
+.era-cell { position: relative; padding-right: 2px; }
+.era-rule { display: block; height: 1px; background: rgba(255,255,255,0.18); }
+.era-cell[data-on] .era-rule { height: 2px; background: #fff; box-shadow: 0 0 12px rgba(255,255,255,0.45); }
+
+/* Rail (components/tide/SectionRail). */
+.section-rail-link { color: var(--faint); border-left: 1px solid transparent; padding-left: 0.9rem; transition: color .3s ease, border-color .3s ease; }
+.section-rail-link:hover { color: var(--text); }
+.section-rail-link[aria-current] { color: #fff; border-color: hsl(var(--tint, 0 0% 100%) / 0.8); }
+@media (max-width: 1023px) { .section-rail-link { border-left: 0; padding-left: 0; } }
+
+/* Plates (components/tide/Plate): held in the dark, lit by their subject. */
+.plate-frame { background: #08080a; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
+.plate-img { filter: grayscale(0.55) contrast(1.05) brightness(0.86); transition: filter 1.2s ease, transform 2.4s cubic-bezier(.2,.7,.1,1); }
+.plate:hover .plate-img, a:focus-visible .plate-img { filter: grayscale(0.2) contrast(1.05) brightness(0.98); transform: scale(1.025); }
+.plate-glow { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--plate-glow, #dfe5ec) 26%, transparent), transparent 70%), linear-gradient(to top, rgba(5,5,6,0.85), transparent 45%); mix-blend-mode: normal; }
+
+/* Callouts placed on maps and plates (components/tide/Callout). */
+.tide-callout { z-index: 2; }
+.tide-callout-line { width: 3.5rem; }
+.tide-callout[data-canon="provisional"] .tide-callout-line { background: repeating-linear-gradient(90deg, rgba(255,255,255,.5) 0 4px, transparent 4px 7px); }
+.tide-callout[data-canon="unverified"] .tide-callout-line { background: repeating-linear-gradient(90deg, rgba(255,255,255,.5) 0 1px, transparent 1px 4px); }
