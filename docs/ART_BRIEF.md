@@ -79,7 +79,7 @@ The style rules:
     - Relics: the Rótbook (a living book of roots), a Shoreborn artefact, a moon-shard, an obsidian idol.
 
 ### E. People and their rooms
-25. **Missing portraits.** 2×1 sheet, 3:4: Irridosai and Blightmourn, matching the existing five. Syntherion waits for its description.
+25. **People hero.** 21:9, 3360×1440. A long dark gallery of tall glass panels receding into the distance, faint figures held inside them, and light streams running along a mirror floor. There is room on the left for a giant numeral. This is the People page opening. (The portraits of all eight peoples are already in place.)
 26. **Homelands.** 5×1 sheet, 16:9 each, the wide headers for each people's page:
     - the Stillholds (Nyth'rok);
     - the Molten Cities (Obscarron);
@@ -121,7 +121,7 @@ The style rules:
 | 22 | History |
 | 23 | Phenomena |
 | 24 | the Technology and Relics rooms |
-| 25–27 | People, the folios and Arrivals |
+| 25–27 | the People opening, the folios and Arrivals |
 | 28 | anywhere art is missing |
 | 29 | the Stories, Studio and Workshop openings |
 | 30 | the reading view, the Veil and Arrival chapters, and a general overlay |
