@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 
 const SRC = "/audio/ilyr-narration.mp3";
 const CAPTIONS = "/audio/ilyr-narration.vtt";
-const LENGTH = 427; // seconds, until the file's own duration is known
+const LENGTH = 438; // seconds, until the file's own duration is known
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
