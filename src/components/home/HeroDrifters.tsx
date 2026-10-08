@@ -16,9 +16,9 @@
  *   only arrive. One appears far out in the dark, grows as it falls in, flares
  *   at the atmosphere and is lost there.
  * - Debris surfaces out of the dark, drifts a little, and sinks back into it.
- * Two at first, then something every ten to twenty seconds, never more than
- * three at once. Each has a thin leader line with a short label translated
- * from the Tide's script. Off under reduced motion.
+ * Always one or two in view, never more; each at its own slow pace. Each has
+ * a thin leader line with a short label translated from the Tide's script.
+ * Off under reduced motion.
  *
  * The list changes rarely (React); positions are set every frame on the
  * elements directly (transform-only, sub-pixel), so motion stays smooth.
@@ -136,7 +136,7 @@ function driftPath(): [number, number, number, number, number, number] {
  * arch high; about a third take a lower, flatter line into the horizon further
  * down. Every pass differs in start, height and where it meets the horizon.
  */
-function orbitPath(): number[] {
+export function orbitPath(): number[] {
   const low = Math.random() < 0.33;
   // Where it meets the horizon (screen angle from the centre, y down): high
   // passes at about mid-height, low ones a little further down.
@@ -155,7 +155,7 @@ const CAM = 2.1;
 const perspective = (z: number) => CAM / Math.max(0.3, CAM - z);
 
 /** Never more than this many things in motion at once. */
-const MAX_TOTAL = 3;
+const MAX_TOTAL = 2;
 
 export function HeroDrifters({ progress, className }: { progress: { current: number }; className?: string }) {
   const layer = useRef<HTMLDivElement>(null);
@@ -194,7 +194,7 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         t0: now,
         // How long each takes: a satellite's pass, the fragment's fall, an
         // arrival, a piece of debris surfacing and sinking back.
-        life: mode === "orbit" ? rand(95000, 130000) : mode === "capture" ? rand(120000, 150000) : mode === "arrival" ? rand(75000, 95000) : rand(70000, 95000),
+        life: mode === "orbit" ? rand(90000, 160000) : mode === "capture" ? rand(110000, 170000) : mode === "arrival" ? rand(80000, 130000) : rand(80000, 140000),
         // The captured fragment: a tilted circular orbit, starting well out and
         // shrinking as it falls in, lost behind the planet's left horizon.
         R: rand(1.8, 2.0),
@@ -229,23 +229,26 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       root.style.opacity = String(smooth(0.72, 0.92, p));
       const on = p >= 0.72;
       const all = [...motionMap.values()];
+      // Always one or two things in view: when fewer than one is clearly in
+      // play (not about to leave), another starts at once; a second follows
+      // after a while. Never more than two.
+      const live = all.filter((m) => (now - m.t0) / m.life < 0.85).length;
+      const count = (md: Mode) => all.filter((m) => m.mode === md).length;
+      const pick = (): Mode => {
+        const r = Math.random();
+        let mode: Mode = r < 0.5 ? "orbit" : r < 0.62 ? "capture" : r < 0.8 ? "arrival" : "drift";
+        if (mode !== "orbit" && count(mode) >= 1) mode = "orbit";
+        return mode;
+      };
       if (on && !nextAt && all.length === 0) {
         // On reveal: a satellite already crossing the planet, and something
         // surfacing out in the dark.
         spawn(now, "orbit", true);
         spawn(now, "drift", true);
-        nextAt = now + rand(8000, 14000);
-      } else if (on && nextAt && now >= nextAt) {
-        if (all.length < MAX_TOTAL) {
-          const count = (md: Mode) => all.filter((m) => m.mode === md).length;
-          const r = Math.random();
-          let mode: Mode = r < 0.45 ? "orbit" : r < 0.6 ? "capture" : r < 0.8 ? "arrival" : "drift";
-          // At most two satellites, and one of each other kind, at a time.
-          if (mode === "orbit" && count("orbit") >= 2) mode = "drift";
-          if (mode !== "orbit" && count(mode) >= 1) mode = count("orbit") < 2 ? "orbit" : mode;
-          if (count(mode) < (mode === "orbit" ? 2 : 1)) spawn(now, mode);
-        }
-        nextAt = now + rand(10000, 20000);
+        nextAt = now + rand(15000, 30000);
+      } else if (on && nextAt && all.length < MAX_TOTAL && (live < 1 || now >= nextAt)) {
+        spawn(now, pick());
+        nextAt = now + rand(15000, 30000);
       }
 
       const rect = root.getBoundingClientRect();

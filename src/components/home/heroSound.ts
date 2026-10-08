@@ -135,8 +135,8 @@ export class HeroSound {
     }
     if (this.hum2) {
       const c = heroSignal.charging ? heroSignal.charge : 0;
-      this.hum2.o.frequency.setTargetAtTime(30 + 34 * c, t, 0.2);
-      this.hum2.g.gain.setTargetAtTime(heroSignal.charging ? 0.04 + 0.16 * c : 0, t, heroSignal.charging ? 0.3 : 0.05);
+      this.hum2.o.frequency.setTargetAtTime(28 + 40 * c, t, 0.3);
+      this.hum2.g.gain.setTargetAtTime(heroSignal.charging ? 0.02 + 0.18 * c : 0, t, heroSignal.charging ? 0.4 : 0.05);
       if (!heroSignal.charging) {
         const h = this.hum2;
         this.hum2 = null;
@@ -201,6 +201,29 @@ export class HeroSound {
     src.connect(bp).connect(gn).connect(this.master);
     src.start(t + 0.05, Math.random());
     src.stop(t + len + 0.4);
+    // Stronger releases hit harder: from about half charge a deep impact and a
+    // crack; at full charge a second impact and a long low rumble as well.
+    if (strength > 0.45) {
+      this.hit(t + 0.01, 0.2 + 0.3 * strength);
+      this.crack(t, 0.08 + 0.12 * strength, 0.12, 900);
+    }
+    if (strength > 0.8) {
+      this.hit(t + 0.45, 0.3);
+      for (let i = 0; i < 6; i++) this.crack(t + 0.1 + Math.random() * 0.8, 0.03 + Math.random() * 0.04, 0.05, 1500 + Math.random() * 2500);
+      const r = ctx.createBufferSource();
+      r.buffer = this.noise;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(220, t);
+      lp.frequency.exponentialRampToValueAtTime(60, t + 4);
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, t);
+      g2.gain.linearRampToValueAtTime(0.25, t + 0.3);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 4.2);
+      r.connect(lp).connect(g2).connect(this.master);
+      r.start(t, Math.random());
+      r.stop(t + 4.3);
+    }
   }
 
   /** A short burst of filtered noise (a crackle or the strike's crack). */

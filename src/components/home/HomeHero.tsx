@@ -105,11 +105,32 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
       [["Gravity well", "Formed, collapsed"], ["Tidal shear", "Passing"]],
       [["Singularity", "Collapsed"], ["Deep well", "Released"]],
     ];
-    const tier = kinds[strength < 0.25 ? 0 : strength < 0.7 ? 1 : 2]!;
+    const tier = kinds[strength < 0.15 ? 0 : strength < 0.6 ? 1 : 2]!;
     const [title, line] = tier[Math.floor(Math.random() * tier.length)]!;
     const id = Date.now();
     setStormNote({ id, x, y, left: x > window.innerWidth * 0.62, title, line });
     window.setTimeout(() => setStormNote((n) => (n && n.id === id ? null : n)), 5000);
+    // The strongest releases shake the whole scene for a moment (decaying).
+    if (strength > 0.6 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const amp = 2 + ((strength - 0.6) / 0.4) * 9;
+      const dur = 600 + 1400 * ((strength - 0.6) / 0.4);
+      const t0 = performance.now();
+      const els = [stage.current, overlay.current].filter((e): e is HTMLDivElement => !!e);
+      const shake = (now: number) => {
+        const u = (now - t0) / dur;
+        if (u >= 1) {
+          for (const e of els) e.style.translate = "";
+          return;
+        }
+        const a = amp * (1 - u) * (1 - u);
+        const t = (now - t0) / 1000;
+        const dx = a * (Math.sin(t * 61) * 0.6 + Math.sin(t * 37 + 1.3) * 0.4);
+        const dy = a * (Math.sin(t * 53 + 0.7) * 0.6 + Math.sin(t * 29 + 2.1) * 0.4);
+        for (const e of els) e.style.translate = `${dx.toFixed(2)}px ${dy.toFixed(2)}px`;
+        requestAnimationFrame(shake);
+      };
+      requestAnimationFrame(shake);
+    }
   }, []);
 
   useEffect(() => {

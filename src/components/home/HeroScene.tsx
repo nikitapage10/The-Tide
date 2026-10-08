@@ -807,54 +807,79 @@ void main() {
   float cs = cos(twist), sn = sin(twist);
   vec2 dRot = vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
   vec2 warped = uM + dRot - dir * pull;
-  // A gravity well you charge by holding in open space (uWell): a small dark
-  // core with a thin ring of bent light (an Einstein ring) forms and deepens,
-  // and space pinches and swirls into it, more the longer you hold. Let go and
-  // it collapses into a lensing shockwave (uGrav) whose reach, strength and
-  // length follow the charge, bending the stars and streams behind it.
+  // A gravity well you charge by holding in open space (uWell). It starts as
+  // the faintest curving of the light, and deepens slowly over ten seconds: a
+  // dark core with a thin ring of bent light (an Einstein ring) forms, and
+  // space pinches and swirls into it, wider and harder as the charge grows,
+  // trembling near the top. Let go and it collapses (uGrav), more violently
+  // the longer it was held: a quick ripple for a tap; an echo ring; three rings
+  // and a flash; at full charge ragged, churning fronts, a lingering
+  // turbulence and a bright flash (and the screen shakes; see HomeHero).
   float gRing = 0.0;
   float gCore = 0.0;
   float gEin = 0.0;
+  float gFlash = 0.0;
   if (uWell.w > 0.5) {
     float c = uWell.z;
     vec2 gd = sp - uWell.xy;
     float gr = length(gd);
     vec2 gdir = gr > 0.001 ? gd / gr : vec2(0.0);
-    float core = smoothstep(0.0, 0.12, c);
-    // A faint tremor once it is strongly charged.
-    float coreR = (6.0 + 14.0 * c) * (1.0 + 0.05 * c * c * sin(uT * 23.0));
-    float reach = 60.0 + 130.0 * c;
-    float well = core * exp(-gr * gr / (reach * reach));
-    float sw = (0.3 + 1.2 * c) * well;
+    float core = smoothstep(0.04, 0.2, c);
+    float shake = 0.06 * smoothstep(0.6, 1.0, c);
+    float coreR = (5.0 + 17.0 * c) * (1.0 + shake * sin(uT * 23.0) + 0.5 * shake * sin(uT * 37.0));
+    float reach = 50.0 + 190.0 * c;
+    float well = exp(-gr * gr / (reach * reach));
+    float sw = (0.12 + 1.5 * c) * well;
     float cs2 = cos(sw), sn2 = sin(sw);
     vec2 rel = warped - uWell.xy;
     warped = uWell.xy + vec2(cs2 * rel.x - sn2 * rel.y, sn2 * rel.x + cs2 * rel.y);
-    warped -= gdir * (10.0 + 42.0 * c) * well * (1.0 - exp(-gr / (12.0 + 10.0 * c)));
+    warped -= gdir * (3.0 + 54.0 * c) * well * (1.0 - exp(-gr / (10.0 + 12.0 * c)));
     gCore = max(gCore, core * (1.0 - smoothstep(coreR * 0.55, coreR, gr)));
-    float ein = (gr - coreR * 1.45) / (1.8 + 1.4 * c);
-    gEin = max(gEin, core * (0.45 + 0.55 * c) * exp(-ein * ein));
+    float ein = (gr - coreR * 1.45) / (1.6 + 1.8 * c);
+    gEin = max(gEin, core * (0.35 + 0.65 * c) * exp(-ein * ein));
   }
   for (int k = 0; k < 2; k++) {
     float c = uGrav[k].w;
     if (c <= 0.0) continue;
     float sa = uGrav[k].z;
-    float dur = 1.6 + 2.4 * c;
-    if (sa < 0.0 || sa > dur) continue;
+    float dur = 1.1 + 3.9 * c;
+    if (sa < 0.0 || sa > dur + 0.8) continue;
     vec2 gd = sp - uGrav[k].xy;
     float gr = length(gd);
     vec2 gdir = gr > 0.001 ? gd / gr : vec2(0.0);
-    // The core collapses in a moment...
-    float coreR = 6.0 + 14.0 * c;
-    float core = smoothstep(0.12, 0.0, sa) * smoothstep(0.0, 0.12, c);
-    gCore = max(gCore, core * (1.0 - smoothstep(coreR * 0.3, coreR * 0.8, gr)));
-    // ...and the shockwave runs out: farther, stronger and longer with charge.
-    float u = sa / dur;
-    float amp = smoothstep(0.0, 0.06, sa) * pow(1.0 - u, 2.0);
-    float rr = 14.0 + (140.0 + 560.0 * c) * pow(u, 0.7);
-    float w = 10.0 + (14.0 + 26.0 * c) * u;
-    float q = (gr - rr) / w;
-    warped += gdir * amp * (8.0 + 34.0 * c) * q * exp(-q * q);
-    gRing += amp * (0.5 + 0.9 * c) * exp(-q * q);
+    float ang = atan(gd.y, gd.x);
+    float chaos = smoothstep(0.55, 1.0, c);
+    // The core collapses in a moment, with a flash (from about half charge).
+    float coreR = 5.0 + 17.0 * c;
+    gCore = max(gCore, smoothstep(0.12, 0.0, sa) * smoothstep(0.04, 0.2, c) * (1.0 - smoothstep(coreR * 0.3, coreR * 0.8, gr)));
+    gFlash += smoothstep(0.35, 1.0, c) * exp(-sa * (7.0 - 3.0 * c)) * exp(-gr / (120.0 + 380.0 * c));
+    // One ring for a tap, two for a few seconds, three from about half charge;
+    // the strongest ones have ragged, churning fronts.
+    float rings = 1.0 + step(0.15, c) + step(0.45, c);
+    for (int j = 0; j < 3; j++) {
+      float fj = float(j);
+      if (fj >= rings) continue;
+      float sj = sa - fj * (0.16 + 0.12 * c);
+      if (sj <= 0.0) continue;
+      float u = sj / dur;
+      if (u > 1.0) continue;
+      float amp = smoothstep(0.0, 0.05, sj) * pow(1.0 - u, 2.0) * (1.0 - 0.3 * fj);
+      float ragged = 1.0 + chaos * 0.22 * (vnoise(vec2(ang * 3.0 + fj * 5.0, sj * 2.5 + fj)) - 0.5) * 2.0;
+      float rr = (14.0 + (120.0 + 680.0 * c) * pow(u, 0.7)) * ragged;
+      float w = 9.0 + (12.0 + 30.0 * c) * u;
+      float q = (gr - rr) / w;
+      warped += gdir * amp * (7.0 + 40.0 * c) * q * exp(-q * q);
+      gRing += amp * (0.45 + 1.1 * c) * exp(-q * q);
+    }
+    // At full charge, a churning turbulence lingers behind the fronts.
+    if (chaos > 0.0) {
+      float tq = chaos * exp(-sa * 0.7) * smoothstep(0.0, 0.3, sa) * exp(-gr * gr / (260.0 * 260.0 * (0.5 + c)));
+      float tw = tq * 0.9 * sin(sa * 3.0 + gr * 0.02);
+      float c3 = cos(tw), s3 = sin(tw);
+      vec2 rel = warped - uGrav[k].xy;
+      warped = uGrav[k].xy + vec2(c3 * rel.x - s3 * rel.y, s3 * rel.x + c3 * rel.y);
+      warped += vec2(vnoise(sp * 0.02 + sa * 2.0) - 0.5, vnoise(sp * 0.02 + 7.0 - sa * 2.0) - 0.5) * 30.0 * tq;
+    }
   }
   if (uLayer == 0) {
     // The lens bends space, not the planet: no warp over the planet's disc (its
@@ -1018,6 +1043,7 @@ void main() {
     col *= 1.0 - 0.92 * gCore * pointerInSpace;
     col += vec3(0.86, 0.9, 1.0) * gEin * 0.55 * pointerInSpace;
     col += vec3(0.74, 0.82, 0.98) * gRing * 0.05 * pointerInSpace;
+    col += vec3(0.86, 0.9, 1.0) * min(gFlash, 1.0) * 0.35;
     // Overall grade: a slight cool tint.
     col *= vec3(0.975, 0.993, 1.02);
     gl_FragColor = vec4(col, 1.0);
@@ -1271,10 +1297,8 @@ export function HeroScene({
       const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9, c: 0 }));
       // The well being charged (held in open space), if any.
       const well = { on: false, x: 0, y: 0, t: 0 };
-      const chargeOf = (now: number) => {
-        const h = Math.min(1, (now - well.t) / 3000);
-        return h * h * (3 - 2 * h);
-      };
+      // The charge builds slowly (an ease-in), full at ten seconds.
+      const chargeOf = (now: number) => Math.pow(Math.min(1, (now - well.t) / 10000), 1.6);
       let nextGrav = 0;
       const gravData = new Float32Array(8);
       // Where the cursor last left the planet for space (see uPull).
@@ -1579,7 +1603,7 @@ export function HeroScene({
           gl.uniform4f(U.pull, pull.x, pull.y, (now - pull.t) / 1000, now - pull.t < 2400 ? 1 : 0);
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
           gl.uniform4fv(U.storm, stormData);
-          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 4200 ? Math.max(0.05, gv.c) : 0], k * 4));
+          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 6000 ? Math.max(0.02, gv.c) : 0], k * 4));
           gl.uniform4fv(U.grav, gravData);
           const wc = well.on ? chargeOf(now) : 0;
           heroSignal.charge = wc;
