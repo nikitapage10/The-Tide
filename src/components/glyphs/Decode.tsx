@@ -73,23 +73,26 @@ export function Decode({ text, active, delay = 0, calc = false, tick = paceFor(t
   useEffect(() => {
     if (!active) return;
     const instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let timer = 0;
+    let raf = 0;
+    // Steps follow the clock, not a count of timer ticks (timers run late
+    // under load, and a decode must take exactly as long as planned).
     const start = window.setTimeout(() => {
       if (instant) {
         setStep(total);
         return;
       }
-      let s = 0;
+      const t0 = performance.now();
       setStep(0);
-      timer = window.setInterval(() => {
-        s += 1;
+      const frame = () => {
+        const s = Math.min(total, Math.floor((performance.now() - t0) / tick));
         setStep(s);
-        if (s >= total) window.clearInterval(timer);
-      }, tick);
+        if (s < total) raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
     }, delay);
     return () => {
       window.clearTimeout(start);
-      window.clearInterval(timer);
+      cancelAnimationFrame(raf);
     };
   }, [active, text, delay, total, tick]);
 

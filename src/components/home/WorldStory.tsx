@@ -99,10 +99,6 @@ export function WorldStory({ peoples, doors, hrefs }: { peoples: StoryPeople[]; 
   return (
     <section ref={track} className="world-story" aria-label="The story of the world" style={{ ["--chapters" as string]: CHAPTERS } as CSSProperties}>
       <div className="world-story-stage">
-        {/* The planet stays in view behind the story, dim and slowly turning away. */}
-        <div aria-hidden="true" className="story-planet">
-          <Image src="/brand/planet-v2.webp" alt="" fill sizes="100vw" className="object-cover" />
-        </div>
         {/* 1 · Arrival */}
         <Chapter i={0} n="I" title="Arrival" scene={ART.story.arrival}>
           <p className="story-line t-display-l max-w-4xl">

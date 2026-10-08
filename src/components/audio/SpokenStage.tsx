@@ -2,9 +2,8 @@
 /**
  * The narration, spoken large: while the Arrival narration plays, the line
  * being read is set in display type where the chapter's text was. Each word
- * surfaces in the Tide's script as it is spoken and resolves into English
- * (Decode), flaring as it lands (the read-along's lens flare); when the line
- * ends it lifts away and the next takes its place.
+ * appears as it is spoken, flaring as it lands (the read-along's lens flare);
+ * when the line ends it lifts away and the next takes its place.
  *
  * The lines are the caption cues (already corrected: Ilyr, the Tide...); the
  * words inside each line are timed from the recording's word timings, matched
@@ -12,14 +11,10 @@
  * `tide:narration` event, so this can sit anywhere on the page.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Decode, decodeDoneMs } from "@/components/glyphs/Decode";
 import { timeWords, wordAt, type TimedWord } from "./karaoke";
 
 const CAPTIONS = "/audio/ilyr-narration.vtt";
 const WORDS = "/audio/ilyr-narration.words.json";
-/** The pace of a spoken word's decode (ms a step, steps held). */
-const TICK = 8;
-const HOLD = 1;
 
 interface Line {
   start: number;
@@ -27,8 +22,6 @@ interface Line {
   words: string[];
   starts: number[];
   ends: number[];
-  /** When each word begins to decode: its own decode time before it is heard, so every word resolves as it is spoken, short or long. */
-  shows: number[];
 }
 
 const seconds = (stamp: string) => stamp.split(":").reduce((s, part) => s * 60 + Number(part), 0);
@@ -53,9 +46,7 @@ export function buildLines(cues: { start: number; end: number; text: string }[],
     const words = c.text.split(/\s+/).filter(Boolean);
     const near = timed.filter((t) => t[0] >= c.start - 0.4 && t[0] <= c.end + 0.2);
     const { starts, ends } = near.length ? timeWords(words, near, c.start) : { starts: words.map((_, i) => c.start + ((c.end - c.start) * i) / words.length), ends: words.map((_, i) => c.start + ((c.end - c.start) * (i + 0.8)) / words.length) };
-    const shows = words.map((w, i) => starts[i]! - decodeDoneMs(w, TICK, HOLD) / 1000);
-    for (let i = 1; i < shows.length; i++) if (shows[i]! < shows[i - 1]!) shows[i] = shows[i - 1]!;
-    return { start: c.start, end: c.end, words, starts, ends, shows };
+    return { start: c.start, end: c.end, words, starts, ends };
   });
 }
 
@@ -89,8 +80,8 @@ export function SpokenStage({ children }: { children: ReactNode }) {
       .then(([vtt, timed]) => {
         if (cancelled) return;
         const all = buildLines(parseVtt(vtt), timed);
-        // A line opens when its first word starts decoding.
-        setLines({ all, starts: all.map((l) => l.shows[0] ?? l.start) });
+        // A line opens when its first word is heard.
+        setLines({ all, starts: all.map((l) => l.starts[0] ?? l.start) });
       })
       .catch(() => {
         /* no timings: the chapter keeps its own text */
@@ -110,13 +101,11 @@ export function SpokenStage({ children }: { children: ReactNode }) {
       if (!a) return;
       const t = a.currentTime;
       // The line being spoken (or the last one, through the pause after it).
-      // A line opens as its first word begins to decode.
+      // A line opens with its first word; each word appears as it is heard, flaring.
       const line = wordAt(lines, t);
       const l = lines.all[line];
-      // Words shown: those whose decode has begun. The flare: the word being heard.
-      const word = l ? wordAt({ starts: l.shows }, t) : -1;
-      const heard = l ? wordAt(l, t) : -1;
-      const lit = !!l && heard >= 0 && t < l.ends[heard]! + 0.3 ? heard : -1;
+      const word = l ? wordAt(l, t) : -1;
+      const lit = !!l && word >= 0 && t < l.ends[word]! + 0.3 ? word : -1;
       setAt((p) => (p.line === line && p.word === word && p.lit === lit ? p : { line, word, lit }));
     };
     raf = requestAnimationFrame(frame);
@@ -139,7 +128,7 @@ export function SpokenStage({ children }: { children: ReactNode }) {
           <p key={`l${at.line}`} className="spoken-line">
             {line.words.map((w, k) => (
               <span key={k} className={`spoken-word ${k <= at.word ? "spoken-said" : ""} ${k === at.lit ? "spoken-now" : ""}`}>
-                <Decode text={w} active={k <= at.word} tick={TICK} hold={HOLD} />{" "}
+                {w}{" "}
               </span>
             ))}
           </p>
