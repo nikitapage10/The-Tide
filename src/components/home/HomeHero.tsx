@@ -144,7 +144,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
       last = now;
       // Time-based easing: the same pace at any frame rate.
       const ease = (rate: number) => 1 - Math.exp(-dt * rate);
-      const c = heroSignal.charge;
+      const c = Number.isFinite(heroSignal.charge) ? heroSignal.charge : 0;
       const target = c <= 0.33 ? 0 : Math.min(1, (c - 0.33) / 0.42);
       hush += (target - hush) * ease(3);
       const el = ui.current;

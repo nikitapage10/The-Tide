@@ -1382,7 +1382,9 @@ export function HeroScene({
       const well = { on: false, x: 0, y: 0, t: 0 };
       const zoom = { x: 0, y: 0, z: 1, last: 0, fall: 0 };
       // The charge builds slowly (an ease-in), full at ten seconds.
-      const chargeOf = (now: number) => Math.pow(Math.min(1, (now - well.t) / 10000), 1.6);
+      // (A frame's timestamp can be a little earlier than the press itself:
+      // clamp, or the power of a negative number is NaN, and the scene goes black.)
+      const chargeOf = (now: number) => Math.pow(Math.min(1, Math.max(0, (now - well.t) / 10000)), 1.6);
       let nextGrav = 0;
       const gravData = new Float32Array(8);
 
@@ -1716,6 +1718,9 @@ export function HeroScene({
             zoom.x = well.x;
             zoom.y = well.y;
           }
+          // Never let a bad value stick (it would black out the scene for good).
+          if (!Number.isFinite(zoom.z)) zoom.z = 1;
+          if (!Number.isFinite(zoom.fall)) zoom.fall = 0;
           gl.uniform4f(U.zoom, zoom.x, zoom.y, zoom.z, zoom.fall);
         }
         if (fieldFar && fieldNear) {
