@@ -16,3 +16,4 @@ next-env.d.ts
 .tmp-pg/
 *.zip
 .DS_Store
+__pycache__/
