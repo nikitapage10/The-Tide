@@ -17,6 +17,7 @@ export default async function WorkshopPage() {
     sources: "",
     "cloud-lab": "lab",
     "alphabet-lab": "lab",
+    "orbit-lab": "lab",
     settings: ctx.mode === "demo" ? "demo" : "connected",
   };
   return (

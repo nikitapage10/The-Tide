@@ -4,7 +4,7 @@
  * it to draw how things should move (start where an object appears; arrows show
  * the direction). The drawing is turned into points relative to the planet
  * (centre and radius), so it can be reproduced on any screen size. The current
- * paths can be shown for comparison. Not part of the site's navigation.
+ * paths can be shown for comparison. Linked from the Workshop.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { frameGeometry } from "@/components/home/HeroScene";
@@ -133,7 +133,12 @@ export function OrbitSketch() {
         }}
       />
       <div className="absolute left-4 top-4 max-w-sm space-y-3 bg-black/70 p-4 text-sm sm:left-8 sm:top-8">
-        <p className="tracked text-[0.62rem] text-faint">Orbit sketch</p>
+        <p className="tracked text-[0.62rem] text-faint">
+          <a href="/workshop/orbit-lab" className="text-white/60 no-underline hover:text-white">
+            Workshop
+          </a>{" "}
+          / Orbit sketch
+        </p>
         <p className="text-muted">Draw the path something should take: start where it first appears and follow it to where it disappears. Draw as many as you like (different kinds of pass). Arrows show the direction.</p>
         <label className="flex items-center gap-2 text-muted">
           <input type="checkbox" checked={showCurrent} onChange={(e) => setShowCurrent(e.target.checked)} />
