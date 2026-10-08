@@ -311,12 +311,20 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .smoky-button__status { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
 
 /* Decode (components/glyphs/Decode): each glyph sits in its letter's slot and
-   crossfades into it, so the line never shifts while it resolves. */
+   rolls in like a slot reel (from above or below, per data-dir); on resolving
+   it rolls out and the letter rolls in from the other side. No layout shift. */
 .decode-cell { position: relative; display: inline-block; }
-.decode-letter { opacity: 0; transition: opacity 0.22s ease; }
-.decode-letter.decode-on { opacity: 1; }
-.decode-glyph { position: absolute; left: 50%; top: 50%; translate: -50% -50%; opacity: 0.9; transition: opacity 0.22s ease, filter 0.22s ease; }
-.decode-glyph.decode-off { opacity: 0; filter: blur(1px); }
+.decode-letter { display: inline-block; opacity: 0; }
+.decode-letter.decode-on { opacity: 1; animation: letter-in-up 0.24s cubic-bezier(.2,.8,.2,1) both; }
+.decode-cell[data-dir="down"] .decode-letter.decode-on { animation-name: letter-in-down; }
+.decode-glyph { position: absolute; left: 50%; top: 50%; translate: -50% -50%; opacity: 0.9; animation: slot-in-down 0.09s ease-out both; transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease; }
+.decode-cell[data-dir="up"] .decode-glyph { animation-name: slot-in-up; }
+.decode-glyph.decode-off { animation: none; opacity: 0; filter: blur(1px); transform: translateY(65%); }
+.decode-cell[data-dir="up"] .decode-glyph.decode-off { transform: translateY(-65%); }
+@keyframes slot-in-down { from { transform: translateY(-70%); opacity: 0; filter: blur(1px); } to { transform: none; opacity: 0.9; filter: none; } }
+@keyframes letter-in-down { from { transform: translateY(-60%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes letter-in-up { from { transform: translateY(60%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slot-in-up { from { transform: translateY(70%); opacity: 0; filter: blur(1px); } to { transform: none; opacity: 0.9; filter: none; } }
 /* Glyph pairs fit their letter's slot: narrow in plain text and headings,
    wider in tracked (letter-spaced) labels. */
 .decode-cell { --glyph-w: 0.7em; --glyph-h: 1.05em; }
@@ -325,3 +333,7 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
 .hero-hint { opacity: calc(clamp(0, (var(--p) - 0.78) * 6, 1) * 0.9); transition: opacity 0.6s ease; }
 .hint-coarse { display: none; }
 @media (pointer: coarse) { .hint-fine { display: none; } .hint-coarse { display: inline; } }
+/* Callout effects (components/home/CalloutFx): centred on the callout's point. */
+.callout-fx { position: absolute; left: -50px; top: -50px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
+.callout-fx-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .callout-fx { display: none; } }

@@ -393,12 +393,14 @@ vec3 planetWithLimb(vec2 uv) {
     eyes[1] = vec2(-0.45, -0.55);
     eyes[2] = vec2(-0.2, 0.32);
     // Shadows cast on the ground (through the haze) by cloud toward the sun.
-    col *= 1.0 - 0.4 * densSun * (1.0 - dens);
+    col *= 1.0 - 0.4 * densSun * (1.0 - dens) * smoothstep(0.1, 0.55, uP);
     float tops = fbm5(pw * 18.0 + vec2(uT * 0.05, 0.0));
     float shade = clamp(0.8 - (densSun - dens) * 1.4, 0.35, 1.0);
     float bright = (0.28 + 0.62 * light) * shade * (0.72 + 0.4 * tops);
     vec3 cloudCol = mix(vec3(0.6, 0.66, 0.74), vec3(0.97, 0.98, 1.0), smoothstep(0.1, 0.8, dens)) * bright;
-    float alpha = pow(dens, 1.3) * 0.8 * smoothstep(0.0, 0.15, z);
+    // At rest (before scrolling) the planet is only a shape in the shadows:
+    // its cloud fades in with the reveal, so it never reads as patches.
+    float alpha = pow(dens, 1.3) * 0.8 * smoothstep(0.0, 0.15, z) * smoothstep(0.1, 0.55, uP);
     col = mix(col, cloudCol, inside * alpha);
 
     // Lightning inside the storms: now and then (rarely) a flash lights a cloud
@@ -1296,7 +1298,9 @@ export function HeroScene({
         gl.enableVertexAttribArray(wLocA);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-        const bright = smooth(2.0, 5.2, tSec) * (0.07 + 0.93 * smooth(0, 1, p));
+        // The upper cloud is hidden at rest (the planet is only a shape in the
+        // shadows then) and comes up with the planet's own reveal.
+        const bright = smooth(2.0, 5.2, tSec) * smooth(0.12, 0.85, p);
         for (const set of [wisps, stormPuffs]) {
           if (!set || set.count === 0) continue;
           gl.uniform1f(WU.uBright!, bright);

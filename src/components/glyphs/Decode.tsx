@@ -15,8 +15,14 @@ const HOLD_TICKS = 9;
 
 /** How long a decode takes (ms), for staggering what follows it. */
 export function decodeMs(text: string, calc = false) {
-  return ((calc ? CALC_TICKS : 0) + text.length * 2 + HOLD_TICKS) * TICK;
+  return ((calc ? CALC_TICKS : 0) + text.length * 2 + HOLD_TICKS + ROLL_TICKS) * TICK;
 }
+
+/** Ticks a glyph spends rolling before it locks. */
+const ROLL_TICKS = 5;
+const SLOT_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+/** Which way each glyph rolls in, across a word (varied, not alternating). */
+const SLOT_PATTERN = ["down", "up", "up", "down", "up", "down", "down"] as const;
 
 const OPS = ["∫", "Σ", "Δ", "∂", "√", "λ", "θ", "≈", "∝", "∇"];
 // Deterministic churn (renders stay pure): a different line each tick.
@@ -30,7 +36,7 @@ function working(step: number) {
 export function Decode({ text, active, delay = 0, calc = false }: { text: string; active: boolean; delay?: number; calc?: boolean }) {
   const [step, setStep] = useState(-1);
   const C = calc ? CALC_TICKS : 0;
-  const total = C + text.length * 2 + HOLD_TICKS;
+  const total = C + text.length * 2 + HOLD_TICKS + ROLL_TICKS;
   useEffect(() => {
     if (!active) return;
     const instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -76,7 +82,7 @@ export function Decode({ text, active, delay = 0, calc = false }: { text: string
               {[...w].map((ch, ci) => {
                 const i = at + ci;
                 const typed = st >= C + i + 1;
-                const resolved = st >= C + n + HOLD_TICKS + i + 1;
+                const resolved = st >= C + n + ROLL_TICKS + HOLD_TICKS + i + 1;
                 if (!hasGlyph(ch)) {
                   return (
                     <span key={i} className={typed ? "" : "invisible"}>
@@ -84,10 +90,16 @@ export function Decode({ text, active, delay = 0, calc = false }: { text: string
                     </span>
                   );
                 }
+                // Like a slot reel: each glyph rolls in (from above or below, in a
+                // varied pattern), passing a couple of other glyphs before it
+                // locks; when it resolves, it rolls out and the letter rolls in.
+                const dir = SLOT_PATTERN[(i * 5 + n) % SLOT_PATTERN.length]!;
+                const rolling = typed && st < C + i + 1 + ROLL_TICKS;
+                const shownCh = rolling ? SLOT_CHARS[Math.floor(rnd(i + 1, Math.floor(st / 2)) * SLOT_CHARS.length)]! : ch;
                 return (
-                  <span key={i} className="decode-cell">
+                  <span key={i} className="decode-cell" data-dir={dir}>
                     <span className={`decode-letter ${resolved ? "decode-on" : ""}`}>{ch}</span>
-                    {typed ? <TideGlyph ch={ch} className={`decode-glyph ${resolved ? "decode-off" : ""}`} /> : null}
+                    {typed ? <TideGlyph key={rolling ? `r${Math.floor(st / 2)}` : "g"} ch={shownCh} className={`decode-glyph ${resolved ? "decode-off" : ""}`} /> : null}
                   </span>
                 );
               })}

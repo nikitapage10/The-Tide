@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GLYPH_PRESENCE_DEFAULT, glyphPresence } from "./GlyphTrail";
 import { Decode, decodeMs } from "@/components/glyphs/Decode";
+import { CalloutFx, type FxKind } from "./CalloutFx";
 import { HeroDrifters } from "./HeroDrifters";
 import { HeroScene } from "./HeroScene";
 import { SoundToggle } from "./SoundToggle";
@@ -35,13 +36,16 @@ export interface HeroObservation {
   side: "left" | "right";
   title: string;
   line: string;
+  /** A small effect at the note's point, matched to what it names. */
+  fx?: FxKind;
 }
 
 export interface HeroProps {
   callouts: HeroCallout[];
-  observations: HeroObservation[];
-  /** Notes that pop up out in space (around the streams). */
-  spaceNotes: HeroObservation[];
+  /** Rotating notes on the planet, in slots that run at once (each its own spots). */
+  observations: HeroObservation[][];
+  /** Rotating notes out in space (around the streams), also in slots. */
+  spaceNotes: HeroObservation[][];
   /** Fixed spots on the planet where the cursor's strands are rooted. */
   spots: { x: number; y: number }[];
   /** Short machine-style readout (real data, e.g. release); currently not shown. */
@@ -196,8 +200,14 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
                 <Callout c={c} active={revealed} delay={i * 450} />
               </div>
             ))}
-            <Observations items={observations} active={revealed} />
-            <Observations items={spaceNotes} active={revealed} startDelay={4800} calc />
+            {/* Rotating notes: several slots at once, staggered so they never all
+                change together (three to five callouts on screen at any time). */}
+            {observations.map((slot, i) => (
+              <Observations key={`p${i}`} items={slot} active={revealed} startDelay={1600 + i * 2300} hold={6600 + i * 900} />
+            ))}
+            {spaceNotes.map((slot, i) => (
+              <Observations key={`s${i}`} items={slot} active={revealed} startDelay={3400 + i * 2700} hold={7200 + i * 700} calc />
+            ))}
           </div>
           {/* Top-right note from the mockup. */}
           <div className="absolute right-4 top-[calc(var(--header-h)+1rem)] flex items-center gap-3 sm:right-10">
@@ -301,7 +311,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
 }
 
 /** One note at a time, cycling through the list at different spots on the planet. */
-function Observations({ items, active, startDelay = 1600, calc = false }: { items: HeroObservation[]; active: boolean; startDelay?: number; calc?: boolean }) {
+function Observations({ items, active, startDelay = 1600, hold = 6200, calc = false }: { items: HeroObservation[]; active: boolean; startDelay?: number; hold?: number; calc?: boolean }) {
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -316,7 +326,7 @@ function Observations({ items, active, startDelay = 1600, calc = false }: { item
         if (!alive) return;
         setShown(false);
         t2 = window.setTimeout(() => alive && cycle((i + 1) % items.length), 900);
-      }, 6200);
+      }, hold);
     };
     const t0 = window.setTimeout(() => cycle(index), startDelay);
     return () => {
@@ -327,12 +337,13 @@ function Observations({ items, active, startDelay = 1600, calc = false }: { item
     };
     // Restart the cycle only when revealed/hidden; index continues where it was.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, items.length, startDelay]);
+  }, [active, items.length, startDelay, hold]);
   const o = items[index];
   if (!o) return null;
   const on = active && shown;
   return (
     <div aria-hidden="true" className={`hero-pin obs ${on ? "obs-on" : ""}`} style={pin(o.x, o.y)}>
+      <CalloutFx key={`fx${index}`} kind={o.fx} on={on} />
       <span className="obs-ping absolute -left-2 -top-2 h-4 w-4 rounded-full border border-white/70" />
       <span className="absolute -left-[2px] -top-[2px] h-1 w-1 rounded-full bg-white" />
       <span className={`obs-line absolute top-0 h-px bg-white/50 ${o.side === "right" ? "left-2 origin-left" : "right-2 origin-right"}`} />

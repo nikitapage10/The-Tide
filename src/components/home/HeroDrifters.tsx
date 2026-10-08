@@ -1,21 +1,22 @@
 "use client";
 /**
- * Things in orbit and passing through, once the planet is revealed. Each object
- * moves as what it is:
+ * Things in orbit and passing through, once the planet is revealed. Each moves
+ * as what it is, seen with real perspective (larger near the camera, a few
+ * pixels by the horizon, where they fade):
  * - Satellites and stations orbit like moons: one shared plane (the planet's
  *   equator, seen nearly edge-on with a slight tilt), all the same way round,
  *   sweeping right to left across the front of the planet, round its left side,
- *   then back behind it (hidden by its disc), slightly larger on the near side.
- *   Outer orbits are slower; an orbit takes minutes. Most hold their attitude;
- *   the ring station turns, the sounder spins.
- * - Since the Tide nothing leaves: the atmosphere cannot be crossed, so the
- *   satellites are relics from before, and ships only ever arrive. One comes in
- *   from the far side of space, small and distant, grows as it nears, picks up
- *   speed, flares at the atmosphere and is lost there.
- * - Debris and wrecks drift in from the far side, tumbling slowly.
- * Never more than two at a time. Each has a thin leader line pointing at it
- * with a short label translated from the Tide's script. Small, slow, dimmer on
- * the night side. Off under reduced motion.
+ *   then behind it (hidden by its disc). Outer orbits are slower; an orbit takes
+ *   minutes. Most hold their attitude; the ring station turns, the sounder spins.
+ * - A moon fragment surfaces out of the dark, is caught, and spirals in to be
+ *   lost behind the planet.
+ * - Since the Tide nothing leaves: the atmosphere cannot be crossed, so ships
+ *   only arrive. One appears far out in the dark, grows as it falls in, flares
+ *   at the atmosphere and is lost there.
+ * - Debris surfaces out of the dark, drifts a little, and sinks back into it.
+ * Two at first, then something every ten to twenty seconds, never more than
+ * three at once. Each has a thin leader line with a short label translated
+ * from the Tide's script. Off under reduced motion.
  *
  * The list changes rarely (React); positions are set every frame on the
  * elements directly (transform-only, sub-pixel), so motion stays smooth.
@@ -25,7 +26,7 @@ import { Decode } from "@/components/glyphs/Decode";
 import { DRIFTERS } from "./drifters";
 import { frameGeometry } from "./HeroScene";
 
-type Mode = "orbit" | "arrival" | "drift";
+type Mode = "orbit" | "capture" | "arrival" | "drift";
 
 interface Profile {
   mode: Mode;
@@ -48,7 +49,7 @@ const PROFILES: Record<string, Profile> = {
   orb: { mode: "orbit", spin: 0, weight: 0.5, labels: [["Lantern", "Dim side toward us"]] },
   needle: { mode: "arrival", spin: 0, weight: 1, labels: [["Arrival", "Inbound"], ["Vessel", "From the far side"]] },
   "needle-2": { mode: "arrival", spin: 0, weight: 1, labels: [["Arrival", "Not slowing"], ["Vessel", "Inbound"]] },
-  asteroid: { mode: "drift", spin: 2.5, weight: 2, labels: [["Fragment", "Tumbling"]] },
+  asteroid: { mode: "capture", spin: 2, weight: 1, labels: [["Moon fragment", "Falling inward"], ["Moon fragment", "Captured"]] },
   wreck: { mode: "drift", spin: 0.9, weight: 2, labels: [["Hull", "Cold"], ["Wreck", "No answer"]] },
   "broken-ring": { mode: "drift", spin: 0.6, weight: 1, labels: [["Broken arc", "Once whole"]] },
   "rock-cluster": { mode: "drift", spin: 0.8, weight: 1, labels: [["Debris", "Spreading"]] },
@@ -96,23 +97,43 @@ const weighted = <T,>(xs: T[], w: (x: T) => number) => {
   return xs[xs.length - 1]!;
 };
 /**
- * An arrival's path (artwork fractions): from off the left edge, a gentle curve
- * into a point on the planet's visible limb (just inside the atmosphere).
+ * An arrival's path (artwork fractions): it appears far out in the dark (a
+ * speck), and falls along a gentle curve into a point on the planet's visible
+ * limb (just inside the atmosphere).
  */
-function arrivalPath(level: number): [number, number, number, number, number, number] {
+function arrivalPath(): [number, number, number, number, number, number] {
   const th = Math.PI * rand(0.86, 1.12);
   const ex = 1.0122 + 0.4415 * 0.99 * Math.cos(th);
   const ey = 0.65 + 0.4415 * (2000 / 1126) * 0.99 * Math.sin(th);
-  const sx = -0.08;
-  const sy = level + rand(-0.15, 0.15);
-  return [sx, sy, (sx + ex) / 2, (sy + ey) / 2 + rand(-0.15, 0.15), ex, ey];
+  const sx = rand(0.06, 0.3);
+  const sy = rand(0.15, 0.85);
+  return [sx, sy, (sx + ex) / 2, (sy + ey) / 2 + rand(-0.12, 0.12), ex, ey];
 }
+
+/**
+ * Debris in open space: it surfaces out of the dark somewhere away from the
+ * edges, drifts a short way on a slight curve, and sinks back into the dark.
+ */
+function driftPath(): [number, number, number, number, number, number] {
+  const sx = rand(0.08, 0.42);
+  const sy = rand(0.18, 0.82);
+  const a = rand(0, Math.PI * 2);
+  const d = rand(0.06, 0.12);
+  const ex = sx + Math.cos(a) * d;
+  const ey = sy + Math.sin(a) * d * 1.6;
+  const bend = rand(-0.04, 0.04);
+  return [sx, sy, (sx + ex) / 2 - Math.sin(a) * bend, (sy + ey) / 2 + Math.cos(a) * bend * 1.6, ex, ey];
+}
+
+/** Camera distance from the planet's centre (planet radii): sets the perspective. */
+const CAM = 2.1;
+const perspective = (z: number) => CAM / Math.max(0.3, CAM - z);
 
 /** The shared orbital plane: nearly edge-on, tilted slightly. */
 const PLANE_INC = 1.36;
 const PLANE_NODE = -0.14;
 /** Never more than this many things in motion at once. */
-const MAX_TOTAL = 2;
+const MAX_TOTAL = 3;
 
 export function HeroDrifters({ progress, className }: { progress: { current: number }; className?: string }) {
   const layer = useRef<HTMLDivElement>(null);
@@ -151,32 +172,35 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       let R = d.name === "orb" ? rand(1.6, 1.8) : rand(1.18, 1.6);
       for (let tries = 0; tries < 8 && taken.some((r) => Math.abs(r - R) < 0.14); tries++) R = rand(1.18, 1.6);
       const period = 300000 * Math.pow(R / 1.35, 1.5);
-      const level = rand(0.25, 0.75);
       const m: Motion = {
         mode,
         t0: now,
         // Orbiters stay one orbit (leaving while behind the planet); an arrival
         // takes under a minute; debris a couple of minutes.
-        life: mode === "orbit" ? period : mode === "arrival" ? rand(40000, 55000) : rand(120000, 160000),
-        R,
+        life: mode === "orbit" ? period : mode === "capture" ? rand(70000, 90000) : mode === "arrival" ? rand(40000, 55000) : rand(45000, 65000),
+        // A captured fragment starts well out and spirals in (R shrinks over its life).
+        R: mode === "capture" ? rand(2.1, 2.4) : R,
         inc: PLANE_INC + rand(-0.03, 0.03),
         node: PLANE_NODE + rand(-0.02, 0.02),
         // The first is already crossing the visible side; later ones come round
         // from behind the planet, off screen to the right.
-        a0: first ? rand(1.0, 1.9) : rand(-0.3, -0.1),
-        w: (Math.PI * 2) / period,
+        a0: mode === "capture" ? rand(1.7, 2.1) : first ? rand(1.0, 1.9) : rand(-0.3, -0.1),
+        w: mode === "capture" ? 0 : (Math.PI * 2) / period,
         // Arrivals: from the far side of space (off the left edge) down a gentle
         // curve into the planet's limb (pulled in by it). Debris: a slow drift
         // in from the far side, nearly level.
-        p: mode === "arrival" ? arrivalPath(level) : [-0.06, rand(0.2, 0.8), 0.3, rand(0.2, 0.8), 0.62, rand(0.2, 0.8)],
-        size: mode === "arrival" ? rand(0.012, 0.016) : mode === "orbit" ? rand(0.009, 0.013) : rand(0.008, 0.012),
-        rot0: mode === "drift" ? rand(0, 360) : rand(-12, 12),
+        p: mode === "arrival" ? arrivalPath() : driftPath(),
+        // Sizes at the planet's distance (perspective scales them from there):
+        // small things, a few pixels by the horizon.
+        size: mode === "arrival" ? rand(0.009, 0.012) : mode === "orbit" ? rand(0.0032, 0.0046) : mode === "capture" ? rand(0.004, 0.0055) : rand(0.006, 0.009),
+        rot0: mode === "drift" || mode === "capture" ? rand(0, 360) : rand(-12, 12),
         spin: (prof.spin * (Math.random() < 0.5 ? -1 : 1)) / 1000,
         base: 0,
       };
       motionMap.set(id, m);
       // Labels sit on the side with more open space.
       const side = mode === "drift" ? "right" : "left";
+      if (mode === "capture") m.w = 2.05 / m.life;
       setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side }]);
     };
 
@@ -188,19 +212,22 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       const on = p >= 0.72;
       const all = [...motionMap.values()];
       if (on && !nextAt && all.length === 0) {
-        // On reveal: one satellite already crossing the planet.
+        // On reveal: a satellite already crossing the planet, and something
+        // surfacing out in the dark.
         spawn(now, "orbit", true);
-        nextAt = now + rand(25000, 45000);
+        spawn(now, "drift", true);
+        nextAt = now + rand(8000, 14000);
       } else if (on && nextAt && now >= nextAt) {
         if (all.length < MAX_TOTAL) {
-          const busyModes = new Set(all.map((m) => m.mode));
+          const count = (md: Mode) => all.filter((m) => m.mode === md).length;
           const r = Math.random();
-          let mode: Mode = r < 0.6 ? "orbit" : r < 0.8 ? "arrival" : "drift";
-          // One arrival or one piece of debris at a time.
-          if (mode !== "orbit" && busyModes.has(mode)) mode = "orbit";
-          spawn(now, mode);
+          let mode: Mode = r < 0.45 ? "orbit" : r < 0.6 ? "capture" : r < 0.8 ? "arrival" : "drift";
+          // At most two satellites, and one of each other kind, at a time.
+          if (mode === "orbit" && count("orbit") >= 2) mode = "drift";
+          if (mode !== "orbit" && count(mode) >= 1) mode = count("orbit") < 2 ? "orbit" : mode;
+          if (count(mode) < (mode === "orbit" ? 2 : 1)) spawn(now, mode);
         }
-        nextAt = now + rand(30000, 60000);
+        nextAt = now + rand(10000, 20000);
       }
 
       const rect = root.getBoundingClientRect();
@@ -235,18 +262,21 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         let rot = m.rot0 + m.spin * age;
         // Arrivals: heat as they meet the atmosphere (flare, then lost).
         let heat = 0;
-        if (m.mode === "orbit") {
+        if (m.mode === "orbit" || m.mode === "capture") {
           // A tilted circular orbit seen from the front: the near half crosses
-          // in front of the planet, the far half passes behind it.
+          // in front of the planet, the far half passes behind it. A captured
+          // fragment's orbit shrinks as it falls in, and it is lost behind.
           const t = m.a0 + m.w * age;
+          const R = m.mode === "capture" ? m.R - (m.R - 1.12) * smooth(0, 1, u) : m.R;
           const ox = Math.cos(t);
           const oy = Math.sin(t) * Math.cos(m.inc);
-          z = Math.sin(t) * Math.sin(m.inc);
+          z = R * Math.sin(t) * Math.sin(m.inc);
           const cn = Math.cos(m.node), sn = Math.sin(m.node);
-          x = pcx + pr * m.R * (ox * cn - oy * sn);
-          y = pcy + pr * m.R * (ox * sn + oy * cn);
+          x = pcx + pr * R * (ox * cn - oy * sn);
+          y = pcy + pr * R * (ox * sn + oy * cn);
           behind = z < 0;
-          depth = 1 + 0.18 * z;
+          // Perspective: larger crossing in front, a few pixels by the horizon.
+          depth = perspective(z);
         } else {
           const [x0, y0, cx, cy, x1, y1] = m.p;
           // Arrivals speed up as the planet pulls them in.
@@ -259,10 +289,11 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
             const dx = 2 * (1 - v) * (cx - x0) + 2 * v * (x1 - cx);
             const dy = (2 * (1 - v) * (cy - y0) + 2 * v * (y1 - cy)) * (g.fh / g.fw);
             rot = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-            depth = 0.55 + 0.6 * v;
+            // Far out at first (a speck), nearer and larger as it falls in.
+            depth = 0.25 + 1.05 * Math.pow(v, 1.4);
             heat = smooth(0.84, 0.97, v);
           } else {
-            depth = 0.95 + 0.1 * Math.sin(u * Math.PI);
+            depth = 0.7;
           }
         }
         const body = el.firstElementChild as HTMLElement | null;
@@ -291,17 +322,27 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           const night = smooth(-0.3, 0.5, (x - pcx) / pr) * near;
           body.style.filter = heat > 0.001
             ? `brightness(${(1 + 1.6 * heat).toFixed(3)}) drop-shadow(0 0 ${(2 + 7 * heat).toFixed(1)}px rgba(214,226,255,${(0.9 * heat).toFixed(3)}))`
-            : `brightness(${(1 - 0.5 * night + 0.08 * z).toFixed(3)})`;
+            : `brightness(${(1 - 0.5 * night + 0.05 * z).toFixed(3)})`;
         }
         // Long, eased fades at both ends; never fully opaque (they are far off).
-        const fade = m.mode === "arrival" ? smooth(0, 0.12, u) * (1 - smooth(0.965, 1, u)) : smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
-        el.style.opacity = (fade * 0.85).toFixed(3);
+        // Fades: things surface out of the dark and sink back into it; and what
+        // is only a few pixels across is barely there.
+        const fade =
+          m.mode === "arrival"
+            ? smooth(0, 0.2, u) * (1 - smooth(0.965, 1, u))
+            : m.mode === "drift"
+              ? smooth(0, 0.3, u) * (1 - smooth(0.7, 1, u))
+              : m.mode === "capture"
+                ? smooth(0, 0.2, u) * (1 - smooth(0.9, 1, u))
+                : smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
+        const px = m.base * k;
+        el.style.opacity = (fade * 0.85 * smooth(3, 11, px)).toFixed(3);
         // The callout follows the object; it hides while the object is behind.
         const tag = el.lastElementChild as HTMLElement | null;
         if (tag) {
           const r = Math.max(5, m.base * k * 0.45);
           tag.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
-          const vis = fade > 0.6 && hidden < 0.5 && x > 8 && x < rect.width - 8 && y > 8 && y < rect.height - 8;
+          const vis = fade > 0.6 && px > 7 && hidden < 0.5 && x > 8 && x < rect.width - 8 && y > 8 && y < rect.height - 8;
           tag.style.opacity = vis ? "1" : "0";
           tag.style.setProperty("--r", `${r.toFixed(1)}px`);
           // The label's area (beside the object, on its side); hide its text if a
