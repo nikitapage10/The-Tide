@@ -746,8 +746,8 @@ vec4 scene(vec2 sp) {
     col *= iPlanet * mix(0.015, 1.0, smoothstep(0.02, 0.85, uP));
     return vec4(col, 1.0);
   }
-  float iNear = intro(0.4, 2.4);
-  float iFar = intro(0.8, 3.0);
+  float iNear = intro(0.15, 1.7);
+  float iFar = intro(0.45, 2.3);
 
   // Depth of field grows as the rocks leave the focal plane; streaks come from
   // the zoom itself plus how fast you scroll.
@@ -1169,6 +1169,10 @@ export function HeroScene({
     if (!canvas) return;
     const transparent = layer === "meteors";
     const bit = layer === "planet" ? 1 : 2;
+    if (layer === "planet") {
+      canvas.style.opacity = "0";
+      canvas.style.transition = "opacity 1.2s ease";
+    }
     const gl = canvas.getContext("webgl", { antialias: false, alpha: transparent, premultipliedAlpha: true });
     if (!gl) {
       onFail?.();
@@ -1579,17 +1583,22 @@ export function HeroScene({
       let firstWarm = 0;
       const loop = (now: number) => {
         if (disposed) return;
-        // Start the shared intro once both layers have warmed up (a few frames
-        // drawn: textures uploaded, shaders ready; a layer scrolled out of view
-        // counts as warm), or after a few seconds if the other never gets there.
+        // Start the shared intro as soon as the rocks' layer has drawn a couple of
+        // frames (textures up, shader ready): the rocks come first, and at rest
+        // the planet is nearly black, so it never needs to hold them back (it
+        // fades in on its own whenever it is ready). If the planet is ready
+        // first, it waits briefly for the rocks.
         if (!clock.current.start && !document.hidden) {
-          warmFrames = visible ? warmFrames + 1 : Math.max(warmFrames, 3);
-          if (warmFrames === 3 || !visible) clock.current.ready |= bit;
-          if (warmFrames >= 3 && !firstWarm) firstWarm = now;
-          if (warmFrames >= 3 && (clock.current.ready === 3 || now - firstWarm > 5000)) clock.current.start = now;
+          warmFrames = visible ? warmFrames + 1 : Math.max(warmFrames, 2);
+          if (warmFrames === 2 || !visible) clock.current.ready |= bit;
+          if (warmFrames >= 2 && !firstWarm) firstWarm = now;
+          if (warmFrames >= 2 && (clock.current.ready & 2 || now - firstWarm > 1500)) clock.current.start = now;
         }
         if (visible && !document.hidden) {
           draw(now);
+          // The planet fades in on its first frame, whenever that is (it may be
+          // ready after the rocks have started).
+          if (layer === "planet" && canvas.style.opacity !== "1") canvas.style.opacity = "1";
           // Adaptive quality (planet only): if frames run long, render a little
           // smaller; recover when there is headroom. At most one change per 2s.
           if (layer === "planet" && quality.last) {

@@ -1,8 +1,9 @@
 "use client";
 /**
  * A label being translated: (optionally) a line of working churns where it will
- * appear, then the text types out in the Tide's script, holds a beat, and each
- * glyph resolves into its English letter, left to right. Every glyph sits in
+ * appear, then the text arrives in the Tide's script (each glyph rolling in like
+ * a slot reel, in no particular order), holds a beat, and each glyph resolves
+ * into its English letter (in a different order). Every glyph sits in
  * its letter's own slot, so nothing shifts as it resolves. Screen readers get
  * the English text only; reduced motion shows it at once.
  */
@@ -27,6 +28,14 @@ const SLOT_PATTERN = ["down", "up", "up", "down", "up", "down", "down"] as const
 const OPS = ["∫", "Σ", "Δ", "∂", "√", "λ", "θ", "≈", "∝", "∇"];
 // Deterministic churn (renders stay pure): a different line each tick.
 const rnd = (n: number, k: number) => (((n * 2654435761) ^ (k * 2246822519)) >>> 0) / 4294967296;
+/** The position of each index when sorted by key (a random permutation). */
+function rankBy(n: number, key: (i: number) => number) {
+  const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => key(a) - key(b));
+  const rank = new Array<number>(n);
+  idx.forEach((i, r) => (rank[i] = r));
+  return rank;
+}
+
 function working(step: number) {
   const op = (k: number) => OPS[Math.floor(rnd(step, k) * OPS.length)]!;
   const num = (k: number) => (rnd(step, k) * 9.99).toFixed(3);
@@ -62,6 +71,10 @@ export function Decode({ text, active, delay = 0, calc = false }: { text: string
 
   const st = active ? step : -1;
   const n = text.length;
+  // Random order (fixed per text): the order glyphs arrive in, and a different
+  // order they resolve in, like a signal coming clear.
+  const arrive = rankBy(n, (i) => rnd(i + 1, n * 7 + 1));
+  const settle = rankBy(n, (i) => rnd(i + 1, n * 13 + 5));
   // Words (kept unbroken) with each one's starting index in the text.
   const words = text.split(/(\s+)/).reduce<{ w: string; at: number }[]>((acc, w) => {
     const prev = acc[acc.length - 1];
@@ -81,8 +94,8 @@ export function Decode({ text, active, delay = 0, calc = false }: { text: string
             <span key={wi} className="whitespace-nowrap">
               {[...w].map((ch, ci) => {
                 const i = at + ci;
-                const typed = st >= C + i + 1;
-                const resolved = st >= C + n + ROLL_TICKS + HOLD_TICKS + i + 1;
+                const typed = st >= C + arrive[i]! + 1;
+                const resolved = st >= C + n + ROLL_TICKS + HOLD_TICKS + settle[i]! + 1;
                 if (!hasGlyph(ch)) {
                   return (
                     <span key={i} className={typed ? "" : "invisible"}>
@@ -94,7 +107,7 @@ export function Decode({ text, active, delay = 0, calc = false }: { text: string
                 // varied pattern), passing a couple of other glyphs before it
                 // locks; when it resolves, it rolls out and the letter rolls in.
                 const dir = SLOT_PATTERN[(i * 5 + n) % SLOT_PATTERN.length]!;
-                const rolling = typed && st < C + i + 1 + ROLL_TICKS;
+                const rolling = typed && st < C + arrive[i]! + 1 + ROLL_TICKS;
                 const shownCh = rolling ? SLOT_CHARS[Math.floor(rnd(i + 1, Math.floor(st / 2)) * SLOT_CHARS.length)]! : ch;
                 return (
                   <span key={i} className="decode-cell" data-dir={dir}>

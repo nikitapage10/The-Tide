@@ -306,8 +306,9 @@ export function CalloutFx({ kind, on, space = false }: { kind?: FxKind; on: bool
     const fx = FX[kind];
     const tint = TINT[kind];
     const [cr, cg, cb] = space || !tint ? NEUTRAL : (NEUTRAL.map((v, k) => Math.round((v + tint[k]!) / 2)) as RGB);
-    // Out of focus: softer still in space (a dim, blurred drift).
-    const blur = space ? 1.3 : 0.7;
+    // Out of focus: softer still in space (a dim, blurred drift). The softness
+    // comes from wide faint halos (a canvas blur filter is too costly here).
+    const halo = space ? 4.6 : 3.6;
     const dim = space ? 0.65 : 0.85;
     const t0 = performance.now();
     let raf = 0;
@@ -319,16 +320,19 @@ export function CalloutFx({ kind, on, space = false }: { kind?: FxKind; on: bool
       ctx.setTransform(dpr, 0, 0, dpr, SIZE / 2 * dpr, SIZE / 2 * dpr);
       ctx.clearRect(-SIZE / 2, -SIZE / 2, SIZE, SIZE);
       ctx.globalCompositeOperation = "lighter";
-      ctx.filter = `blur(${blur}px)`;
       for (let i = 0; i < fx.n; i++) {
         const p = fx.at(i, t);
         if (!p) continue;
         const a = p[2] * intro * dim;
         if (a <= 0.01) continue;
         // A soft mote: a wide faint halo and a small, quiet core.
+        ctx.fillStyle = `rgba(${cr},${cg},${cb},${(a * 0.06).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], p[3] * halo, 0, TAU);
+        ctx.fill();
         ctx.fillStyle = `rgba(${cr},${cg},${cb},${(a * 0.1).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(p[0], p[1], p[3] * 3.4, 0, TAU);
+        ctx.arc(p[0], p[1], p[3] * 1.8, 0, TAU);
         ctx.fill();
         ctx.fillStyle = `rgba(${cr},${cg},${cb},${(a * 0.42).toFixed(3)})`;
         ctx.beginPath();

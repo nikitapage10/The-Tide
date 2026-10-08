@@ -9,6 +9,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { preload } from "react-dom";
 import { GLYPH_PRESENCE_DEFAULT, glyphPresence } from "./GlyphTrail";
 import { Decode, decodeMs } from "@/components/glyphs/Decode";
 import { CalloutFx, type FxKind } from "./CalloutFx";
@@ -57,7 +58,11 @@ const HAIKU = ["Waves crash upon shores,", "As the Tide's eternal song,", "Echoe
 
 const pin = (x: number, y: number) => ({ "--x": `${x}%`, "--y": `${y}%` }) as React.CSSProperties;
 
+/** The rocks' images: fetched as early as possible so the intro can start at once. */
+const ROCK_IMAGES = ["/brand/meteors-near.webp", "/brand/meteors-far.webp", "/brand/meteors-near-ids.png", "/brand/meteors-far-ids.png", "/brand/meteors-near-centres.png", "/brand/meteors-far-centres.png"];
+
 export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProps) {
+  for (const src of ROCK_IMAGES) preload(src, { as: "image", fetchPriority: "high" });
   const track = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);

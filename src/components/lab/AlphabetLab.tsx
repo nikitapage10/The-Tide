@@ -38,6 +38,24 @@ const randomOrder = (i: number) => h(i, 7);
 
 const STYLES: { name: string; note: string; dur: number; fn: StyleFn; interlinear?: boolean }[] = [
   {
+    name: "Random reels (on the site)",
+    note: "Slot reels in random order: glyphs roll in scattered across the line, then resolve to letters in a different order.",
+    dur: 3.6,
+    fn: (i, n, t) => {
+      const at = 0.05 * n * h(i, 11);
+      const dir = [1, -1, -1, 1, -1, 1, 1][(i * 5 + n) % 7]!;
+      const rolling = t >= at && t < at + 0.32;
+      const res = 0.05 * n + 0.75 + 0.05 * n * h(i, 12);
+      const k = ramp(t, at, 0.12);
+      const r = ramp(t, res, 0.22);
+      return {
+        roll: rolling ? rollCh(i, t) : undefined,
+        g: t < at ? null : { opacity: 0.9 * k * (1 - r), transform: `translateY(${(1 - k) * -70 * dir + r * 65 * dir}%)`, filter: `blur(${r}px)` },
+        l: { opacity: r, transform: `translateY(${(1 - r) * -60 * dir}%)` },
+      };
+    },
+  },
+  {
     name: "Slot reels",
     note: "Each glyph rolls in from above or below past other glyphs, locks, then rolls out as the letter rolls in.",
     dur: 3.4,
@@ -275,7 +293,7 @@ export function AlphabetLab() {
               / Alphabet lab
             </p>
             <h1 className="mt-3 font-[family-name:var(--font-display)] text-4xl font-light">Alphabet lab</h1>
-            <p className="mt-2 max-w-xl text-sm text-muted">Twelve ways for the Tide&apos;s script to translate into English. Each letter is its pair of glyphs.</p>
+            <p className="mt-2 max-w-xl text-sm text-muted">Thirteen ways for the Tide&apos;s script to translate into English. Each letter is its pair of glyphs.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="tracked text-[0.6rem] text-faint" htmlFor="lab-text">
