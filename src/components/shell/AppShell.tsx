@@ -89,10 +89,12 @@ export function AppShell({ mode, actorLabel, canEdit, children }: { mode: "demo"
         <main id="main" tabIndex={-1} className="page-x py-8 focus:outline-none sm:py-10">
           {children}
         </main>
-        <footer className="tracked page-mx flex flex-wrap justify-between gap-2 border-t border-white/10 py-6 text-[0.62rem] text-faint">
-          <span>Lore is written in the ChatGPT spaces. This site shows published releases only.</span>
-          <span>{mode === "demo" ? "Local demo · not production data" : canEdit ? `Signed in · ${actorLabel}` : "Public view · read-only"}</span>
-        </footer>
+        {/* Only a quiet note for the GM (or the local demo); visitors see no footer text. */}
+        {mode === "demo" || canEdit ? (
+          <footer className="tracked page-mx flex flex-wrap justify-end gap-2 border-t border-white/10 py-6 text-[0.62rem] text-faint">
+            <span>{mode === "demo" ? "Local demo · not production data" : `Signed in · ${actorLabel}`}</span>
+          </footer>
+        ) : null}
       </div>
     </EditAccessProvider>
   );
