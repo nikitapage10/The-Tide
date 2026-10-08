@@ -136,6 +136,7 @@ uniform sampler2D uPlanet, uFar, uNear;
 uniform sampler2D uFlow;          // planet: weather flow (z: where the clouds were brushed thin)
 uniform sampler2D uMasks;         // planet: baked masks (R land, G light streams on the disc)
 uniform sampler2D uIdsFar, uIdsNear; // meteors: rock id per pixel
+uniform vec4 uGrav[2];            // planet: disturbances you set off in space (CSS px x, y, age s, on)
 uniform vec4 uStorm[3];           // planet: storms you planted (disc x, y, age s, seed); age < 0 = none
 uniform sampler2D uCentFar, uCentNear;   // meteors: each rock pixel's rock centre + movable flag
 uniform sampler2D uStateFar, uStateNear; // meteors: rock bodies (offsets, spins, search hints), 64×64
@@ -704,6 +705,9 @@ vec4 scene(vec2 sp) {
     // Stars only where space is empty: dark, and off the planet.
     float dlS = length((puv - LIMB_C) * SRC) - LIMB_R;
     float empty = (1.0 - smoothstep(0.03, 0.14, dot(col, vec3(0.3333)))) * smoothstep(20.0, 80.0, dlS);
+    // The streams of light stay hidden until you start scrolling, then come up
+    // over the first half of the scroll (the planet itself is unaffected).
+    col *= mix(smoothstep(0.03, 0.5, uP), 1.0, smoothstep(-90.0, 30.0, -dlS));
     col += stars(sp, empty);
     // Fine star dust and a faint drifting nebula haze fill the empty dark,
     // strongest on the left where the frame is emptiest. Very low contrast.
@@ -797,6 +801,24 @@ void main() {
   float cs = cos(twist), sn = sin(twist);
   vec2 dRot = vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
   vec2 warped = uM + dRot - dir * pull;
+  // A gravitational disturbance (a click in open space): a brief pinch at the
+  // spot, then a faint lensing ripple running outward, bending the light behind.
+  float gRing = 0.0;
+  for (int k = 0; k < 2; k++) {
+    if (uGrav[k].w < 0.5) continue;
+    float ga = uGrav[k].z;
+    if (ga < 0.0 || ga > 3.2) continue;
+    vec2 gd = sp - uGrav[k].xy;
+    float gr = length(gd);
+    vec2 gdir = gr > 0.001 ? gd / gr : vec2(0.0);
+    float amp = smoothstep(0.0, 0.12, ga) * pow(1.0 - ga / 3.2, 2.0);
+    float rr = 24.0 + 190.0 * pow(ga, 0.75);
+    float w = 12.0 + 18.0 * ga;
+    float q = (gr - rr) / w;
+    warped += gdir * amp * 7.0 * q * exp(-q * q);
+    warped -= gdir * amp * 9.0 * exp(-gr * gr / 1600.0) * (1.0 - smoothstep(0.0, 1.2, ga));
+    gRing += amp * exp(-q * q);
+  }
   if (uLayer == 0) {
     // The lens bends space, not the planet: no warp over the planet's disc (its
     // clouds still part, and the light ring, prism and flares still show).
@@ -931,6 +953,8 @@ void main() {
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
     col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 4.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
+    // The disturbance's ripple catches a little light as it passes.
+    col += vec3(0.78, 0.84, 0.95) * gRing * 0.025 * pointerInSpace;
     // Overall grade: a slight cool tint.
     col *= vec3(0.975, 0.993, 1.02);
     gl_FragColor = vec4(col, 1.0);
@@ -1062,6 +1086,7 @@ export function HeroScene({
   onReady,
   onFail,
   onStorm,
+  onGravity,
   tip,
   anchors,
   className,
@@ -1077,6 +1102,8 @@ export function HeroScene({
   onReady?: () => void;
   /** A storm was planted at this point (CSS px, relative to the canvas). */
   onStorm?: (x: number, y: number) => void;
+  /** A disturbance was set off in open space at this point (CSS px, relative to the canvas). */
+  onGravity?: (x: number, y: number) => void;
   /** Element placed at the ribbons' tip (the cursor in space) while they show. */
   tip?: { current: HTMLElement | null };
   /** Marked spots on the artwork (percent), where the cursor's strands start. */
@@ -1148,7 +1175,7 @@ export function HeroScene({
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const u = (n: string) => gl.getUniformLocation(prog, n);
-      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
+      const U = { res: u("uRes"), fc: u("uFrameC"), fs: u("uFrameS"), p: u("uP"), t: u("uT"), m: u("uM"), v: u("uV"), e: u("uE"), dpr: u("uDpr"), s: u("uS"), menu: u("uMenuH"), q: u("uQ"), storm: u("uStorm[0]"), grav: u("uGrav[0]"), strandA: u("uStrandA[0]"), strandT: u("uStrandT[0]"), strandBox: u("uStrandBox") };
       gl.clearColor(0, 0, 0, 0);
 
       // Pointer state: the lens follows the cursor closely, while its strength
@@ -1173,6 +1200,10 @@ export function HeroScene({
       const storms = [0, 1, 2].map(() => ({ x: 0, y: 0, t: -1e9, seed: Math.random() }));
       let nextStorm = 0;
       const stormData = new Float32Array(12);
+      // Disturbances set off by clicking open space (up to two at once).
+      const gravs = [0, 1].map(() => ({ x: 0, y: 0, t: -1e9 }));
+      let nextGrav = 0;
+      const gravData = new Float32Array(8);
 
       // Small data textures (weather flow, gravity fields), updated in place.
       const dataTex = new Map<number, WebGLTexture>();
@@ -1460,6 +1491,8 @@ export function HeroScene({
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
           gl.uniform4fv(U.storm, stormData);
+          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 3500 ? 1 : 0], k * 4));
+          gl.uniform4fv(U.grav, gravData);
         }
         if (fieldFar && fieldNear) {
           // Before scrolling, the pointer is a soft reverse singularity among the rocks.
@@ -1583,9 +1616,12 @@ export function HeroScene({
         visible = entry?.isIntersecting ?? true;
       });
       io.observe(canvas);
-      // Clicking the planet plants a small storm there.
+      // Clicking the planet plants a small storm there; clicking open space sets
+      // off a faint gravitational disturbance.
       const onDown = (e: PointerEvent) => {
         if (!flow || reduced || progress.current < 0.6) return;
+        // Links and buttons (the menu, callouts, sound) keep their own clicks.
+        if ((e.target as Element | null)?.closest?.("a, button, input, textarea, select, [role='button']")) return;
         const rect = canvas.getBoundingClientRect();
         const g = frameGeometry(rect.width, rect.height);
         const fx = (e.clientX - rect.left - (g.cx - g.fw / 2)) / g.fw;
@@ -1593,7 +1629,18 @@ export function HeroScene({
         const sP = 1.25 - 0.25 * progress.current;
         const mx = ((0.85 + (fx - 0.85) / sP - 1.0122) * 2000) / 883;
         const my = ((0.58 + (fy - 0.58) / sP - 0.65) * 1126) / 883;
-        if (mx * mx + my * my > 1) return;
+        if (mx * mx + my * my > 1) {
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          if (y < 0 || y > rect.height) return;
+          const gv = gravs[nextGrav]!;
+          nextGrav = (nextGrav + 1) % gravs.length;
+          gv.x = x;
+          gv.y = y;
+          gv.t = performance.now();
+          onGravity?.(x, y);
+          return;
+        }
         const st = storms[nextStorm]!;
         nextStorm = (nextStorm + 1) % storms.length;
         st.x = mx;
@@ -1627,7 +1674,7 @@ export function HeroScene({
       disposed = true;
       teardown?.();
     };
-  }, [layer, progress, clock, onReady, onFail, onStorm, tip, anchors]);
+  }, [layer, progress, clock, onReady, onFail, onStorm, onGravity, tip, anchors]);
 
   return <canvas ref={ref} aria-hidden="true" className={className} />;
 }

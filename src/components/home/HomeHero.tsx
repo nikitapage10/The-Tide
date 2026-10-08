@@ -88,6 +88,19 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
     });
     window.setTimeout(() => setStormNote((n) => (n && n.id === id ? null : n)), 6000);
   }, []);
+  // A disturbance in open space gets the same kind of short-lived callout.
+  const onGravity = useCallback((x: number, y: number) => {
+    const kinds: [string, string][] = [
+      ["Gravity ripple", "Faint, passing"],
+      ["Mass shadow", "Source unseen"],
+      ["Lensing", "Light bent, briefly"],
+      ["Tidal shear", "Weak, local"],
+    ];
+    const [title, line] = kinds[Math.floor(Math.random() * kinds.length)]!;
+    const id = Date.now();
+    setStormNote({ id, x, y, left: x > window.innerWidth * 0.62, title, line });
+    window.setTimeout(() => setStormNote((n) => (n && n.id === id ? null : n)), 5000);
+  }, []);
 
   useEffect(() => {
     const t = track.current;
@@ -149,7 +162,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
         </div>
 
         {/* WebGL scene: planet + meteors + gravity lens (replaces the DOM layers when available). */}
-        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} tip={tip} anchors={anchors} className="hero-layer z-[1] h-full w-full" />
+        <HeroScene layer="planet" progress={progress} clock={clock} onReady={onSceneReady} onFail={onSceneFail} onStorm={onStorm} onGravity={onGravity} tip={tip} anchors={anchors} className="hero-layer z-[1] h-full w-full" />
 
         {/* Things passing through: orbiters on the dashed orbit, debris drifting by. */}
         <HeroDrifters progress={progress} className="pointer-events-none absolute inset-0 z-[1] overflow-hidden" />

@@ -1,35 +1,55 @@
 "use client";
 /**
- * Things in orbit and passing through, once the planet is revealed. A few at a
- * time (never a crowd): orbiters (relays, probes, stations, beacons) travel real
- * tilted orbits around the planet, in front of it and then behind it (hidden by
- * its disc), slightly larger on the near side; debris (rocks, shards, wrecks)
- * drifts across open space along slow curves, tumbling. Each carries a small
- * callout that follows it, its label translated from the Tide's script. All
- * slow and small; dimmer on the night side. Off under reduced motion.
+ * Things in orbit and passing through, once the planet is revealed. Each object
+ * moves as what it is:
+ * - Satellites and stations orbit like moons: one shared plane (the planet's
+ *   equator, seen nearly edge-on with a slight tilt), all the same way round,
+ *   sweeping right to left across the front of the planet, round its left side,
+ *   then back behind it (hidden by its disc), slightly larger on the near side.
+ *   Outer orbits are slower; an orbit takes minutes. Most hold their attitude;
+ *   the ring station turns, the sounder spins.
+ * - Ships are under way: they cross on a gentle curve, nose along their course.
+ * - Debris and wrecks drift across open space, tumbling slowly.
+ * Never more than two at a time. Each has a thin leader line pointing at it
+ * with a short label translated from the Tide's script. Small, slow, dimmer on
+ * the night side. Off under reduced motion.
  *
  * The list changes rarely (React); positions are set every frame on the
  * elements directly (transform-only, sub-pixel), so motion stays smooth.
  */
 import { useEffect, useRef, useState } from "react";
 import { Decode } from "@/components/glyphs/Decode";
-import { DRIFTERS, type DrifterKind } from "./drifters";
+import { DRIFTERS } from "./drifters";
 import { frameGeometry } from "./HeroScene";
 
-const ORBITERS: DrifterKind[] = ["relay", "probe", "station", "beacon", "needle", "orb"];
+type Mode = "orbit" | "transit" | "drift";
 
-/** Vague on purpose: the archive never quite knows what these are. */
-const LABELS: Record<DrifterKind, [string, string][]> = {
-  relay: [["Relay", "Silent, still in orbit"], ["Relay", "Last contact unknown"]],
-  probe: [["Probe", "Signal faint, repeating"], ["Probe", "Listening"]],
-  station: [["Station", "No answer on any band"], ["Station", "Orbit decaying"]],
-  beacon: [["Beacon", "Source unknown"], ["Marker", "Older than the record"]],
-  needle: [["Spindle", "Origin unresolved"], ["Vessel", "Course unchanged"]],
-  orb: [["Object", "Designation withheld"]],
-  rock: [["Debris", "Drifting, slowly"], ["Fragment", "Not from here"]],
-  debris: [["Debris field", "Arrivals from elsewhere"]],
-  crystal: [["Shard", "Unclassified"], ["Shard", "Resonating faintly"]],
-  wreck: [["Hull fragment", "Record incomplete"], ["Wreckage", "Origin unresolved"]],
+interface Profile {
+  mode: Mode;
+  /** Rotation in degrees per second (0 = holds its attitude). Ships face their course. */
+  spin: number;
+  /** Relative chance of being chosen within its mode. */
+  weight: number;
+  /** Short and plain: what it is, and one thing about it. */
+  labels: [string, string][];
+}
+
+const PROFILES: Record<string, Profile> = {
+  relay: { mode: "orbit", spin: 0, weight: 3, labels: [["Relay", "Silent"], ["Relay", "Faint carrier"]] },
+  "dish-probe": { mode: "orbit", spin: 0, weight: 3, labels: [["Listening post", "Aimed outward"], ["Array", "Still listening"]] },
+  "ring-station": { mode: "orbit", spin: 2.2, weight: 2, labels: [["Ring station", "Turning"], ["Halo", "Dark windows"]] },
+  sputnik: { mode: "orbit", spin: 7, weight: 2, labels: [["Sounder", "Spin-stable"], ["Sounder", "Pulsing"]] },
+  "sphere-station": { mode: "orbit", spin: 0, weight: 2, labels: [["Keep", "Sealed"], ["Keep", "No lights"]] },
+  beacon: { mode: "orbit", spin: 1.2, weight: 1, labels: [["Marker", "Older than the charts"]] },
+  "cross-beacon": { mode: "orbit", spin: 0, weight: 1, labels: [["Waymark", "Holding station"]] },
+  orb: { mode: "orbit", spin: 0, weight: 0.5, labels: [["Lantern", "Dim side toward us"]] },
+  needle: { mode: "transit", spin: 0, weight: 1, labels: [["Courier", "Under way"], ["Lancer", "Running dark"]] },
+  "needle-2": { mode: "transit", spin: 0, weight: 1, labels: [["Tender", "Changing course"], ["Spire", "Bow first"]] },
+  asteroid: { mode: "drift", spin: 2.5, weight: 2, labels: [["Fragment", "Tumbling"]] },
+  wreck: { mode: "drift", spin: 0.9, weight: 2, labels: [["Hull", "Cold"], ["Wreck", "No answer"]] },
+  "broken-ring": { mode: "drift", spin: 0.6, weight: 1, labels: [["Broken arc", "Once whole"]] },
+  "rock-cluster": { mode: "drift", spin: 0.8, weight: 1, labels: [["Debris", "Spreading"]] },
+  "debris-cluster": { mode: "drift", spin: 0.8, weight: 1, labels: [["Debris", "Drifting, slowly"]] },
 };
 
 interface Item {
@@ -42,7 +62,7 @@ interface Item {
 }
 
 interface Motion {
-  orbit: boolean;
+  mode: Mode;
   t0: number;
   life: number;
   // Orbit: radius (planet radii), inclination, node angle, start angle, angular speed (rad/ms).
@@ -51,23 +71,32 @@ interface Motion {
   node: number;
   a0: number;
   w: number;
-  // Drift: start, control and end points on the artwork (fractions), quadratic path.
+  // Transit / drift: start, control and end points on the artwork (fractions), quadratic path.
   p: [number, number, number, number, number, number];
   /** Long side as a fraction of the artwork's width. */
   size: number;
   rot0: number;
+  /** Degrees per ms. */
   spin: number;
   base: number;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)]!;
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
-const MAX_ORBIT = 3;
-const MAX_DRIFT = 1;
+const weighted = <T,>(xs: T[], w: (x: T) => number) => {
+  const total = xs.reduce((s, x) => s + w(x), 0);
+  let r = Math.random() * total;
+  for (const x of xs) if ((r -= w(x)) <= 0) return x;
+  return xs[xs.length - 1]!;
+};
+/** The shared orbital plane: nearly edge-on, tilted slightly. */
+const PLANE_INC = 1.36;
+const PLANE_NODE = -0.14;
+/** Never more than this many things in motion at once. */
+const MAX_TOTAL = 2;
 
 export function HeroDrifters({ progress, className }: { progress: { current: number }; className?: string }) {
   const layer = useRef<HTMLDivElement>(null);
@@ -93,40 +122,53 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
     let busy: DOMRect[] = [];
     let busyAt = 0;
 
-    const spawn = (now: number, orbit: boolean, first = false) => {
-      const pool = DRIFTERS.filter((d) => ORBITERS.includes(d.kind) === orbit && !recent.includes(d.name) && (d.kind !== "orb" || Math.random() < 0.3));
-      const d = pick(pool.length ? pool : DRIFTERS.filter((x) => ORBITERS.includes(x.kind) === orbit));
+    const spawn = (now: number, mode: Mode, first = false) => {
+      const pool = DRIFTERS.filter((d) => PROFILES[d.name]?.mode === mode && !recent.includes(d.name));
+      const d = weighted(pool.length ? pool : DRIFTERS.filter((x) => PROFILES[x.name]?.mode === mode), (x) => PROFILES[x.name]!.weight);
+      const prof = PROFILES[d.name]!;
       recent.push(d.name);
       if (recent.length > 5) recent.shift();
       const id = nextId++;
-      const [title, line] = pick(LABELS[d.kind]);
+      const [title, line] = prof.labels[Math.floor(Math.random() * prof.labels.length)]!;
       const toLeft = Math.random() < 0.5;
+      // Orbits: keep apart from the other orbiter's radius; outer ones slower (Kepler).
+      const taken = [...motionMap.values()].filter((o) => o.mode === "orbit").map((o) => o.R);
+      let R = d.name === "orb" ? rand(1.6, 1.8) : rand(1.18, 1.6);
+      for (let tries = 0; tries < 8 && taken.some((r) => Math.abs(r - R) < 0.14); tries++) R = rand(1.18, 1.6);
+      const period = 300000 * Math.pow(R / 1.35, 1.5);
+      const level = rand(0.25, 0.75);
       const m: Motion = {
-        orbit,
+        mode,
         t0: now,
-        // Orbiters stay for about one slow orbit; debris for one crossing.
-        life: orbit ? rand(100000, 140000) : rand(70000, 95000),
-        // Ring-like orbits (seen nearly edge-on, gently tilted): they cross the
-        // visible half of the planet, swing round its left side through open
-        // space, and pass behind it (the planet's centre is off to the right).
-        R: rand(1.15, 1.55),
-        inc: rand(1.05, 1.4),
-        node: rand(-0.45, 0.45),
-        // The first are already on the visible side; later ones come round
-        // from the right, off screen.
-        a0: first ? Math.PI + rand(-0.9, 0.9) : rand(-0.3, 0.3),
-        w: ((Math.random() < 0.5 ? 1 : -1) * (Math.PI * 2)) / rand(110000, 150000),
-        p: toLeft
-          ? [rand(0.62, 0.8), rand(-0.06, 0.15), rand(0.35, 0.5), rand(0.3, 0.7), -0.06, rand(0.55, 1.05)]
-          : [-0.06, rand(0.1, 0.9), rand(0.2, 0.4), rand(0.2, 0.8), rand(0.55, 0.7), rand(-0.06, 1.06)],
-        size: orbit ? rand(0.009, 0.014) : rand(0.008, 0.015),
-        rot0: orbit ? rand(-20, 20) : rand(0, 360),
-        spin: (orbit ? rand(-0.5, 0.5) : rand(-2, 2)) / 1000,
+        // Orbiters stay one orbit (leaving while behind the planet); ships cross
+        // in about half a minute; debris takes a couple of minutes.
+        life: mode === "orbit" ? period : mode === "transit" ? rand(30000, 42000) : rand(120000, 160000),
+        R,
+        inc: PLANE_INC + rand(-0.03, 0.03),
+        node: PLANE_NODE + rand(-0.02, 0.02),
+        // The first is already crossing the visible side; later ones come round
+        // from behind the planet, off screen to the right.
+        a0: first ? rand(1.0, 1.9) : rand(-0.3, -0.1),
+        w: (Math.PI * 2) / period,
+        // Ships: a long, gentle curve across the frame (a course correction).
+        // Debris: a slow, nearly level crossing of open space.
+        p:
+          mode === "transit"
+            ? toLeft
+              ? [1.0, level + rand(-0.1, 0.1), 0.5, level + rand(-0.12, 0.12), -0.08, level + rand(-0.1, 0.1)]
+              : [-0.08, level + rand(-0.1, 0.1), 0.5, level + rand(-0.12, 0.12), 1.0, level + rand(-0.1, 0.1)]
+            : toLeft
+              ? [0.66, rand(0.2, 0.75), 0.33, rand(0.2, 0.8), -0.06, rand(0.2, 0.8)]
+              : [-0.06, rand(0.2, 0.8), 0.3, rand(0.2, 0.8), 0.62, rand(0.2, 0.8)],
+        size: mode === "transit" ? rand(0.012, 0.016) : mode === "orbit" ? rand(0.009, 0.013) : rand(0.008, 0.012),
+        rot0: mode === "drift" ? rand(0, 360) : rand(-12, 12),
+        spin: (prof.spin * (Math.random() < 0.5 ? -1 : 1)) / 1000,
         base: 0,
       };
-      if (first && !orbit) m.t0 = now - m.life * rand(0.1, 0.3);
       motionMap.set(id, m);
-      setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side: orbit || toLeft ? "left" : "right" }]);
+      // Labels sit on the side with more open space.
+      const side = mode === "orbit" || (mode === "transit" ? !toLeft : toLeft) ? "left" : "right";
+      setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side }]);
     };
 
     const frame = (now: number) => {
@@ -136,18 +178,20 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       root.style.opacity = String(smooth(0.72, 0.92, p));
       const on = p >= 0.72;
       const all = [...motionMap.values()];
-      const nOrbit = all.filter((m) => m.orbit).length;
-      const nDrift = all.length - nOrbit;
       if (on && !nextAt && all.length === 0) {
-        // On reveal: two orbiters already in view and one piece of debris.
-        spawn(now, true, true);
-        spawn(now, true, true);
-        spawn(now, false, true);
-        nextAt = now + rand(6000, 12000);
+        // On reveal: one satellite already crossing the planet.
+        spawn(now, "orbit", true);
+        nextAt = now + rand(25000, 45000);
       } else if (on && nextAt && now >= nextAt) {
-        if (nOrbit < MAX_ORBIT) spawn(now, true);
-        else if (nDrift < MAX_DRIFT) spawn(now, false);
-        nextAt = now + rand(6000, 12000);
+        if (all.length < MAX_TOTAL) {
+          const busyModes = new Set(all.map((m) => m.mode));
+          const r = Math.random();
+          let mode: Mode = r < 0.6 ? "orbit" : r < 0.8 ? "transit" : "drift";
+          // One ship or one piece of debris at a time.
+          if (mode !== "orbit" && busyModes.has(mode)) mode = "orbit";
+          spawn(now, mode);
+        }
+        nextAt = now + rand(30000, 60000);
       }
 
       const rect = root.getBoundingClientRect();
@@ -180,7 +224,8 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         let depth = 1;
         let behind = false;
         let z = 0;
-        if (m.orbit) {
+        let rot = m.rot0 + m.spin * age;
+        if (m.mode === "orbit") {
           // A tilted circular orbit seen from the front: the near half crosses
           // in front of the planet, the far half passes behind it.
           const t = m.a0 + m.w * age;
@@ -197,7 +242,14 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           const fx = (1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * cx + u * u * x1;
           const fy = (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * cy + u * u * y1;
           [x, y] = toScreen(fx, fy);
-          depth = 0.95 + 0.1 * Math.sin(u * Math.PI);
+          if (m.mode === "transit") {
+            // Nose along the course (the sprites point up).
+            const dx = 2 * (1 - u) * (cx - x0) + 2 * u * (x1 - cx);
+            const dy = (2 * (1 - u) * (cy - y0) + 2 * u * (y1 - cy)) * (g.fh / g.fw);
+            rot = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+          } else {
+            depth = 0.95 + 0.1 * Math.sin(u * Math.PI);
+          }
         }
         const body = el.firstElementChild as HTMLElement | null;
         if (!m.base) {
@@ -219,14 +271,14 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           body.style.maskImage = mask;
           body.style.webkitMaskImage = mask;
           const img = body.firstElementChild as HTMLElement | null;
-          if (img) img.style.transform = `rotate(${(m.rot0 + m.spin * age).toFixed(3)}deg)`;
+          if (img) img.style.transform = `rotate(${rot.toFixed(3)}deg)`;
           // Sunlight from the left: dimmer beside and over the night side.
           const near = 1 - smooth(1.0, 1.8, dPlanet / pr);
           const night = smooth(-0.3, 0.5, (x - pcx) / pr) * near;
-          body.style.filter = `brightness(${(1 - 0.5 * night + (m.orbit ? 0.08 * z : 0)).toFixed(3)})`;
+          body.style.filter = `brightness(${(1 - 0.5 * night + 0.08 * z).toFixed(3)})`;
         }
         // Long, eased fades at both ends; never fully opaque (they are far off).
-        const fade = smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
+        const fade = smooth(0, m.mode === "transit" ? 0.1 : 0.06, u) * (1 - smooth(m.mode === "transit" ? 0.9 : 0.94, 1, u));
         el.style.opacity = (fade * 0.85).toFixed(3);
         // The callout follows the object; it hides while the object is behind.
         const tag = el.lastElementChild as HTMLElement | null;
@@ -235,14 +287,14 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           tag.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
           const vis = fade > 0.6 && hidden < 0.5 && x > 8 && x < rect.width - 8 && y > 8 && y < rect.height - 8;
           tag.style.opacity = vis ? "1" : "0";
+          tag.style.setProperty("--r", `${r.toFixed(1)}px`);
           // The label's area (beside the object, on its side); hide its text if a
-          // fixed callout is there. The ring stays.
+          // fixed callout is there. The leader line stays.
           const lx0 = tag.dataset.side === "left" ? x - 230 : x - 10;
           const lx1 = tag.dataset.side === "left" ? x + 10 : x + 230;
-          const crowded = busy.some((b) => b.right + rect.left > lx0 + rect.left - 12 && b.left - rect.left < lx1 + 12 && b.bottom - rect.top > y - 36 && b.top - rect.top < y + 36);
+          const crowded = busy.some((b) => b.right - rect.left > lx0 - 12 && b.left - rect.left < lx1 + 12 && b.bottom - rect.top > y - 36 && b.top - rect.top < y + 36);
           const text = tag.lastElementChild as HTMLElement | null;
           if (text) text.style.opacity = crowded ? "0" : "1";
-          tag.style.setProperty("--r", `${r.toFixed(1)}px`);
           // Each label decodes once, the first time its object is clearly in view.
           if (vis && !labelOn.has(id)) {
             labelOn.add(id);
@@ -285,11 +337,24 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
               style={{ width: it.aspect >= 1 ? "66.6%" : `${it.aspect * 66.6}%`, height: it.aspect >= 1 ? `${66.6 / it.aspect}%` : "66.6%" }}
             />
           </div>
-          {/* Callout: a ring on the object, a leader line, and the translated label. */}
+          {/* Callout: a thin leader line pointing at the object, and its label. */}
           <div data-side={it.side} className="absolute left-0 top-0 transition-opacity duration-700" style={{ opacity: 0, willChange: "transform" }}>
-            <span className="absolute rounded-full border border-white/45" style={{ width: "calc(var(--r) * 2 + 6px)", height: "calc(var(--r) * 2 + 6px)", left: "calc(var(--r) * -1 - 3px)", top: "calc(var(--r) * -1 - 3px)" }} />
-            <span className={`absolute top-0 h-px w-9 bg-white/35 ${it.side === "left" ? "right-[calc(var(--r)+5px)]" : "left-[calc(var(--r)+5px)]"}`} />
-            <div className={`absolute -top-2 w-max transition-opacity duration-500 ${it.side === "left" ? "right-[calc(var(--r)+3rem)] text-right" : "left-[calc(var(--r)+3rem)]"}`}>
+            <span
+              className="absolute left-0 top-0"
+              style={{ transform: `translate(calc(var(--r) * ${it.side === "left" ? -0.75 : 0.75} ${it.side === "left" ? "-" : "+"} 2px), calc(var(--r) * -0.75 - 2px))` }}
+            >
+              <svg width="1" height="1" overflow="visible" className="absolute left-0 top-0">
+                <path d={it.side === "left" ? "M0 0 L-12 -12 L-46 -12" : "M0 0 L12 -12 L46 -12"} fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+              </svg>
+            </span>
+            <div
+              className={`absolute w-max transition-opacity duration-500 ${it.side === "left" ? "text-right" : ""}`}
+              style={
+                it.side === "left"
+                  ? { right: "calc(var(--r) * 0.75 + 54px)", top: "calc(var(--r) * -0.75 - 22px)" }
+                  : { left: "calc(var(--r) * 0.75 + 54px)", top: "calc(var(--r) * -0.75 - 22px)" }
+              }
+            >
               <span className="tracked block text-[0.58rem] text-white/85">
                 <Decode text={it.title} active={!!shown[it.id]} calc />
               </span>
