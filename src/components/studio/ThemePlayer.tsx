@@ -14,11 +14,19 @@ export function ThemePlayer({ src, title }: { src: string; title: string }) {
     if (!a) return;
     const tick = () => setP(a.duration ? a.currentTime / a.duration : 0);
     const end = () => setPlaying(false);
+    // A narration takes the floor: the theme stops.
+    const onNarration = (e: Event) => {
+      if (!(e as CustomEvent<{ playing: boolean }>).detail.playing || a.paused) return;
+      a.pause();
+      setPlaying(false);
+    };
     a.addEventListener("timeupdate", tick);
     a.addEventListener("ended", end);
+    window.addEventListener("tide:narration", onNarration);
     return () => {
       a.removeEventListener("timeupdate", tick);
       a.removeEventListener("ended", end);
+      window.removeEventListener("tide:narration", onNarration);
     };
   }, []);
   const toggle = () => {

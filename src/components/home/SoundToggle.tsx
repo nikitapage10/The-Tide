@@ -8,6 +8,7 @@ const KEY = "tide.sound";
 export function SoundToggle({ className }: { className?: string }) {
   const [on, setOn] = useState(false);
   const engine = useRef<HeroSound | null>(null);
+  const narrating = useRef(false);
 
   // Restore the preference; audio itself still waits for a click (browser rule).
   useEffect(() => {
@@ -19,7 +20,10 @@ export function SoundToggle({ className }: { className?: string }) {
     }
     if (!saved) return;
     const start = () => {
-      if (!engine.current) engine.current = new HeroSound();
+      if (!engine.current) {
+        engine.current = new HeroSound();
+        if (narrating.current) engine.current.duck(true);
+      }
       setOn(true);
     };
     window.addEventListener("pointerdown", start, { once: true });
@@ -28,16 +32,22 @@ export function SoundToggle({ className }: { className?: string }) {
 
   useEffect(() => () => engine.current?.dispose(), []);
 
-  // Make room for the narration while it speaks.
+  // Silent while a narration speaks (and if sound is turned on mid-narration).
   useEffect(() => {
-    const onNarration = (e: Event) => engine.current?.duck((e as CustomEvent<{ playing: boolean }>).detail.playing);
+    const onNarration = (e: Event) => {
+      narrating.current = (e as CustomEvent<{ playing: boolean }>).detail.playing;
+      engine.current?.duck(narrating.current);
+    };
     window.addEventListener("tide:narration", onNarration);
     return () => window.removeEventListener("tide:narration", onNarration);
   }, []);
 
   const toggle = () => {
     const next = !on;
-    if (next && !engine.current) engine.current = new HeroSound();
+    if (next && !engine.current) {
+      engine.current = new HeroSound();
+      if (narrating.current) engine.current.duck(true);
+    }
     if (!next) {
       engine.current?.dispose();
       engine.current = null;
