@@ -776,3 +776,8 @@ a.tracklist-row:hover { background: rgba(255,255,255,0.03); }
 @keyframes spoken-in { from { opacity: 0; translate: 0 14px; filter: blur(3px); } }
 @keyframes spoken-lift { from { opacity: 0.9; translate: 0 2.4rem; filter: blur(0); } to { opacity: 1; translate: 0 0; } }
 @media (prefers-reduced-motion: reduce) { .spoken-line, .spoken-prev { animation: none; } }
+@media (max-width: 640px) {
+  /* On a phone the numerals sit above the title, so a long title keeps the full width. */
+  .section-intro-art .section-numerals, .section-numerals { height: 4.5rem; }
+  div:has(> .section-numerals) { flex-wrap: wrap; row-gap: 0.4rem; }
+}
