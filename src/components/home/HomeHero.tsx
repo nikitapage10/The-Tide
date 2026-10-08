@@ -91,10 +91,10 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
   // A disturbance in open space gets the same kind of short-lived callout.
   const onGravity = useCallback((x: number, y: number) => {
     const kinds: [string, string][] = [
-      ["Gravity ripple", "Faint, passing"],
+      ["Gravity well", "Formed, collapsed"],
       ["Mass shadow", "Source unseen"],
-      ["Lensing", "Light bent, briefly"],
-      ["Tidal shear", "Weak, local"],
+      ["Lensing event", "Light bent, briefly"],
+      ["Singularity", "Brief, local"],
     ];
     const [title, line] = kinds[Math.floor(Math.random() * kinds.length)]!;
     const id = Date.now();
@@ -272,7 +272,7 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
           <p className="hero-haiku max-w-sm font-[family-name:var(--font-display)] text-[clamp(1rem,0.8rem+0.5vw,1.45rem)] italic leading-relaxed text-white/70">
             {HAIKU.map((line, i) => (
               <span key={line} className="block">
-                <Typed text={line} active={revealed} delay={600 + i * 1100} speed={45} />
+                <Decode text={line} active={revealed} delay={600 + i * 1500} />
               </span>
             ))}
           </p>
@@ -289,47 +289,14 @@ export function HomeHero({ callouts, observations, spaceNotes, spots }: HeroProp
           <span>Scroll</span>
           <span className="hero-cue-line block h-9 w-px overflow-hidden bg-white/15" />
         </div>
+        {/* A faint hint, once the planet is revealed: the scene can be touched. */}
+        <span aria-hidden="true" className="hero-hint tracked pointer-events-none absolute bottom-[2.35rem] right-[9.5rem] hidden text-[0.56rem] text-white/35 sm:right-[11.5rem] sm:block">
+          <span className="hint-fine">Click the planet, or the dark</span>
+          <span className="hint-coarse">Tap the planet, or the dark</span>
+        </span>
         <SoundToggle className="tracked pointer-events-auto absolute bottom-7 right-4 flex min-h-10 items-center gap-2 px-2 text-[0.6rem] text-white/60 hover:text-white sm:right-10" />
       </div>
     </section>
-  );
-}
-
-/** Text that types itself out while `active` (instantly under reduced motion). */
-function Typed({ text, active, delay = 0, speed = 28 }: { text: string; active: boolean; delay?: number; speed?: number }) {
-  const [typed, setN] = useState(0);
-  let n = typed;
-  useEffect(() => {
-    if (!active) return;
-    const instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let i = 0;
-    let timer = 0;
-    const start = window.setTimeout(() => {
-      setN(instant ? text.length : 0);
-      if (instant) return;
-      timer = window.setInterval(() => {
-        i += 1;
-        setN(i);
-        if (i >= text.length) window.clearInterval(timer);
-      }, speed);
-    }, delay);
-    return () => {
-      window.clearTimeout(start);
-      window.clearInterval(timer);
-    };
-  }, [active, text, delay, speed]);
-  // Hidden: nothing typed (derived, so no state reset is needed).
-  if (!active) n = 0;
-  const done = n >= text.length;
-  return (
-    <>
-      <span className="sr-only">{text}</span>
-      <span aria-hidden="true">
-        {text.slice(0, n)}
-        {active && !done ? <span className="typed-caret">▍</span> : null}
-        <span className="invisible">{text.slice(n)}</span>
-      </span>
-    </>
   );
 }
 

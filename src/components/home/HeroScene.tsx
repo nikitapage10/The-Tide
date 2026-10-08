@@ -705,9 +705,10 @@ vec4 scene(vec2 sp) {
     // Stars only where space is empty: dark, and off the planet.
     float dlS = length((puv - LIMB_C) * SRC) - LIMB_R;
     float empty = (1.0 - smoothstep(0.03, 0.14, dot(col, vec3(0.3333)))) * smoothstep(20.0, 80.0, dlS);
-    // The streams of light stay hidden until you start scrolling, then come up
-    // over the first half of the scroll (the planet itself is unaffected).
-    col *= mix(smoothstep(0.03, 0.5, uP), 1.0, smoothstep(-90.0, 30.0, -dlS));
+    // The streams of light (and the bright horizon they cross) stay hidden until
+    // you start scrolling, then come up over the first half of the scroll; deep
+    // inside the disc the planet is left to the overall reveal below.
+    col *= mix(smoothstep(0.08, 0.6, uP), 1.0, smoothstep(30.0, 140.0, -dlS));
     col += stars(sp, empty);
     // Fine star dust and a faint drifting nebula haze fill the empty dark,
     // strongest on the left where the frame is emptiest. Very low contrast.
@@ -738,7 +739,8 @@ vec4 scene(vec2 sp) {
       col *= 1.0 + 0.4 * band * litAmt;
       col += vec3(0.8, 0.86, 0.95) * band * 0.02;
     }
-    col *= iPlanet * mix(0.07, 1.0, smoothstep(0.0, 1.0, uP));
+    // Nearly black at rest (only the rocks read), brightening with the scroll.
+    col *= iPlanet * mix(0.015, 1.0, smoothstep(0.02, 0.85, uP));
     return vec4(col, 1.0);
   }
   float iNear = intro(0.4, 2.4);
@@ -801,23 +803,43 @@ void main() {
   float cs = cos(twist), sn = sin(twist);
   vec2 dRot = vec2(cs * d.x - sn * d.y, sn * d.x + cs * d.y);
   vec2 warped = uM + dRot - dir * pull;
-  // A gravitational disturbance (a click in open space): a brief pinch at the
-  // spot, then a faint lensing ripple running outward, bending the light behind.
+  // A gravitational disturbance (a click in open space). First a small dark
+  // core with a thin ring of bent light (an Einstein ring) appears; space pinches
+  // and swirls into it. Then it collapses, and a lensing shockwave runs outward,
+  // visibly bending the stars and the streams of light behind it.
   float gRing = 0.0;
+  float gCore = 0.0;
+  float gEin = 0.0;
   for (int k = 0; k < 2; k++) {
     if (uGrav[k].w < 0.5) continue;
     float ga = uGrav[k].z;
-    if (ga < 0.0 || ga > 3.2) continue;
+    if (ga < 0.0 || ga > 3.6) continue;
     vec2 gd = sp - uGrav[k].xy;
     float gr = length(gd);
     vec2 gdir = gr > 0.001 ? gd / gr : vec2(0.0);
-    float amp = smoothstep(0.0, 0.12, ga) * pow(1.0 - ga / 3.2, 2.0);
-    float rr = 24.0 + 190.0 * pow(ga, 0.75);
-    float w = 12.0 + 18.0 * ga;
-    float q = (gr - rr) / w;
-    warped += gdir * amp * 7.0 * q * exp(-q * q);
-    warped -= gdir * amp * 9.0 * exp(-gr * gr / 1600.0) * (1.0 - smoothstep(0.0, 1.2, ga));
-    gRing += amp * exp(-q * q);
+    // The core: grows in, holds, then collapses at about 0.9 s.
+    float core = smoothstep(0.0, 0.25, ga) * (1.0 - smoothstep(0.75, 1.0, ga));
+    float coreR = 10.0 + 6.0 * smoothstep(0.0, 0.5, ga);
+    // Pinch and swirl toward the core while it lives.
+    float well = core * exp(-gr * gr / (110.0 * 110.0));
+    float sw = 0.9 * well;
+    float cs2 = cos(sw), sn2 = sin(sw);
+    vec2 rel = warped - uGrav[k].xy;
+    warped = uGrav[k].xy + vec2(cs2 * rel.x - sn2 * rel.y, sn2 * rel.x + cs2 * rel.y);
+    warped -= gdir * 34.0 * well * (1.0 - exp(-gr / 18.0));
+    gCore = max(gCore, core * (1.0 - smoothstep(coreR * 0.55, coreR, gr)));
+    float ein = (gr - coreR * 1.45) / 2.2;
+    gEin = max(gEin, core * exp(-ein * ein));
+    // The shockwave after the collapse.
+    float sa = ga - 0.85;
+    if (sa > 0.0) {
+      float amp = smoothstep(0.0, 0.08, sa) * pow(1.0 - sa / 2.75, 2.0);
+      float rr = 16.0 + 260.0 * pow(sa, 0.7);
+      float w = 10.0 + 22.0 * sa;
+      float q = (gr - rr) / w;
+      warped += gdir * amp * 22.0 * q * exp(-q * q);
+      gRing += amp * exp(-q * q);
+    }
   }
   if (uLayer == 0) {
     // The lens bends space, not the planet: no warp over the planet's disc (its
@@ -953,8 +975,11 @@ void main() {
     // Fine grain baked into the image: a little heavier on the bright strands.
     float lum = dot(col, vec3(0.3333));
     col += (hash(sp + fract(uT)) - 0.5) * ((3.0 + 4.0 * smoothstep(0.05, 0.6, lum)) / 255.0);
-    // The disturbance's ripple catches a little light as it passes.
-    col += vec3(0.78, 0.84, 0.95) * gRing * 0.025 * pointerInSpace;
+    // The disturbance: a dark core, its thin ring of light, and the shockwave
+    // catching a little light (cool on its leading edge) as it passes.
+    col *= 1.0 - 0.92 * gCore * pointerInSpace;
+    col += vec3(0.86, 0.9, 1.0) * gEin * 0.55 * pointerInSpace;
+    col += vec3(0.74, 0.82, 0.98) * gRing * 0.05 * pointerInSpace;
     // Overall grade: a slight cool tint.
     col *= vec3(0.975, 0.993, 1.02);
     gl_FragColor = vec4(col, 1.0);
@@ -1491,7 +1516,7 @@ export function HeroScene({
           heroSignal.overPlanet = p > 0.6 && mx * mx + my * my < 1.05;
           storms.forEach((st, k) => stormData.set([st.x, st.y, (now - st.t) / 1000, st.seed], k * 4));
           gl.uniform4fv(U.storm, stormData);
-          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 3500 ? 1 : 0], k * 4));
+          gravs.forEach((gv, k) => gravData.set([gv.x, gv.y, (now - gv.t) / 1000, now - gv.t < 3700 ? 1 : 0], k * 4));
           gl.uniform4fv(U.grav, gravData);
         }
         if (fieldFar && fieldNear) {
@@ -1638,6 +1663,7 @@ export function HeroScene({
           gv.x = x;
           gv.y = y;
           gv.t = performance.now();
+          heroSignal.gravAt = gv.t;
           onGravity?.(x, y);
           return;
         }

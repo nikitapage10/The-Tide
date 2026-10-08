@@ -8,8 +8,11 @@
  *   then back behind it (hidden by its disc), slightly larger on the near side.
  *   Outer orbits are slower; an orbit takes minutes. Most hold their attitude;
  *   the ring station turns, the sounder spins.
- * - Ships are under way: they cross on a gentle curve, nose along their course.
- * - Debris and wrecks drift across open space, tumbling slowly.
+ * - Since the Tide nothing leaves: the atmosphere cannot be crossed, so the
+ *   satellites are relics from before, and ships only ever arrive. One comes in
+ *   from the far side of space, small and distant, grows as it nears, picks up
+ *   speed, flares at the atmosphere and is lost there.
+ * - Debris and wrecks drift in from the far side, tumbling slowly.
  * Never more than two at a time. Each has a thin leader line pointing at it
  * with a short label translated from the Tide's script. Small, slow, dimmer on
  * the night side. Off under reduced motion.
@@ -22,7 +25,7 @@ import { Decode } from "@/components/glyphs/Decode";
 import { DRIFTERS } from "./drifters";
 import { frameGeometry } from "./HeroScene";
 
-type Mode = "orbit" | "transit" | "drift";
+type Mode = "orbit" | "arrival" | "drift";
 
 interface Profile {
   mode: Mode;
@@ -35,7 +38,7 @@ interface Profile {
 }
 
 const PROFILES: Record<string, Profile> = {
-  relay: { mode: "orbit", spin: 0, weight: 3, labels: [["Relay", "Silent"], ["Relay", "Faint carrier"]] },
+  relay: { mode: "orbit", spin: 0, weight: 3, labels: [["Relay", "Silent"], ["Old relay", "Faint carrier"]] },
   "dish-probe": { mode: "orbit", spin: 0, weight: 3, labels: [["Listening post", "Aimed outward"], ["Array", "Still listening"]] },
   "ring-station": { mode: "orbit", spin: 2.2, weight: 2, labels: [["Ring station", "Turning"], ["Halo", "Dark windows"]] },
   sputnik: { mode: "orbit", spin: 7, weight: 2, labels: [["Sounder", "Spin-stable"], ["Sounder", "Pulsing"]] },
@@ -43,8 +46,8 @@ const PROFILES: Record<string, Profile> = {
   beacon: { mode: "orbit", spin: 1.2, weight: 1, labels: [["Marker", "Older than the charts"]] },
   "cross-beacon": { mode: "orbit", spin: 0, weight: 1, labels: [["Waymark", "Holding station"]] },
   orb: { mode: "orbit", spin: 0, weight: 0.5, labels: [["Lantern", "Dim side toward us"]] },
-  needle: { mode: "transit", spin: 0, weight: 1, labels: [["Courier", "Under way"], ["Lancer", "Running dark"]] },
-  "needle-2": { mode: "transit", spin: 0, weight: 1, labels: [["Tender", "Changing course"], ["Spire", "Bow first"]] },
+  needle: { mode: "arrival", spin: 0, weight: 1, labels: [["Arrival", "Inbound"], ["Vessel", "From the far side"]] },
+  "needle-2": { mode: "arrival", spin: 0, weight: 1, labels: [["Arrival", "Not slowing"], ["Vessel", "Inbound"]] },
   asteroid: { mode: "drift", spin: 2.5, weight: 2, labels: [["Fragment", "Tumbling"]] },
   wreck: { mode: "drift", spin: 0.9, weight: 2, labels: [["Hull", "Cold"], ["Wreck", "No answer"]] },
   "broken-ring": { mode: "drift", spin: 0.6, weight: 1, labels: [["Broken arc", "Once whole"]] },
@@ -71,7 +74,7 @@ interface Motion {
   node: number;
   a0: number;
   w: number;
-  // Transit / drift: start, control and end points on the artwork (fractions), quadratic path.
+  // Arrival / drift: start, control and end points on the artwork (fractions), quadratic path.
   p: [number, number, number, number, number, number];
   /** Long side as a fraction of the artwork's width. */
   size: number;
@@ -92,6 +95,19 @@ const weighted = <T,>(xs: T[], w: (x: T) => number) => {
   for (const x of xs) if ((r -= w(x)) <= 0) return x;
   return xs[xs.length - 1]!;
 };
+/**
+ * An arrival's path (artwork fractions): from off the left edge, a gentle curve
+ * into a point on the planet's visible limb (just inside the atmosphere).
+ */
+function arrivalPath(level: number): [number, number, number, number, number, number] {
+  const th = Math.PI * rand(0.86, 1.12);
+  const ex = 1.0122 + 0.4415 * 0.99 * Math.cos(th);
+  const ey = 0.65 + 0.4415 * (2000 / 1126) * 0.99 * Math.sin(th);
+  const sx = -0.08;
+  const sy = level + rand(-0.15, 0.15);
+  return [sx, sy, (sx + ex) / 2, (sy + ey) / 2 + rand(-0.15, 0.15), ex, ey];
+}
+
 /** The shared orbital plane: nearly edge-on, tilted slightly. */
 const PLANE_INC = 1.36;
 const PLANE_NODE = -0.14;
@@ -130,7 +146,6 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       if (recent.length > 5) recent.shift();
       const id = nextId++;
       const [title, line] = prof.labels[Math.floor(Math.random() * prof.labels.length)]!;
-      const toLeft = Math.random() < 0.5;
       // Orbits: keep apart from the other orbiter's radius; outer ones slower (Kepler).
       const taken = [...motionMap.values()].filter((o) => o.mode === "orbit").map((o) => o.R);
       let R = d.name === "orb" ? rand(1.6, 1.8) : rand(1.18, 1.6);
@@ -140,9 +155,9 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       const m: Motion = {
         mode,
         t0: now,
-        // Orbiters stay one orbit (leaving while behind the planet); ships cross
-        // in about half a minute; debris takes a couple of minutes.
-        life: mode === "orbit" ? period : mode === "transit" ? rand(30000, 42000) : rand(120000, 160000),
+        // Orbiters stay one orbit (leaving while behind the planet); an arrival
+        // takes under a minute; debris a couple of minutes.
+        life: mode === "orbit" ? period : mode === "arrival" ? rand(40000, 55000) : rand(120000, 160000),
         R,
         inc: PLANE_INC + rand(-0.03, 0.03),
         node: PLANE_NODE + rand(-0.02, 0.02),
@@ -150,24 +165,18 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         // from behind the planet, off screen to the right.
         a0: first ? rand(1.0, 1.9) : rand(-0.3, -0.1),
         w: (Math.PI * 2) / period,
-        // Ships: a long, gentle curve across the frame (a course correction).
-        // Debris: a slow, nearly level crossing of open space.
-        p:
-          mode === "transit"
-            ? toLeft
-              ? [1.0, level + rand(-0.1, 0.1), 0.5, level + rand(-0.12, 0.12), -0.08, level + rand(-0.1, 0.1)]
-              : [-0.08, level + rand(-0.1, 0.1), 0.5, level + rand(-0.12, 0.12), 1.0, level + rand(-0.1, 0.1)]
-            : toLeft
-              ? [0.66, rand(0.2, 0.75), 0.33, rand(0.2, 0.8), -0.06, rand(0.2, 0.8)]
-              : [-0.06, rand(0.2, 0.8), 0.3, rand(0.2, 0.8), 0.62, rand(0.2, 0.8)],
-        size: mode === "transit" ? rand(0.012, 0.016) : mode === "orbit" ? rand(0.009, 0.013) : rand(0.008, 0.012),
+        // Arrivals: from the far side of space (off the left edge) down a gentle
+        // curve into the planet's limb (pulled in by it). Debris: a slow drift
+        // in from the far side, nearly level.
+        p: mode === "arrival" ? arrivalPath(level) : [-0.06, rand(0.2, 0.8), 0.3, rand(0.2, 0.8), 0.62, rand(0.2, 0.8)],
+        size: mode === "arrival" ? rand(0.012, 0.016) : mode === "orbit" ? rand(0.009, 0.013) : rand(0.008, 0.012),
         rot0: mode === "drift" ? rand(0, 360) : rand(-12, 12),
         spin: (prof.spin * (Math.random() < 0.5 ? -1 : 1)) / 1000,
         base: 0,
       };
       motionMap.set(id, m);
       // Labels sit on the side with more open space.
-      const side = mode === "orbit" || (mode === "transit" ? !toLeft : toLeft) ? "left" : "right";
+      const side = mode === "drift" ? "right" : "left";
       setItems((xs) => [...xs, { id, name: d.name, aspect: d.w / d.h, title, line, side }]);
     };
 
@@ -186,8 +195,8 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         if (all.length < MAX_TOTAL) {
           const busyModes = new Set(all.map((m) => m.mode));
           const r = Math.random();
-          let mode: Mode = r < 0.6 ? "orbit" : r < 0.8 ? "transit" : "drift";
-          // One ship or one piece of debris at a time.
+          let mode: Mode = r < 0.6 ? "orbit" : r < 0.8 ? "arrival" : "drift";
+          // One arrival or one piece of debris at a time.
           if (mode !== "orbit" && busyModes.has(mode)) mode = "orbit";
           spawn(now, mode);
         }
@@ -197,8 +206,7 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
       const rect = root.getBoundingClientRect();
       if (now - busyAt > 400) {
         busyAt = now;
-        const stage = root.parentElement;
-        busy = stage ? [...stage.querySelectorAll<HTMLElement>(".hero-ui .tracked, .obs-on .tracked, .hero-haiku")].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 || r.height > 0) : [];
+        busy = [...document.querySelectorAll<HTMLElement>(".hero-ui .tracked, .obs-on .tracked, .hero-haiku, .hero-hint")].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 || r.height > 0);
       }
       const g = frameGeometry(rect.width, rect.height);
       const sP = 1.25 - 0.25 * p;
@@ -225,6 +233,8 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
         let behind = false;
         let z = 0;
         let rot = m.rot0 + m.spin * age;
+        // Arrivals: heat as they meet the atmosphere (flare, then lost).
+        let heat = 0;
         if (m.mode === "orbit") {
           // A tilted circular orbit seen from the front: the near half crosses
           // in front of the planet, the far half passes behind it.
@@ -239,14 +249,18 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           depth = 1 + 0.18 * z;
         } else {
           const [x0, y0, cx, cy, x1, y1] = m.p;
-          const fx = (1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * cx + u * u * x1;
-          const fy = (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * cy + u * u * y1;
+          // Arrivals speed up as the planet pulls them in.
+          const v = m.mode === "arrival" ? Math.pow(u, 1.35) : u;
+          const fx = (1 - v) * (1 - v) * x0 + 2 * (1 - v) * v * cx + v * v * x1;
+          const fy = (1 - v) * (1 - v) * y0 + 2 * (1 - v) * v * cy + v * v * y1;
           [x, y] = toScreen(fx, fy);
-          if (m.mode === "transit") {
-            // Nose along the course (the sprites point up).
-            const dx = 2 * (1 - u) * (cx - x0) + 2 * u * (x1 - cx);
-            const dy = (2 * (1 - u) * (cy - y0) + 2 * u * (y1 - cy)) * (g.fh / g.fw);
+          if (m.mode === "arrival") {
+            // Nose along the course (the sprites point up); nearer, so larger.
+            const dx = 2 * (1 - v) * (cx - x0) + 2 * v * (x1 - cx);
+            const dy = (2 * (1 - v) * (cy - y0) + 2 * v * (y1 - cy)) * (g.fh / g.fw);
             rot = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+            depth = 0.55 + 0.6 * v;
+            heat = smooth(0.84, 0.97, v);
           } else {
             depth = 0.95 + 0.1 * Math.sin(u * Math.PI);
           }
@@ -275,10 +289,12 @@ export function HeroDrifters({ progress, className }: { progress: { current: num
           // Sunlight from the left: dimmer beside and over the night side.
           const near = 1 - smooth(1.0, 1.8, dPlanet / pr);
           const night = smooth(-0.3, 0.5, (x - pcx) / pr) * near;
-          body.style.filter = `brightness(${(1 - 0.5 * night + 0.08 * z).toFixed(3)})`;
+          body.style.filter = heat > 0.001
+            ? `brightness(${(1 + 1.6 * heat).toFixed(3)}) drop-shadow(0 0 ${(2 + 7 * heat).toFixed(1)}px rgba(214,226,255,${(0.9 * heat).toFixed(3)}))`
+            : `brightness(${(1 - 0.5 * night + 0.08 * z).toFixed(3)})`;
         }
         // Long, eased fades at both ends; never fully opaque (they are far off).
-        const fade = smooth(0, m.mode === "transit" ? 0.1 : 0.06, u) * (1 - smooth(m.mode === "transit" ? 0.9 : 0.94, 1, u));
+        const fade = m.mode === "arrival" ? smooth(0, 0.12, u) * (1 - smooth(0.965, 1, u)) : smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
         el.style.opacity = (fade * 0.85).toFixed(3);
         // The callout follows the object; it hides while the object is behind.
         const tag = el.lastElementChild as HTMLElement | null;

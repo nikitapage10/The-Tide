@@ -171,7 +171,7 @@ main:has(> .hero-track) { padding-top: 0; }
 /* Planet scale S(p) = 1.35 - 0.35p around the planet's centre; the artwork is the final frame.
    Callouts reuse the same maths so they stay pinned to the art. */
 .hero-planet { transform: scale(calc(1.25 - 0.25 * var(--p))); transform-origin: 85% 58%; }
-.hero-planet-dom { filter: brightness(calc(0.16 + 0.84 * var(--p))); }
+.hero-planet-dom { filter: brightness(calc(0.04 + 0.96 * var(--p))); }
 .hero-pin { position: absolute; left: calc(85% + (var(--x) - 85%) * (1.25 - 0.25 * var(--p))); top: calc(58% + (var(--y) - 58%) * (1.25 - 0.25 * var(--p))); }
 /* The plain image layers are only a fallback when WebGL is unavailable. */
 .hero-stage:not([data-gl="off"]) .hero-dom { visibility: hidden; }
@@ -321,3 +321,7 @@ header a, header button, header nav { text-shadow: 0 0 6px #000, 0 0 14px rgba(0
    wider in tracked (letter-spaced) labels. */
 .decode-cell { --glyph-w: 0.7em; --glyph-h: 1.05em; }
 .tracked .decode-cell, .eyebrow .decode-cell { --glyph-w: 1.15em; --glyph-h: 1.3em; }
+/* The hero's "click around" hint: faint, only once the planet is revealed. */
+.hero-hint { opacity: calc(clamp(0, (var(--p) - 0.78) * 6, 1) * 0.9); transition: opacity 0.6s ease; }
+.hint-coarse { display: none; }
+@media (pointer: coarse) { .hint-fine { display: none; } .hint-coarse { display: inline; } }

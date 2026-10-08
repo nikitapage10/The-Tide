@@ -7,10 +7,11 @@
  *   speed, with a rare soft blip when moving fast.
  * - Over the planet (once it is revealed): an airy cloud swish instead.
  * - A storm surge (click on the planet): rolling thunder.
+ * - A gravitational disturbance (click in open space): a soft, deep pulse.
  */
 
 /** Written by the hero scene each frame; read by the sound engine. */
-export const heroSignal = { overPlanet: false, surgeAt: 0 };
+export const heroSignal = { overPlanet: false, surgeAt: 0, gravAt: 0 };
 
 export class HeroSound {
   private ctx: AudioContext;
@@ -27,6 +28,7 @@ export class HeroSound {
   private last = { x: 0, y: 0, t: 0 };
   private raf = 0;
   private lastSurge = 0;
+  private lastGrav = 0;
   private lastGlitch = 0;
 
   constructor() {
@@ -118,6 +120,10 @@ export class HeroSound {
       this.lastSurge = heroSignal.surgeAt;
       this.thunder();
     }
+    if (heroSignal.gravAt && heroSignal.gravAt !== this.lastGrav) {
+      this.lastGrav = heroSignal.gravAt;
+      this.pulse();
+    }
     this.raf = requestAnimationFrame(this.tick);
   };
 
@@ -139,6 +145,37 @@ export class HeroSound {
     o.connect(lp).connect(g).connect(this.master);
     o.start(t);
     o.stop(t + 0.2);
+  }
+
+  /** A deep, soft pulse: a low sine falling in pitch, with a breath of air. */
+  private pulse() {
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(72, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 1.6);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.32, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + 2.3);
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.setValueAtTime(300, t + 0.8);
+    bp.frequency.exponentialRampToValueAtTime(90, t + 2.4);
+    bp.Q.value = 0.8;
+    const gn = ctx.createGain();
+    gn.gain.setValueAtTime(0, t + 0.8);
+    gn.gain.linearRampToValueAtTime(0.06, t + 1.0);
+    gn.gain.exponentialRampToValueAtTime(0.001, t + 2.6);
+    src.connect(bp).connect(gn).connect(this.master);
+    src.start(t + 0.8, Math.random());
+    src.stop(t + 2.7);
   }
 
   private thunder() {
