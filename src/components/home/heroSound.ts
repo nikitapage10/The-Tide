@@ -1,5 +1,5 @@
 /**
- * Generated sound for the home hero (Web Audio, no audio files). Off until the
+ * Sound for the home hero (generated with Web Audio, plus the theme). Off until the
  * visitor turns it on (browsers require a gesture, and sound should never
  * surprise anyone).
  *
@@ -9,6 +9,8 @@
  * - A storm surge (click on the planet): rolling thunder.
  * - A gravity well (hold in open space): a low hum rising as it charges; on
  *   release a soft, deep pulse, deeper and longer the stronger the charge.
+ * - Under it all, quietly, the Tide's theme on a loop (streamed, fading in;
+ *   it steps back while a well charges, so the effects carry).
  */
 
 /** Written by the hero scene each frame; read by the sound engine. */
@@ -32,6 +34,8 @@ export class HeroSound {
   private lastGrav = 0;
   private hum2: { o: OscillatorNode; g: GainNode } | null = null;
   private lastGlitch = 0;
+  private music: HTMLAudioElement;
+  private musicGain: GainNode;
 
   constructor() {
     const ctx = new AudioContext();
@@ -40,6 +44,18 @@ export class HeroSound {
     this.master.gain.value = 0;
     this.master.connect(ctx.destination);
     this.master.gain.setTargetAtTime(0.42, ctx.currentTime, 1.2);
+
+    // The theme, low in the mix (streamed rather than decoded whole).
+    this.music = new Audio("/audio/tide-theme.mp3");
+    this.music.loop = true;
+    this.music.preload = "auto";
+    this.musicGain = ctx.createGain();
+    this.musicGain.gain.value = 0;
+    ctx.createMediaElementSource(this.music).connect(this.musicGain).connect(this.master);
+    this.musicGain.gain.setTargetAtTime(0.28, ctx.currentTime + 0.3, 2.5);
+    void this.music.play().catch(() => {
+      /* blocked or unavailable: the generated sound still plays */
+    });
 
     // Shared noise buffer (2 s, looped).
     this.noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -143,6 +159,8 @@ export class HeroSound {
         h.o.stop(t + 0.4);
       }
     }
+    // The theme steps back while a well charges, and returns after.
+    this.musicGain.gain.setTargetAtTime(heroSignal.charging ? 0.28 * (1 - 0.65 * heroSignal.charge) : 0.28, t, heroSignal.charging ? 0.6 : 2.0);
     if (heroSignal.gravAt && heroSignal.gravAt !== this.lastGrav) {
       this.lastGrav = heroSignal.gravAt;
       this.pulse(heroSignal.gravStrength);
@@ -296,6 +314,12 @@ export class HeroSound {
     const t = this.ctx.currentTime;
     this.master.gain.setTargetAtTime(0, t, 0.15);
     const ctx = this.ctx;
-    setTimeout(() => void ctx.close(), 600);
+    const music = this.music;
+    setTimeout(() => {
+      music.pause();
+      music.removeAttribute("src");
+      music.load();
+      void ctx.close();
+    }, 600);
   }
 }
