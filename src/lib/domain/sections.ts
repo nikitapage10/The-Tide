@@ -77,6 +77,7 @@ export const SECTIONS: SectionDef[] = [
       { slug: "builds", label: "Builds", description: "Physical creations, code and logic." },
       { slug: "publishing", label: "Publishing", description: "Import, preview, publish and roll back lore releases." },
       { slug: "sources", label: "Sources", description: "Source references and their access metadata." },
+      { slug: "ceo", label: "C.E.O. desk", description: "The Archive's agents in the C.E.O., and the jobs the Tide gives them." },
       { slug: "cloud-lab", label: "Cloud lab", description: "Try cloud and weather simulations by hand." },
       { slug: "alphabet-lab", label: "Alphabet lab", description: "Ways for the Tide's script to translate into English." },
       { slug: "orbit-lab", label: "Orbit sketch", description: "Draw how things should move around the planet." },

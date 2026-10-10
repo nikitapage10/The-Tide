@@ -15,6 +15,7 @@ import { Markdown } from "@/components/ui/Markdown";
 import { EmptyState } from "@/components/ui/States";
 import { listRecords, resolveRef } from "@/lib/domain/queries";
 import { SECTIONS } from "@/lib/domain/sections";
+import { workOrders } from "@/lib/domain/work-orders";
 import type { AppContext } from "@/lib/server/context";
 
 const fmt = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" }) + " UTC";
@@ -46,6 +47,7 @@ export async function Bench({ ctx }: { ctx: AppContext }) {
     builds: `${builds.filter((b) => !["done", "abandoned"].includes(b.status)).length} active`,
     publishing: project.releaseCount ? `v${project.releaseCount}` : "no releases",
     settings: ctx.mode === "demo" ? "demo" : "connected",
+    ceo: `${workOrders(state, checklist, sessionStates).length} orders`,
   };
   const tools = def.subsections.filter((s) => !LABS.has(s.slug));
   const labs = def.subsections.filter((s) => LABS.has(s.slug));

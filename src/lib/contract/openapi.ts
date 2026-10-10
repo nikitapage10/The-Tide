@@ -39,6 +39,13 @@ export function publisherOpenApi(origin: string) {
           responses: { "200": { description: "{ activeReleaseId, lifecycle, record }" }, "404": { description: "Not found" } },
         },
       },
+      "/api/v1/workshop/work-orders": {
+        get: {
+          operationId: "listWorkOrders",
+          summary: "The jobs the Tide gives the agents in the C.E.O.'s Archive: questions to settle, entries without text, peoples without a portrait, the next session and open prep. Each has a stable id, the agent (loremaster or d20), a priority and the record it concerns.",
+          responses: { "200": { description: "{ projectId, activeReleaseId, room, agents, orders[] }" } },
+        },
+      },
       "/api/v1/publications/validate": {
         post: {
           operationId: "validateBundle",

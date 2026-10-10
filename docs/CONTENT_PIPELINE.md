@@ -104,3 +104,19 @@ npx tsx scripts/build-lore-bundle.ts                    # → fixtures/publicati
   ```sh
   npx tsx scripts/build-lore-bundle.ts --base <active release id>
   ```
+
+## The C.E.O. desk (agents)
+
+The Tide is the Archive room in the C.E.O. (Command Everything, Obviously,
+https://command-everything-obviously.vercel.app/), the GM's office of AI
+agents: the **Loremaster** (scribe, the ChatGPT spaces) and **D20** (the GM's
+hands, Manus).
+
+- **Work orders.** `GET /api/v1/workshop/work-orders` (machine publisher key, or a GM session) lists the jobs the Tide's own state gives them. It is read-only. The jobs are:
+  - open lore questions to settle;
+  - entries with no text yet;
+  - peoples without a portrait;
+  - the next scheduled session and its open prep.
+
+  Each order has a stable `id`, an `agent`, a `priority` and the `recordId` it concerns. Orders clear themselves when the work is published or ticked off. The same list is shown in Workshop → C.E.O. desk (`src/lib/domain/work-orders.ts`).
+- **Publishing.** The C.E.O. asks for approval (`lore.publish`); an approved release then goes through the normal validate → publish path above, and can be rolled back.

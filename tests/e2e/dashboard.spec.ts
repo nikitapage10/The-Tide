@@ -72,6 +72,21 @@ test("the Arrival can be heard: on the home story and on its Library page", asyn
   await expect(text.locator(".rw-now")).toHaveCount(1, { timeout: 10_000 });
 });
 
+test("the C.E.O. desk: the Archive's agents and the Tide's own work orders", async ({ page, request }) => {
+  await page.goto("/workshop");
+  await page.getByRole("link", { name: /C\.E\.O\. desk/ }).first().click();
+  await expect(page.getByRole("heading", { name: "In the Archive" })).toBeVisible();
+  await expect(page.getByText("Loremaster", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Settle: / }).first()).toBeVisible();
+  await axe(page);
+  const res = await request.get("/api/v1/workshop/work-orders");
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(body.room).toBe("archive");
+  expect(body.orders.length).toBeGreaterThan(0);
+  expect(new Set(body.orders.map((o: { id: string }) => o.id)).size).toBe(body.orders.length);
+});
+
 test("keyboard: skip link first, visible focus, search by Unicode-insensitive name", async ({ page }) => {
   await page.goto("/");
   await page.keyboard.press("Tab");
