@@ -179,7 +179,7 @@ for (const r of RELATIONS) {
       inverseLabel: r.inverse ?? null,
       note: r.note ?? null,
       canonStatus: "provisional",
-      visibility: "player_safe",
+      visibility: r.visibility ?? "player_safe",
       demo: false,
     },
   });
@@ -210,12 +210,12 @@ for (const a of ARCHIVE) operations.push({ op: "archive", targetId: a.id, reason
 const bundle = {
   schemaVersion: "tide.publication.v1",
   projectId: PROJECT,
-  releaseId: recordId(PROJECT, "release/lore-from-documents-1"),
+  releaseId: recordId(PROJECT, `release/lore-${sha(JSON.stringify(operations))}`),
   baseReleaseId: BASE,
-  createdAt: "2026-10-08T00:00:00Z",
-  title: "Lore from the GM's documents",
+  createdAt: "2026-11-05T00:00:00Z",
+  title: "Ilyr sources: nine peoples and the post-Tide present",
   notes:
-    "The Intro, Tide 101, the Nyth'rok, Obscarron, Teruānga, Umbrasa and Resonara documents and the Normandy Enclave: eras, peoples, factions, places, events, enclaves, portraits, relationships and the contradictions found, as open questions.",
+    "The complete 12-document source pack, including Humans, Blightmourn, Irridosai and Syntherion, the updated Umbrasa account, and the GM’s two-year planning anchor. Source contradictions remain open. Review visibility before publishing detailed origins.",
   operations,
 };
 

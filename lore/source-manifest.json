@@ -1,0 +1,65 @@
+{
+  "archive": "01-The-Tide-Ilyr-Sources-Complete-1-.zip",
+  "documents": [
+    {
+      "filename": "Blightmourn.docx",
+      "slug": "blightmourn",
+      "sha256": "e50992638ca65ec46490b64259c60c396aa4ef5229c8cbb0815784a37c693391"
+    },
+    {
+      "filename": "Humans.docx",
+      "slug": "humans",
+      "sha256": "46c55973908cc32eac507f1d29520b2fb9401d73bf7d200c3533293e7be78336"
+    },
+    {
+      "filename": "Irridosa.docx",
+      "slug": "irridosai",
+      "sha256": "7f44f11a10a247c83bc89f29ba9528342c025084ae04f97db0138b549b93ea1a"
+    },
+    {
+      "filename": "Nyth-rok.docx",
+      "slug": "nythrok",
+      "sha256": "662ed511a30385a50bae5f2457355a8b1b02e1db542f29bf1cf9b767daedf071"
+    },
+    {
+      "filename": "Obscarron.docx",
+      "slug": "obscarron",
+      "sha256": "6403f4bc7970892d9a406fe49f7644dc0cf9bfb22cfafaeb7217b8d37704bc63"
+    },
+    {
+      "filename": "Resonara.docx",
+      "slug": "resonara",
+      "sha256": "4228d2e9e2df61360e544bc00a7d81d9c140d8b75f36f2c119fc4b75dcbc3be0"
+    },
+    {
+      "filename": "Syntherion.docx",
+      "slug": "syntherion",
+      "sha256": "2c6c40dd2660e40a30686038edc3c941871646868c39d43da9301a87d17d2df8"
+    },
+    {
+      "filename": "Teru-nga.docx",
+      "slug": "teruanga",
+      "sha256": "f99ae2f3483aa332199441b3a66b45e4425bb9b828f7bb5e66901a2f224ed6aa"
+    },
+    {
+      "filename": "The-Normandy-Enclave.docx",
+      "slug": "normandy-enclave",
+      "sha256": "cb965998a89a353b14335ce17f9316ab55758a6ea9c71781c19ae4bf470a8826"
+    },
+    {
+      "filename": "The-Tide-Intro-New-.docx",
+      "slug": "intro",
+      "sha256": "f4b7cd98a31a2592b316ff534efcb7105584da17d44e99bce17288cf60911d62"
+    },
+    {
+      "filename": "Tide-101-Updated.docx",
+      "slug": "tide-101",
+      "sha256": "242d6389a03e3f6a10119c7ed23595ccd6bc5839e8caefc8e3acd43710f82be9"
+    },
+    {
+      "filename": "Umbrasa.docx",
+      "slug": "umbrasa",
+      "sha256": "529dd2828cb072872110843ef3524cefad753e7947e5765df772f4580d2c4608"
+    }
+  ]
+}

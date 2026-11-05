@@ -35,7 +35,7 @@ export const WORLD_KIND_GROUPS: Record<string, { label: string; kinds: EntityKin
 };
 
 export const PEOPLE_KIND_GROUPS: Record<string, { label: string; kinds: EntityKind[]; description: string }> = {
-  peoples: { label: "Peoples", kinds: ["people"], description: "The eight established peoples, and others when supplied." },
+  peoples: { label: "Peoples", kinds: ["people"], description: "The nine peoples of Ilyr, including native and Drift-arriving humans." },
   characters: { label: "Characters", kinds: ["character"], description: "Named individuals." },
   creatures: { label: "Creatures", kinds: ["creature"], description: "Fauna and beings." },
   factions: { label: "Factions", kinds: ["faction"], description: "Groups with shared aims." },

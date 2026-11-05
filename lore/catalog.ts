@@ -9,7 +9,7 @@
  *   optionally one section of it), copied verbatim.
  * - Summaries are short and quiet; the documents hold the detail.
  * - The world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for "light that
- *   remains"; adjective Ilyrian. (Primus was its working name.)
+ *   remains"; adjective Ilyan. (Primus was its working name.)
  */
 import type { CanonStatus, EntityKind, Era, Visibility } from "../src/lib/contract/schema";
 
@@ -35,6 +35,7 @@ export interface EntityEntry {
 }
 
 export interface RelationEntry {
+  visibility?: Visibility;
   from: string;
   to: string;
   label: string;
@@ -84,6 +85,11 @@ export const SOURCES: Record<string, string> = {
   umbrasa: "Umbrasa",
   resonara: "Resonara",
   "normandy-enclave": "The Normandy Enclave",
+  blightmourn: "Blightmourn",
+  irridosai: "Irridosai",
+  syntherion: "Syntherion",
+  humans: "Humans",
+  "umbrasa-legacy": "Umbrasa (legacy draft, superseded)",
 };
 
 const P = (doc: string, section: string, until?: string): Body => ({ doc, section, until });
@@ -136,7 +142,7 @@ export const ENTITIES: EntityEntry[] = [
     title: "The Undertow",
     summary: "The first great cataclysm: about nine months of upheaval that drowned coastlines, bent gravity and ended the Shoreborn.",
     body:
-      "The singular cataclysm, circa 2102 B.U., that ended the Shoreborn civilization. For about nine months the planet convulsed: extreme geological upheaval, unprecedented atmospheric phenomena, gravitational anomalies and minor incursions of energies from beyond known reality. Coastlines were redrawn, most of the population perished, and the survivors were irrevocably altered, the beginning of the Ilyrian races.\n\nEach people remembers it differently: the Veigrstorm of the Nyth'rok, the eruptions that buried the Obscarron, the surge that dragged the Teruānga into the abyss, the Song of Unmaking of the Resonara, and the shattering of the moon that made the Umbrasa.",
+      "The singular cataclysm, circa 2102 B.U., that ended the Shoreborn civilization. For about nine months the planet convulsed: extreme geological upheaval, unprecedented atmospheric phenomena, gravitational anomalies and minor incursions of energies from beyond known reality. Coastlines were redrawn, most of the population perished, and the survivors were irrevocably altered, the beginning of the Ilyan races.\n\nEach people remembers it differently: the Veigrstorm of the Nyth'rok, the eruptions that buried the Obscarron, the surge that dragged the Teruānga into the abyss, the Song of Unmaking of the Resonara, and the shattering of the moon that made the Umbrasa.",
     era: "undertow",
     chronology: { label: "~2102 B.U.", certainty: "approximate", sortKey: 2102 },
     tags: ["cataclysm"],
@@ -236,7 +242,7 @@ export const ENTITIES: EntityEntry[] = [
     title: "The Divergence",
     summary: "The second Consequence: latent powers wake. Gravity, time, matter, minds and energy answer new masters.",
     body:
-      "A poorly understood event, perhaps a wave of cosmic energy or a shift in underlying reality, that unlocked latent potential within the Ilyrian races. It amplified existing traits or granted new abilities tied to fundamental forces (gravity, entropy, quantum effects, electromagnetism), and with them rapid shifts of power and new elites, like the Geomagnus.\n\nThe Nyth'rok gained three branches of quantum power; the Obscarron, magnetism and geothermal force; the Teruānga, pressure and the heat of the deep; the Umbrasa, mass itself; the Resonara, waves of sound, light and thought.",
+      "A poorly understood event, perhaps a wave of cosmic energy or a shift in underlying reality, that unlocked latent potential within the Ilyan races. It amplified existing traits or granted new abilities tied to fundamental forces (gravity, entropy, quantum effects, electromagnetism), and with them rapid shifts of power and new elites, like the Geomagnus.\n\nThe Nyth'rok gained three branches of quantum power; the Obscarron, magnetism and geothermal force; the Teruānga, pressure and the heat of the deep; the Umbrasa, mass itself; the Resonara, waves of sound, light and thought.",
     era: "tide",
     chronology: { label: "the Tide", certainty: "uncertain", sortKey: 5802 },
     parent: "phenomenon/the-tide",
@@ -299,7 +305,7 @@ export const ENTITIES: EntityEntry[] = [
     summary: "Tall, pale people of the northern fjords, remade by a quantum storm; keepers of the Deep Root and its living book.",
     body: { doc: "nythrok" },
     palette: "#b9c7d6",
-    tags: ["the eight peoples"],
+    tags: ["the nine peoples"],
     canon: "provisional",
     visibility: "public",
     source: "nythrok",
@@ -313,7 +319,7 @@ export const ENTITIES: EntityEntry[] = [
     summary: "Obsidian-skinned, molten-veined, born from the earth's crust after centuries of stone sleep; their cities run on rivers of fire.",
     body: { doc: "obscarron" },
     palette: "#d0703a",
-    tags: ["the eight peoples"],
+    tags: ["the nine peoples"],
     canon: "provisional",
     visibility: "public",
     source: "obscarron",
@@ -327,7 +333,7 @@ export const ENTITIES: EntityEntry[] = [
     summary: "Shelled people of the deep ocean, lit by ember-like markings; the navigators who found everyone again.",
     body: { doc: "teruanga" },
     palette: "#c8a84a",
-    tags: ["the eight peoples"],
+    tags: ["the nine peoples"],
     canon: "provisional",
     visibility: "public",
     source: "teruanga",
@@ -338,10 +344,10 @@ export const ENTITIES: EntityEntry[] = [
     kind: "people",
     title: "Umbrasa",
     aliases: ["Laughing Shadows"],
-    summary: "Small, armoured miners of the shattered moon who breathe helium and exhale light; they came down to the world on star-barges.",
+    summary: "Descendants of lunar labor crews with fused skin-plates, helium-dependent bone-breathing, and pullsense. Neon breath becomes visible in electrically charged air.",
     body: { doc: "umbrasa" },
     palette: "#8fcfc4",
-    tags: ["the eight peoples"],
+    tags: ["the nine peoples"],
     canon: "provisional",
     visibility: "public",
     source: "umbrasa",
@@ -354,7 +360,7 @@ export const ENTITIES: EntityEntry[] = [
     summary: "Beings of white, silken fibre who see with sound and thought; wandering troupes since a fog swallowed their paradise.",
     body: { doc: "resonara" },
     palette: "#e6e1d6",
-    tags: ["the eight peoples"],
+    tags: ["the nine peoples"],
     canon: "provisional",
     visibility: "public",
     source: "resonara",
@@ -364,33 +370,60 @@ export const ENTITIES: EntityEntry[] = [
     name: "people/irridosai",
     kind: "people",
     title: "Irridosai",
-    summary: "A radiant people of a lush, dangerous island of cliffs; the first the Teruānga found. Details to come.",
-    tags: ["the eight peoples"],
-    canon: "unverified",
+    summary: "Porcelain-skinned people of irradiated forests, confronting dangerous overgrowth, radiobeasts, and the influence of Aether.",
+    body: { doc: "irridosai" },
+    tags: ["the nine peoples"],
+    canon: "provisional",
     visibility: "public",
-    source: "tide-101",
+    source: "irridosai",
     portrait: "/lore/peoples/irridosai.webp",
   },
   {
     name: "people/blightmourn",
     kind: "people",
     title: "Blightmourn",
-    summary: "A people of harsh deserts, reached by early Teruānga voyages. Details to come.",
-    tags: ["the eight peoples"],
-    canon: "unverified",
+    summary: "A people sustained by Erethium suits through cycles of decay and regeneration. Entropy powers deepen the conflict between the Sects of Life and Death.",
+    body: { doc: "blightmourn" },
+    tags: ["the nine peoples"],
+    canon: "provisional",
     visibility: "public",
-    source: "tide-101",
+    source: "blightmourn",
     portrait: "/lore/peoples/blightmourn.webp",
   },
   {
     name: "people/syntherion",
     kind: "people",
     title: "Syntherion",
-    summary: "One of the eight peoples. Still being written.",
-    tags: ["the eight peoples"],
-    canon: "unverified",
+    summary: "Descendants of isolated artificial intelligences whose bodies are becoming organic through the Pinocc Effect. Six Great Houses respond to a fractured Lattice.",
+    body: { doc: "syntherion" },
+    tags: ["the nine peoples"],
+    canon: "provisional",
     visibility: "public",
     portrait: "/lore/peoples/syntherion.webp",
+    source: "syntherion",
+  },
+
+  {
+    name: "people/humans",
+    kind: "people",
+    title: "Humans",
+    summary: "Native descendants of Undertow survivors and people carried to Ilyr by the Drift, with different connections to the world’s history.",
+    body: { doc: "humans" },
+    tags: ["the nine peoples"],
+    canon: "provisional",
+    visibility: "gm_only",
+    source: "humans",
+  },
+  {
+    name: "world-mechanic/post-tide-present",
+    kind: "world_mechanic",
+    title: "Two years after the upheaval",
+    summary: "The working present for new campaigns and stories: roughly two years after the Tide’s major upheaval.",
+    body: "This is the GM’s current planning anchor, not a claim that every surviving source has been chronologically reconciled. The starting region, first storyline, surviving infrastructure, and ongoing frequency of the Three Consequences remain to be developed.",
+    era: "today",
+    tags: ["post-Tide", "starting region", "working premise"],
+    canon: "provisional",
+    visibility: "gm_only",
   },
 
   // ── Nyth'rok ─────────────────────────────────────────────────────────────
@@ -424,12 +457,12 @@ export const ENTITIES: EntityEntry[] = [
   { name: "event/battle-of-te-ara-kore", kind: "event", title: "The Battle of Te Ara Kore", summary: "Teruānga defend pirates out of the Drift; the Nagga Kai side with an Armada out of spite.", body: P("teruanga", "The Battle of Te Ara Kore: A Misplaced Alliance", "The Teruānga Today: Post-Tide"), era: "tide", chronology: { label: "after the Drift", certainty: "uncertain", sortKey: 5803.2 }, parent: "place/te-ara-kore", canon: "provisional", visibility: "player_safe", source: "teruanga" },
 
   // ── Umbrasa ──────────────────────────────────────────────────────────────
-  { name: "faction/mass-weavers", kind: "faction", title: "The Mass-Weavers", summary: "Umbrasa spiritual leaders of the Divergence, who levitate and anchor themselves at will.", parent: "people/umbrasa", palette: "#8fcfc4", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
-  { name: "institution/gravitar", kind: "institution", title: "The Gravitar", summary: "Couriers who cross between the moon's shards, trailing light.", parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
-  { name: "place/primordial-aukar", kind: "place", title: "The Primordial Aukar", summary: "A small black hole born in the Undertow, holding the moon's fragments in a long, distorted pendant.", body: P("umbrasa", "Origins and Early Evolution (Post-Undertow)"), era: "undertow", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
+  { name: "faction/mass-weavers", kind: "faction", title: "The Mass-Weavers", summary: "Umbrasa spiritual leaders of the Divergence, who levitate and anchor themselves at will.", parent: "people/umbrasa", palette: "#8fcfc4", canon: "unverified", visibility: "gm_only", source: "umbrasa-legacy" },
+  { name: "institution/gravitar", kind: "institution", title: "The Gravitar", summary: "Couriers who cross between the moon's shards, trailing light.", parent: "people/umbrasa", canon: "unverified", visibility: "gm_only", source: "umbrasa-legacy" },
+  { name: "place/primordial-aukar", kind: "place", title: "Hollmaw", summary: "The black hole holding Muunbrak’s broken lunar fragments in its influence.", body: P("umbrasa", "Muunbrak and Hollmaw"), era: "undertow", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
   { name: "place/lunar-shards", kind: "place", title: "The Lunar Shards", summary: "The broken moon, settled by the Umbrasa through the Age of the Veil.", body: P("umbrasa", "The Age of the Abyssal Veil"), parent: "place/primordial-aukar", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
-  { name: "event/the-return", kind: "event", title: "The Return", summary: "Umbrasa star-barges reach the world's mountain plateaus; the locals name them Laughing Shadows.", body: P("umbrasa", "The Return to Ilyr (Era of Verdancy)"), era: "verdancy", chronology: { label: "the Era of Verdancy", certainty: "uncertain", sortKey: 3200 }, parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
-  { name: "technology/helio-regulator", kind: "technology", title: "Helio-Regulator mantles", summary: "Fungal mantles that make helium, so the Umbrasa can live in the world's air.", parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
+  { name: "event/the-return", kind: "event", title: "The Return", summary: "Star-Barges and Helio-Regulators allow Umbrasa communities to travel between Muunbrak and Ilyr.", body: P("umbrasa", "Reconnection and the Era of Verdancy"), era: "verdancy", chronology: { label: "the Era of Verdancy", certainty: "uncertain", sortKey: 3200 }, parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
+  { name: "technology/helio-regulator", kind: "technology", title: "Helio-Regulators", summary: "Environmental support that enables the helium-dependent Umbrasa to live and travel on Ilyr.", parent: "people/umbrasa", canon: "provisional", visibility: "player_safe", source: "umbrasa" },
 
   // ── Resonara ─────────────────────────────────────────────────────────────
   { name: "faction/echocrafters", kind: "faction", title: "Echocrafters", summary: "Resonara who shape waves into constructs, summoned beings and armour.", body: P("resonara", "Advanced Wave Manipulation"), parent: "people/resonara", palette: "#e6e1d6", canon: "provisional", visibility: "player_safe", source: "resonara" },
@@ -467,8 +500,8 @@ export const RELATIONS: RelationEntry[] = [
   { from: "faction/obscarron-resistance", to: "people/obscarron", label: "Faction of", inverse: "Factions" },
   { from: "faction/nagga-kai", to: "people/teruanga", label: "Faction of", inverse: "Factions" },
   { from: "faction/wayfarers", to: "people/teruanga", label: "Faction of", inverse: "Factions" },
-  { from: "faction/mass-weavers", to: "people/umbrasa", label: "Faction of", inverse: "Factions" },
-  { from: "institution/gravitar", to: "people/umbrasa", label: "Faction of", inverse: "Factions" },
+  { from: "faction/mass-weavers", to: "people/umbrasa", label: "Faction of", inverse: "Factions", visibility: "gm_only" },
+  { from: "institution/gravitar", to: "people/umbrasa", label: "Faction of", inverse: "Factions", visibility: "gm_only" },
   { from: "faction/echocrafters", to: "people/resonara", label: "Faction of", inverse: "Factions" },
   { from: "faction/sons-of-the-sirens", to: "people/resonara", label: "Faction of", inverse: "Factions" },
   { from: "event/the-first-ascent", to: "people/teruanga", label: "Involved", inverse: "Took part in" },
@@ -490,7 +523,7 @@ export const QUESTIONS: QuestionEntry[] = [
   {
     name: "question/world-name",
     title: "The world's name",
-    summary: "Settled: the world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for “light that remains”; adjective Ilyrian. The documents' working name was replaced throughout.",
+    summary: "Settled: the world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for “light that remains”; adjective Ilyan. The documents' working name was replaced throughout.",
     status: "resolved",
     related: ["world/primus"],
   },
@@ -504,7 +537,7 @@ export const QUESTIONS: QuestionEntry[] = [
   {
     name: "question/veil-length",
     title: "How long was the Age of the Veil?",
-    summary: "Tide 101 says about 700 years; the Umbrasa document about 900; the Resonara document “thousands of years”.",
+    summary: "Tide 101 says about 700 years, while the Resonara document describes thousands of years. The older Umbrasa draft also differed; the current source no longer fixes that duration.",
     status: "open",
     related: ["history/age-of-the-veil", "people/umbrasa", "people/resonara"],
   },
@@ -525,7 +558,7 @@ export const QUESTIONS: QuestionEntry[] = [
   {
     name: "question/umbrasa-undertow",
     title: "The Umbrasa's Three Consequences",
-    summary: "The Umbrasa document ties the Three Consequences to the Undertow and describes the Drowning as gravitational fracturing on the moon, unlike the other documents.",
+    summary: "The current Umbrasa source separates the Undertow’s lunar destruction from the later Tide. The precise movements of lunar fragments during the Drowning remain open.",
     status: "open",
     related: ["people/umbrasa", "phenomenon/the-drowning"],
   },
@@ -553,10 +586,39 @@ export const QUESTIONS: QuestionEntry[] = [
   {
     name: "question/syntherion",
     title: "The Syntherion",
-    summary: "One of the eight peoples, not yet written.",
-    status: "open",
+    summary: "A full source now covers the Syntherion, the Lattice, six Great Houses, Cognitive Seeding, and the Pinocc Effect.",
+    status: "resolved",
     related: ["people/syntherion"],
   },
+  {
+    name: "question/starting-region",
+    title: "Where does the first story begin?",
+    summary: "Choose one starting region and a specific storyline in the shared present, roughly two years after the major upheaval. No settlement, faction conflict, or geography has been chosen yet.",
+    status: "open",
+    related: ["world-mechanic/post-tide-present"],
+  },
+  {
+    name: "question/post-tide-conditions",
+    title: "What still works two years after the Tide?",
+    summary: "Define surviving technology, travel, communication, authority, and ordinary life locally. Decide whether major Drowning events, new Drift arrivals, and emerging Divergence powers are continuing.",
+    status: "open",
+    related: ["world-mechanic/post-tide-present", "phenomenon/the-tide"],
+  },
+  {
+    name: "question/blightmourn-chronology",
+    title: "Recently lost cities or centuries-old legends?",
+    summary: "The Blightmourn source describes cities lost in the Drowning becoming mythical over centuries. Reconcile that passage with a shared present two years after the major upheaval without silently rewriting it.",
+    status: "open",
+    related: ["people/blightmourn", "world-mechanic/post-tide-present"],
+  },
+  {
+    name: "question/umbrasa-legacy-entries",
+    title: "Reconcile the older Umbrasa institutions",
+    summary: "Mass-Weavers and Gravitar remain private legacy entries from the superseded draft. The current source describes Pathrunners and weight-shifters; do not equate these groups without review. Hollmaw, Muunbrak, and conditional neon illumination follow the current source.",
+    status: "open",
+    related: ["people/umbrasa", "faction/mass-weavers", "institution/gravitar"],
+  },
+
 ];
 
 /** Records from the first release that the documents have settled; archived (still readable). */

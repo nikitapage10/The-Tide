@@ -20,3 +20,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   - Both read `SUPABASE_URL` and `SUPABASE_SECRET_KEY` from the session's environment (set in the cloud environment's settings). Never write the key into a file or commit.
   - Publishing validates first, stops on errors, and every release can be rolled back in Workshop → Publishing.
 - **One branch.** Work, commit and push directly on the repository's default branch (currently `claude/lucid-mccarthy-493lvy`; `main` once renamed). Don't create session or feature branches, and if a session is assigned one, use the default branch instead. The GM has asked for this.
+
+## Continuing the project in Codex
+
+Read `docs/CODEX_CONTEXT.md` before lore or codex work. It records the current
+source pack, the GM’s post-Tide focus, and decisions from the migration session.
+The source text in `lore/docs/` is working authoring material. Importing it or
+pushing code is not an instruction to publish it. Keep the active
+`fixtures/publication/lore-release.json` separate from the staged
+`lore-release-next.json` until the GM requests publication. Do not silently
+resolve contradictions or treat suggested regions, stories, or power limits as
+established lore. Preserve the existing application, stable record IDs,
+source/live ownership, and GM/player access boundaries.

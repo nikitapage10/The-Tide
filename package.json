@@ -22,7 +22,8 @@
     "contract:hash": "tsx scripts/hash-bundle.ts",
     "demo:reset": "node scripts/reset-demo.mjs",
     "publish:bundle": "NODE_OPTIONS=--conditions=react-server tsx scripts/publish-bundle.ts",
-    "publish:lore": "tsx scripts/build-lore-bundle.ts && NODE_OPTIONS=--conditions=react-server tsx scripts/publish-bundle.ts fixtures/publication/lore-release.json"
+    "publish:lore": "tsx scripts/build-lore-bundle.ts && NODE_OPTIONS=--conditions=react-server tsx scripts/publish-bundle.ts fixtures/publication/lore-release.json",
+    "lore:prepare": "node --import tsx scripts/build-lore-bundle.ts --out fixtures/publication/lore-release-next.json"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",

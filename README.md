@@ -1,6 +1,8 @@
 # The Tide — dashboard
 
-A private worldbuilding, storytelling and creative project dashboard for **The Tide**, a homebrew sci-fi Daggerheart setting on a transformed future Earth (planet name undecided).
+**Continuing in Codex:** start with [docs/CODEX_CONTEXT.md](docs/CODEX_CONTEXT.md). The current source import contains all nine peoples; `fixtures/publication/lore-release-next.json` is a validated draft for review, not the active release.
+
+A private worldbuilding, storytelling and creative project dashboard for **The Tide**, a homebrew sci-fi Daggerheart setting on a transformed future Earth (Ilyr).
 
 The dashboard has five sections (**The World**, **People & Powers**, **Stories**, **The Studio**, **The Workshop**) plus Home, global search and a GM-only publishing workflow.
 
@@ -32,7 +34,7 @@ npm run demo          # = TIDE_DATA_MODE=demo next dev
 
 Demo mode uses seeded fixtures and a local file store (`.tide-demo/state.json`, git-ignored). Changes survive page refreshes and dev-server restarts. Reset with **The Workshop → Connection & settings → Reset demo data**, `npm run demo:reset`, or by deleting the file. Demo mode is a local tool only: it is refused on Vercel and in production builds unless you explicitly set `TIDE_ALLOW_DEMO_IN_PRODUCTION_BUILD=true` for a local test.
 
-Things to try: search for `teruanga` or `primus`, filter People & Powers by tag, follow relationships, tick prep items and set a date on **Stories → Demo campaign → Demo session 1**, create a print job and record a failed reprint, then go to **The Workshop → Publishing**, insert the example bundle, preview it, publish it and roll it back.
+Things to try: search for `teruanga` or `ilyr`, filter People & Powers by tag, follow relationships, tick prep items and set a date on **Stories → Demo campaign → Demo session 1**, create a print job and record a failed reprint, then go to **The Workshop → Publishing**, insert the example bundle, preview it, publish it and roll it back.
 
 ## Connected mode (Supabase)
 
@@ -89,6 +91,16 @@ Nothing has been deployed. When you choose to:
 - [docs/TEST_REPORT.md](docs/TEST_REPORT.md): what was run (passed / failed / unrun) and the manual checklist
 - [docs/HANDOFF.md](docs/HANDOFF.md): features, deferrals, known issues, assumptions, manual setup
 
-## Canon policy
+## Canon and working material
 
-Only the facts in the GM brief are seeded as canon: the project name, a transformed future Earth with a planet named Ilyr (ih-LEER, from the Teruānga for “light that remains”; “Primus” was the working name), cataclysms, seven cycles, the names Drowning / Divergence / Drift, the eight peoples (Blightmourn, Irridosai, Nyth’rok, Obscarron, Resonara, Syntherion, Teruānga, Umbrasa), and the unresolved Undertow / Age of the Abyssal Veil / The Tide question. Everything else is a clearly labelled demo record (`demo: true`, `canonStatus: "non_canon"`). The two Drive PDFs are recorded as source references only; they were not read, and their titles, revisions and hashes are left empty.
+The setting is Ilyr; its adjective is **Ilyan** (ill-ee-an). The current source
+pack contains nine peoples, including Humans. Imported text is provisional and
+may contain conflicting histories or perspectives. Keep those differences as
+open questions until the GM resolves them.
+
+The existing bootstrap release and demo fixtures are retained for continuity.
+`lore/catalog.ts` and `lore/docs/` now prepare the complete-source release at
+`fixtures/publication/lore-release-next.json`. Run `npm run lore:prepare` to
+regenerate and validate that draft without publishing it. Use the existing
+publishing workflow only when the GM asks to publish, and review visibility
+before sharing detailed origins with players or contributors.
