@@ -26,6 +26,13 @@ async function main() {
     console.error("usage: SUPABASE_URL=… SUPABASE_SECRET_KEY=… npm run publish:bundle -- <bundle.json>");
     process.exit(2);
   }
+  if (process.env.SUPABASE_DB_URL && process.env.TIDE_SUPABASE_PROJECT_REF) {
+    const target = new URL(process.env.SUPABASE_DB_URL);
+    const ref = process.env.TIDE_SUPABASE_PROJECT_REF;
+    if (!decodeURIComponent(target.username).endsWith('.' + ref) && target.hostname !== 'db.' + ref + '.supabase.co') {
+      throw new Error('The repository database secret targets a different Supabase project than the deployed site. Update SUPABASE_DB_URL to the deployed project’s session-pooler connection.');
+    }
+  }
   const store = process.env.SUPABASE_DB_URL
     ? new PostgresPublicationStore(process.env.SUPABASE_DB_URL, PROJECT)
     : new SupabaseStore(createClient(url!, key!, { auth: { persistSession: false, autoRefreshToken: false } }), PROJECT);

@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 10
     env:
       TIDE_SKIP_UNCHANGED: 'true'
+      TIDE_SUPABASE_PROJECT_REF: uhoowsfdedbcqkgtnosc
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

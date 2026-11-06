@@ -65,10 +65,17 @@ export class PostgresPublicationStore implements PublicationStore {
         timeout: 60000,
       },
     );
-    if (result.status !== 0 || result.error)
-      throw new Error(
-        "Database publication query failed. Credentials and submitted text have been omitted.",
-      );
+    if (result.status !== 0 || result.error) {
+      const message = result.stderr || '';
+      const reason = /password authentication failed|authentication failed/i.test(message) ? 'Database authentication failed.'
+        : /tenant or user not found/i.test(message) ? 'Database pooler could not find this project or user.'
+        : /could not translate host|name or service not known/i.test(message) ? 'Database hostname could not be resolved.'
+        : /network is unreachable|connection refused|timeout expired|timed out/i.test(message) ? 'Database connection is unavailable.'
+        : /SSL|certificate/i.test(message) ? 'Database TLS connection failed.'
+        : /permission denied/i.test(message) ? 'Database permission check failed.'
+        : 'Database query failed.';
+      throw new Error(reason + ' Credentials and submitted text have been omitted.');
+    }
     return JSON.parse(result.stdout.trim() || "null") as T;
   }
   async getProject(): Promise<ProjectInfo> {
