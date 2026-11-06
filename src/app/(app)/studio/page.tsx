@@ -10,7 +10,7 @@ import { MEDIA_STAGES, type MediaRecord } from "@/lib/contract/schema";
 import { listRecords } from "@/lib/domain/queries";
 import { STUDIO_TYPE_GROUPS } from "@/lib/domain/sections";
 import { isImageUrl, peoples } from "@/lib/domain/views";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 import { one, type SearchParams } from "@/lib/server/params";
 import { ART } from "@/lib/art";
 
@@ -25,7 +25,7 @@ const STAGE: Record<MediaRecord["stage"], { label: string; note: string }> = {
 
 /** The Studio, as a light table: work pinned up by stage, a listening corner, the palette and the type. */
 export default async function StudioPage({ searchParams }: { searchParams: SearchParams }) {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const state = await ctx.publicationStore.getActiveState();
   const sp = await searchParams;
   if (Object.keys(sp).length) {

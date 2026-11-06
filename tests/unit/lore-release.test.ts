@@ -24,6 +24,6 @@ describe("lore release", () => {
     await publication.publish(clone(lore), GM);
     const state = await store.getActiveState();
     const peoples = Object.values(state.records).filter((r) => r.record?.type === "entity" && r.record.kind === "people" && !r.record.tags?.includes("enclave"));
-    expect(peoples).toHaveLength(8);
+    expect(peoples).toHaveLength(9);
   });
 });

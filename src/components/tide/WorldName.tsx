@@ -9,7 +9,7 @@ import { WORLD_NAME, WORLD_NAME_MEANING, WORLD_NAME_PRONUNCIATION } from "@/lib/
 
 export function WorldName({ className = "" }: { className?: string }) {
   return (
-    <span className={`world-name-text ${className}`} title={`${WORLD_NAME} (${WORLD_NAME_PRONUNCIATION}): “${WORLD_NAME_MEANING}”`}>
+    <span className={`world-name-text ${className}`} title={`${WORLD_NAME} (${WORLD_NAME_PRONUNCIATION})${WORLD_NAME_MEANING ? `: “${WORLD_NAME_MEANING}”` : ""}`}>
       <Decode text={WORLD_NAME} active delay={300} />
     </span>
   );

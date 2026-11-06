@@ -3,14 +3,14 @@ import { GroupView } from "@/components/browse/GroupView";
 import { StudioBrowser } from "@/components/records/StudioBrowser";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { STUDIO_TYPE_GROUPS } from "@/lib/domain/sections";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 import { one, type SearchParams } from "@/lib/server/params";
 
 export default async function Page({ params, searchParams }: { params: Promise<{ group: string }>; searchParams: SearchParams }) {
   const { group } = await params;
   const g = STUDIO_TYPE_GROUPS[group];
   if (!g) notFound();
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const state = await ctx.publicationStore.getActiveState();
   const sp = await searchParams;
   if (!Object.keys(sp).length) return <GroupView state={state} section="studio" group={group} />;

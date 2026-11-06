@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { EmptyState } from "@/components/ui/States";
 import { linkOptions } from "@/lib/domain/link-options";
 import { PRINT_STATUSES } from "@/lib/domain/types";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 import { one, type SearchParams } from "@/lib/server/params";
 import { cx } from "@/components/ui/cx";
 
@@ -13,7 +13,7 @@ export const metadata = { title: "Print queue" };
 const PRIORITY_ORDER = { urgent: 0, high: 1, normal: 2, low: 3 } as const;
 
 export default async function PrintsPage({ searchParams }: { searchParams: SearchParams }) {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const status = one((await searchParams).status);
   const [jobs, state] = await Promise.all([ctx.operationalStore.listPrintJobs(), ctx.publicationStore.getActiveState()]);
   const visible = jobs

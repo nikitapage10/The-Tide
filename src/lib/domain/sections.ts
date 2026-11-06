@@ -73,6 +73,8 @@ export const SECTIONS: SectionDef[] = [
     label: "The Workshop",
     tagline: "Physical builds, the print queue, code, logic and the dashboard itself.",
     subsections: [
+      { slug: "planning", label: "Two Years After", description: "The shared present, starting region and first storyline." },
+      { slug: "drafts", label: "Working drafts", description: "Private drafts, development notes and recoverable revisions." },
       { slug: "prints", label: "Print queue", description: "3D print jobs and attempts." },
       { slug: "builds", label: "Builds", description: "Physical creations, code and logic." },
       { slug: "publishing", label: "Publishing", description: "Import, preview, publish and roll back lore releases." },

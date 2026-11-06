@@ -17,7 +17,7 @@ export default async function StoriesPage() {
   const ctx = await requirePageContext();
   const state = await ctx.publicationStore.getActiveState();
   // Canon first, then the rest, each in title order.
-  const stories = listRecords(state, "story").sort((a, b) => Number(a.record.demo) - Number(b.record.demo));
+  const stories = listRecords(state, "story").filter(s=>!s.record.demo&&!s.record.tags?.includes("working draft")).sort((a, b) => Number(a.record.demo) - Number(b.record.demo));
   return (
     <div data-section="stories">
       <SectionIntro
@@ -36,6 +36,7 @@ export default async function StoriesPage() {
           </>
         }
       />
+      {ctx.canEdit ? <div className="mb-10 border-y border-white/15 py-5"><p className="t-title">The next story begins two years after the upheaval.</p><p className="mt-2 text-sm text-muted">Develop the starting region and opening incident at the planning desk.</p><Link href="/workshop/planning" className="mt-3 inline-block text-sm">Open the planning desk →</Link></div> : null}
       {stories.length ? (
         <>
           <section aria-labelledby="shelf-h" className="mb-20">
@@ -50,7 +51,7 @@ export default async function StoriesPage() {
               The reading list
             </span>
             <div className="grid gap-14 lg:grid-cols-2">
-              {Object.entries(STORY_FORMAT_GROUPS).map(([slug, g]) => {
+              {Object.entries(STORY_FORMAT_GROUPS).filter(([,g])=>stories.some(s=>g.formats.includes(s.record.format))).map(([slug, g]) => {
                 const items = stories.filter((s) => g.formats.includes(s.record.format));
                 return (
                   <div key={slug}>

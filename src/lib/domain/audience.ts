@@ -27,6 +27,8 @@ function scrub(r: PublishedRecord): PublishedRecord {
   const out = { ...r } as PublishedRecord & Record<string, unknown>;
   delete out.sourceRefs;
   delete out.conflicts;
+  // Reader introductions use summaries; detailed people histories stay with the GM.
+  if (out.type === "entity" && out.kind === "people") { out.body = null; delete out.aliases; }
   if (out.type === "session") delete (out as Record<string, unknown>).prep;
   return out;
 }
@@ -54,10 +56,10 @@ export function filterForAudience(state: PublishedState, audience: Audience): Pu
 }
 
 /**
- * How public visitors are scoped. "all" keeps the project's current open
- * preview (visitors read everything published, as before); "tiered" applies
+ * How public visitors are scoped. "all" explicitly opts into the open
+ * preview (visitors read everything published, as before); the default "tiered" applies
  * the audience layers. Set with TIDE_PUBLIC_SCOPE.
  */
 export function publicScope(env: NodeJS.ProcessEnv = process.env): "all" | "tiered" {
-  return env.TIDE_PUBLIC_SCOPE === "tiered" ? "tiered" : "all";
+  return env.TIDE_PUBLIC_SCOPE === "all" ? "all" : "tiered";
 }

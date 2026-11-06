@@ -49,7 +49,9 @@ export async function Bench({ ctx }: { ctx: AppContext }) {
     settings: ctx.mode === "demo" ? "demo" : "connected",
     ceo: `${workOrders(state, checklist, sessionStates).length} orders`,
   };
-  const tools = def.subsections.filter((s) => !LABS.has(s.slug));
+  const core = new Set(["planning", "drafts", "publishing", "sources"]);
+  const tools = def.subsections.filter(s => core.has(s.slug));
+  const secondary = def.subsections.filter(s => !core.has(s.slug) && !LABS.has(s.slug));
   const labs = def.subsections.filter((s) => LABS.has(s.slug));
   return (
     <>
@@ -149,8 +151,9 @@ export async function Bench({ ctx }: { ctx: AppContext }) {
         </div>
         <div>
           <Reveal as="h2" className="t-display-m mb-6" decode="The drawer" />
-          <p className="mb-4 text-sm text-muted">Labs: places to try effects, the script and motion by hand.</p>
-          <ul>
+          <p className="mb-4 text-sm text-muted">Studio, builds, print tools and experiments stay here when you need them.</p>
+          <details className="mb-4 border-t border-white/10 py-4"><summary className="cursor-pointer text-sm">More tools</summary><ul className="mt-4 space-y-3"><li><Link href="/studio">Studio: artwork, music and design</Link></li>{secondary.map(s=><li key={s.slug}><Link href={`/workshop/${s.slug}`}>{s.label}</Link></li>)}</ul></details>
+          <details><summary className="cursor-pointer text-sm">Experimental labs</summary><ul className="mt-4">
             {labs.map((s) => (
               <li key={s.slug}>
                 <Link href={`/workshop/${s.slug}`} className="group flex items-baseline justify-between gap-3 border-t border-white/[0.08] py-3 no-underline">
@@ -159,11 +162,12 @@ export async function Bench({ ctx }: { ctx: AppContext }) {
                 </Link>
               </li>
             ))}
-          </ul>
+          </ul></details>
         </div>
       </section>
 
-      {/* Machines and the log. */}
+      {/* Operational tools are secondary to the story workspace. */}
+      <details className="mb-10"><summary className="cursor-pointer text-sm text-muted">Print activity and recent changes</summary>
       <div className="mb-20 grid gap-12 lg:grid-cols-2">
         <section aria-labelledby="h-prints">
           <h2 id="h-prints" className="tracked mb-4 flex items-center justify-between text-[0.6rem] text-faint">
@@ -203,6 +207,7 @@ export async function Bench({ ctx }: { ctx: AppContext }) {
         </section>
       </div>
 
+      </details>
       {/* The ledger of unresolved lore. */}
       <section aria-labelledby="open-questions-h" id="open-questions" className="mb-12 scroll-mt-32">
         <h2 id="open-questions-h" className="t-display-m mb-2">

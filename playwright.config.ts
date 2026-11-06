@@ -25,7 +25,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], launchOptions: executablePath ? { executablePath } : {} } }],
   webServer: {
-    command: `npx next start -p ${PORT}`,
+    command: `npx next start --hostname 127.0.0.1 -p ${PORT}`,
     url: `http://localhost:${PORT}/setup`,
     reuseExistingServer: false,
     timeout: 60_000,

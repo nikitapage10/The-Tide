@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState, Notice } from "@/components/ui/States";
 import { publicScope } from "@/lib/domain/audience";
 import { ARCHIVE_AGENTS, workOrders, type AgentId, type WorkOrder } from "@/lib/domain/work-orders";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 
 export const metadata = { title: "C.E.O. desk" };
 
@@ -24,7 +24,7 @@ const KIND: Record<WorkOrder["kind"], string> = {
 };
 
 export default async function CeoDeskPage() {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const closed = ctx.audience !== "gm" && publicScope() === "tiered";
   const [state, checklist, sessions] = closed
     ? [null, [], []]

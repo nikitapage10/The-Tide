@@ -1,13 +1,7 @@
-import { SectionOverview } from "@/components/records/EntityPages";
-import { WorldOverview } from "@/components/world/WorldOverview";
-import { requirePageContext } from "@/lib/server/page-context";
+import { redirect } from "next/navigation";
 import type { SearchParams } from "@/lib/server/params";
-
-export const metadata = { title: "The World" };
-
-export default async function Page({ searchParams }: { searchParams: SearchParams }) {
-  const ctx = await requirePageContext();
-  // Filtering (?q=, ?tag=, ...) shows the index; otherwise the atlas.
-  if (Object.keys(await searchParams).length) return <SectionOverview ctx={ctx} section="world" searchParams={searchParams} />;
-  return <WorldOverview state={await ctx.publicationStore.getActiveState()} />;
+export default async function Page({searchParams}:{searchParams:SearchParams}) {
+ const query = new URLSearchParams({view:"all"});
+ for(const [key,value] of Object.entries(await searchParams)) if(typeof value === "string") query.set(key,value);
+ redirect("/codex?"+query.toString());
 }

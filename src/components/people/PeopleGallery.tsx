@@ -43,7 +43,7 @@ export function PeopleGallery({ state }: { state: PublishedState }) {
         <div className="mb-6 flex items-end justify-between gap-6">
           <Reveal as="h2" className="t-display-m" decode="The hall" />
           <p id="hall-h" className="hidden max-w-sm text-right text-sm text-muted sm:block">
-            The eight peoples of the world. Portraits from the GM&rsquo;s documents.
+            The nine peoples of Ilyr. Portraits from the GM&rsquo;s documents.
           </p>
         </div>
         <ol className="corridor -mx-1 flex gap-5 overflow-x-auto px-1 pb-4">

@@ -158,3 +158,29 @@ On an explicit request to publish, follow the existing `publish:lore` or
 `publish:bundle` workflow in AGENTS.md. The publisher rebases against the live
 release, validates, and records a release that can be rolled back. No production
 publication was performed in this migration.
+
+
+## Codex and authoring update (November 6, 2026)
+
+The GM authorized publishing the complete-source release and simplifying the
+interior pages. The homepage artwork, chapter layout, motion, and eight existing
+people illustration slots are preserved. All nine peoples appear in `/codex`.
+World and People lead to the combined Codex, with collection tabs on that page.
+The shared header and menu stay unchanged. Workshop, Studio,
+and experimental labs require GM access. `/world` and `/people` redirect to
+Codex; old entry URLs remain valid.
+
+`/workshop/planning` starts two years after the upheaval. Starting-region and
+first-storyline records are prompts tagged `working draft`, not established lore.
+`/workshop/drafts` stores edits, comments, and append-only revisions in existing
+RLS-protected `gm_notes`, using versioned JSON prefixes. This avoids exposing
+new private writing through the published-record tables. Full older source
+material remains in the public GitHub repository and the pre-existing public
+Data API policies; reader summaries are a curated view, not retroactive secrecy.
+
+The `Publish lore` GitHub workflow publishes the approved active fixture on
+changes, using the existing `SUPABASE_DB_URL` repository secret. It tests the
+Postgres adapter in a throwaway cluster first, previews through PublicationService,
+and commits through the same atomic release RPC. No credentials are written to
+files or logs. Published releases retain the existing rollback workflow. The
+script also supports the original Supabase server-key path.

@@ -3,12 +3,12 @@ import { Badge, DemoBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/States";
 import { safeHref } from "@/lib/contract/safety";
 import { listRecords } from "@/lib/domain/queries";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 
 export const metadata = { title: "Sources" };
 
 export default async function SourcesPage() {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const state = await ctx.publicationStore.getActiveState();
   const sources = listRecords(state, "source", { includeArchived: true });
   return (

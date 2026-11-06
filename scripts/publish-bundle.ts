@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { uuidV5 } from "../src/lib/contract/ids";
 import { SupabaseStore } from "../src/lib/data/supabase-store";
+import { PostgresPublicationStore } from "./postgres-publication-store";
 import { PublicationService } from "../src/lib/domain/publication";
 
 const PROJECT = process.env.TIDE_PROJECT_ID || "333ea628-f6a1-4f3a-8b83-ce98d12f2565";
@@ -21,17 +22,23 @@ async function main() {
   const file = process.argv[2];
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!file || !url || !key) {
+  if (!file || (!process.env.SUPABASE_DB_URL && (!url || !key))) {
     console.error("usage: SUPABASE_URL=… SUPABASE_SECRET_KEY=… npm run publish:bundle -- <bundle.json>");
     process.exit(2);
   }
-  const store = new SupabaseStore(createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }), PROJECT);
+  const store = process.env.SUPABASE_DB_URL
+    ? new PostgresPublicationStore(process.env.SUPABASE_DB_URL, PROJECT)
+    : new SupabaseStore(createClient(url!, key!, { auth: { persistSession: false, autoRefreshToken: false } }), PROJECT);
   const state = await store.getActiveState();
   const raw = JSON.parse(readFileSync(file, "utf8"));
   // Prepared against what is live now; archive steps for records this site never had are dropped.
   const operations = (raw.operations as { op: string; targetId?: string }[]).filter((o) => o.op !== "archive" || (o.targetId && state.records[o.targetId]));
   const bundle = { ...raw, operations, baseReleaseId: state.releaseId, releaseId: uuidV5(PROJECT, `${raw.releaseId}:${state.releaseId ?? "first"}`) };
   const svc = new PublicationService(store, PROJECT);
+  if (process.env.TIDE_SKIP_UNCHANGED === "true") {
+    const same = await svc.preview({ ...bundle, bundleHash: undefined });
+    if (same.ok && !same.counts.added && !same.counts.changed && !same.counts.archived && !same.counts.restored && !same.counts.tombstoned) { console.log("Already published; no changes."); return; }
+  }
   const preview = await svc.preview(bundle);
   console.log(`live: v${state.version} · this bundle:`, preview.counts);
   for (const i of preview.issues) console.log(`  ${i.severity} ${i.code} ${i.path ?? ""} ${i.message}`);

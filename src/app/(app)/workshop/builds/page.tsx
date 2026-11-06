@@ -5,12 +5,12 @@ import { Badge, DemoBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/States";
 import { linkOptions } from "@/lib/domain/link-options";
 import { BUILD_CATEGORIES } from "@/lib/domain/types";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 
 export const metadata = { title: "Builds" };
 
 export default async function BuildsPage() {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const [builds, state] = await Promise.all([ctx.operationalStore.listBuilds(), ctx.publicationStore.getActiveState()]);
   return (
     <>

@@ -74,6 +74,7 @@ test("the Arrival can be heard: on the home story and on its Library page", asyn
 
 test("the C.E.O. desk: the Archive's agents and the Tide's own work orders", async ({ page, request }) => {
   await page.goto("/workshop");
+  await page.getByText("More tools", {exact:true}).click();
   await page.getByRole("link", { name: /C\.E\.O\. desk/ }).first().click();
   await expect(page.getByRole("heading", { name: "In the Archive" })).toBeVisible();
   await expect(page.getByText("Loremaster", { exact: true }).first()).toBeVisible();
@@ -107,18 +108,16 @@ test("keyboard: skip link first, visible focus, search by Unicode-insensitive na
   await axe(page);
 });
 
-test("filters and two-way relationship navigation", async ({ page }) => {
-  await page.goto("/people?tag=the+eight+peoples");
-  await expect(page.getByRole("heading", { name: "8 entries matching filters" })).toBeVisible();
-  await page.getByRole("link", { name: "Nyth'rok" }).first().click();
-  // The world itself: Ilyr.
-  await page.getByRole("link", { name: "Ilyr", exact: true }).first().click();
-  await expect(page.getByRole("heading", { level: 1, name: "Ilyr" })).toBeVisible();
-  const peoples = page.getByRole("definition").filter({ has: page.getByRole("link", { name: "Umbrasa" }) });
-  await expect(peoples.getByRole("link")).toHaveCount(8);
-  await page.goto("/world?canon=demo&status=all");
-  await expect(page.getByRole("link", { name: "Demo place" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Cataclysms", exact: true })).toHaveCount(0);
+test("the Codex gathers nine peoples and searches their source text", async ({ page }) => {
+  await page.goto("/people");
+  await expect(page.getByRole("heading", {level:1,name:"The Codex"})).toBeVisible();
+  await expect(page.getByText(/^9 entries/)).toBeVisible();
+  await page.getByLabel("Search this collection").fill("Humans");
+  await page.getByRole("button", {name:"Search",exact:true}).click();
+  await page.getByRole("link", {name:/Humans/}).first().click();
+  await expect(page.getByRole("heading", {level:1,name:"Humans"})).toBeVisible();
+  await page.goto("/world");
+  await expect(page).toHaveURL(/codex\?view=all/);
 });
 
 test("session live state, checklist and GM notes work and appear on the bench", async ({ page }) => {
@@ -144,14 +143,15 @@ test("session live state, checklist and GM notes work and appear on the bench", 
   await page.goto("/workshop");
   await expect(page.getByRole("link", { name: "Demo session 1" }).first()).toBeVisible();
   await expect(page.getByText("2099-01-15")).toBeVisible();
+  await page.getByText("Print activity and recent changes", {exact:true}).click();
   await expect(page.getByText("Prep item completed: \"E2E prep item\"")).toBeVisible();
   await expect(page.getByText("E2E private note")).toHaveCount(0);
 });
 
 test("each section is its own instrument, accessible, with the world named Ilyr", async ({ page }) => {
   const rooms: [string, string][] = [
-    ["/world", "Ilyr"],
-    ["/people", "The Peoples"],
+    ["/world", "The Codex"],
+    ["/people", "The Codex"],
     ["/stories", "The Library"],
     ["/studio", "The Studio"],
   ];
@@ -164,11 +164,11 @@ test("each section is its own instrument, accessible, with the world named Ilyr"
     await page.waitForTimeout(1600);
     await axe(page);
   }
-  await page.goto("/world");
-  await expect(page.getByRole("img", { name: /globe of the world/ })).toBeVisible();
-  await expect(page.getByLabel("Timeline, scrolls sideways")).toBeVisible();
-  await page.goto("/people");
-  await expect(page.getByRole("group", { name: /peoples, their factions/ })).toBeVisible();
+  await page.goto("/codex?view=peoples");
+  await expect(page.getByRole("link", {name:/Humans/}).first()).toBeVisible();
+  await page.goto("/workshop/planning");
+  await expect(page.getByRole("heading", {level:1})).toBeVisible();
+
 });
 
 test("print job dialog: keyboard, validation, create and record attempts", async ({ page }) => {
@@ -243,6 +243,8 @@ test("small screens: no horizontal scroll and a working menu", async ({ page }) 
   await page.setViewportSize({ width: 360, height: 760 });
   for (const url of ["/", "/world", "/people", "/stories", "/studio", "/workshop", `/people/entry/${ID.p_teruanga}`, `/stories/sessions/${ID.ss_1}`, "/workshop/prints", "/workshop/publishing"]) {
     await page.goto(url);
+    if (url === "/world" || url === "/people") await page.waitForURL(/\/codex/);
+    await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, url).toBeLessThanOrEqual(0);
   }
@@ -266,4 +268,23 @@ test("HTTP hygiene: no GET mutations, no caching, empty and unknown states", asy
   await expect(page.getByText("No results for “zzzzqqq”.")).toBeVisible();
   await page.goto(`/studio/item/${ID.m_private}`);
   await expect(page.getByText("Private asset unavailable")).toBeVisible();
+});
+
+
+test("private drafts retain revisions and development notes", async ({page}) => {
+  await page.goto('/workshop/drafts/new');
+  await page.getByLabel('Title', {exact:true}).fill('E2E proposed starting region');
+  await page.getByLabel('Working text').fill('A private possibility for our opening.');
+  await page.getByRole('button',{name:'Save private draft'}).click();
+  await expect(page).toHaveURL(/workshop\/drafts\/[0-9a-f-]{36}$/);
+  await page.reload();
+  await expect(page.getByLabel('Working text')).toHaveValue('A private possibility for our opening.');
+  await page.getByLabel('Working text').fill('A second private possibility.');
+  await page.getByRole('button',{name:'Save private draft'}).click();
+  await expect(page.getByLabel('Working text')).toHaveValue('A second private possibility.');
+  await expect(page.getByText(/Revision 2/)).toBeVisible();
+  await page.getByLabel('Add a development note').fill('We still need the local conflict.');
+  await page.getByRole('button',{name:'Save note',exact:true}).click();
+  await expect(page.getByText('We still need the local conflict.',{exact:true})).toBeVisible();
+  await axe(page);
 });

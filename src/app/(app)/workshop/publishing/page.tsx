@@ -6,14 +6,14 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { Card, SectionHeading } from "@/components/ui/Card";
 import { EmptyState, Notice } from "@/components/ui/States";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 
 export const metadata = { title: "Publishing" };
 
 const fmt = (iso: string) => new Date(iso).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC";
 
 export default async function PublishingPage() {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const [project, releases, events] = await Promise.all([
     ctx.publicationStore.getProject(),
     ctx.publicationStore.listReleases(),

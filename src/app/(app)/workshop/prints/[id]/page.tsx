@@ -8,13 +8,13 @@ import { Card, SectionHeading } from "@/components/ui/Card";
 import { safeHref } from "@/lib/contract/safety";
 import { linkOptions } from "@/lib/domain/link-options";
 import { resolveRef } from "@/lib/domain/queries";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 
 const show = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? <span className="text-faint">Not recorded</span> : v);
 
 export default async function PrintJobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const job = await ctx.operationalStore.getPrintJob(id);
   if (!job) notFound();
   const [attempts, state] = await Promise.all([ctx.operationalStore.listPrintAttempts(id), ctx.publicationStore.getActiveState()]);

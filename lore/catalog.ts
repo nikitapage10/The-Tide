@@ -8,8 +8,8 @@
  * - `body` is either literal Markdown or a reference to a document (and
  *   optionally one section of it), copied verbatim.
  * - Summaries are short and quiet; the documents hold the detail.
- * - The world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for "light that
- *   remains"; adjective Ilyan. (Primus was its working name.)
+ * - The world is Ilyr (ih-LEER, /ɪˈliːr/); adjective Ilyan. Its etymology is
+ *   unresolved in the current Tide 101. Primus was its working name.
  */
 import type { CanonStatus, EntityKind, Era, Visibility } from "../src/lib/contract/schema";
 
@@ -101,7 +101,7 @@ export const ENTITIES: EntityEntry[] = [
     kind: "place",
     title: "Ilyr",
     aliases: ["Earth"],
-    summary: "The world of The Tide: Earth, long after. Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for \u201clight that remains\u201d.",
+    summary: "The world of The Tide: a transformed future Earth, known today as Ilyr. Its adjective is Ilyan (ill-ee-an).",
     body: P("tide-101", "Terminology"),
     era: "today",
     tags: ["the world"],
@@ -411,7 +411,7 @@ export const ENTITIES: EntityEntry[] = [
     body: { doc: "humans" },
     tags: ["the nine peoples"],
     canon: "provisional",
-    visibility: "gm_only",
+    visibility: "public",
     source: "humans",
   },
   {
@@ -421,8 +421,20 @@ export const ENTITIES: EntityEntry[] = [
     summary: "The working present for new campaigns and stories: roughly two years after the Tide’s major upheaval.",
     body: "This is the GM’s current planning anchor, not a claim that every surviving source has been chronologically reconciled. The starting region, first storyline, surviving infrastructure, and ongoing frequency of the Three Consequences remain to be developed.",
     era: "today",
-    tags: ["post-Tide", "starting region", "working premise"],
+    tags: ["post-Tide", "starting region", "working premise", "working draft"],
     canon: "provisional",
+    visibility: "gm_only",
+  },
+
+  {
+    name: "place/starting-region",
+    kind: "place",
+    title: "The starting region",
+    summary: "An open working brief for the first settlement and the places around it.",
+    body: "## The settlement\n\nName and location: undecided.\n\nWhat makes it habitable? Who lived here before, and who arrived after the upheaval? What do they stand to lose?\n\n## The surroundings\n\nChoose three nearby places people have reasons to visit. Identify one dependable route and one broken connection.\n\n## The pressures\n\nOne dependable resource. One worsening shortage. Three groups with incompatible immediate goals. These details are not established yet.",
+    era: "today",
+    tags: ["working draft", "post-Tide"],
+    canon: "unverified",
     visibility: "gm_only",
   },
 
@@ -523,7 +535,7 @@ export const QUESTIONS: QuestionEntry[] = [
   {
     name: "question/world-name",
     title: "The world's name",
-    summary: "Settled: the world is Ilyr (ih-LEER, /ɪˈliːr/), from the Teruānga for “light that remains”; adjective Ilyan. The documents' working name was replaced throughout.",
+    summary: "The world is Ilyr; its adjective is Ilyan (ill-ee-an). The current Tide 101 leaves the name’s origin open; older etymology notes are not treated as settled here.",
     status: "resolved",
     related: ["world/primus"],
   },

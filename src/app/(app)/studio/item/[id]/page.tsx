@@ -14,11 +14,11 @@ import { safeHref } from "@/lib/contract/safety";
 import { resolveRef } from "@/lib/domain/queries";
 import { isImageUrl } from "@/lib/domain/views";
 import { Plate } from "@/components/tide/Plate";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 
 export default async function StudioItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const state = await ctx.publicationStore.getActiveState();
   const rs = state.records[id];
   if (!rs?.record || rs.record.type !== "media") notFound();

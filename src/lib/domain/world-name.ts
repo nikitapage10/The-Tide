@@ -7,7 +7,7 @@
 export const WORLD_NAME = "Ilyr";
 export const WORLD_ADJECTIVE = "Ilyan";
 export const WORLD_ADJECTIVE_PRONUNCIATION = "ill-ee-an";
-export const WORLD_NAME_MEANING = "light that remains";
+export const WORLD_NAME_MEANING: string | null = null;
 export const WORLD_NAME_PRONUNCIATION = "ih-LEER · /ɪˈliːr/";
 
 /** Old working names, with their possessives. */

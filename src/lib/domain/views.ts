@@ -22,7 +22,7 @@ export function isImageUrl(url: string): boolean {
 export const isEnclave = (e: EntityRecord) => e.kind === "people" && (e.tags ?? []).includes("enclave");
 
 export function peoples(state: PublishedState): Listed<EntityRecord>[] {
-  return listRecords(state, "entity").filter((e) => e.record.kind === "people" && !isEnclave(e.record));
+  return homePeoples(state);
 }
 
 export function enclaves(state: PublishedState): Listed<EntityRecord>[] {
@@ -104,4 +104,13 @@ export function consequences(state: PublishedState) {
     { kind: "divergence" as const, entry: find(/^(the )?divergence$/i) },
     { kind: "drift" as const, entry: find(/^(the )?drift$/i) },
   ];
+}
+
+/** Preserve the homepage's existing eight illustration slots and their order.
+ * New peoples and their full records are available in the Codex. */
+const HOME_ORDER = ["Nyth'rok", "Obscarron", "Resonara", "Teruānga", "Umbrasa", "Blightmourn", "Irridosai", "Syntherion"];
+export function homePeoples(state: PublishedState): Listed<EntityRecord>[] {
+  const normalized = (title:string) => title.replace(/’/g, "'");
+  return listRecords(state, "entity").filter(p=>p.record.kind === "people" && !isEnclave(p.record) && HOME_ORDER.includes(normalized(p.record.title)))
+    .sort((a,b)=>HOME_ORDER.indexOf(normalized(a.record.title))-HOME_ORDER.indexOf(normalized(b.record.title)));
 }

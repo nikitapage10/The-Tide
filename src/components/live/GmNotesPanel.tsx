@@ -1,4 +1,5 @@
 "use client";
+import { isDraftNote } from "@/lib/domain/drafts";
 import { useState } from "react";
 import type { GmNote } from "@/lib/domain/types";
 import { DemoBadge } from "@/components/ui/Badge";
@@ -8,6 +9,7 @@ import { useCanEdit } from "@/components/shell/EditAccess";
 import { useMutation } from "./useMutation";
 
 export function GmNotesPanel({ subjectId, notes }: { subjectId: string; notes: GmNote[] }) {
+  notes = notes.filter(n => !isDraftNote(n.body));
   const m = useMutation();
   const canEdit = useCanEdit();
   const [body, setBody] = useState("");

@@ -166,6 +166,9 @@ operations.push({
   },
 });
 
+// A private, editable outline; no location, characters or incident is invented.
+operations.push({op:"upsert", record:{id:idOf("story/first-storyline"),type:"story",title:"The first storyline",summary:"Find the incident that brings the characters together in the starting region.",body:"## Opening incident\n\nWhat specific event draws the characters together? Who needs help, and why can’t existing authorities resolve it?\n\n## People and choices\n\nA person protecting something. A person who benefits from the situation. A person whose understandable choice makes it worse.\n\nWhat happens if nobody intervenes? What can the characters change?\n\nAim for three sessions and a related short story. None of these details is established yet.",format:"campaign",continuity:"story_specific",draftStatus:"outlining",tags:["working draft","post-Tide"],canonStatus:"unverified",visibility:"gm_only",demo:false}});
+
 // Relationships.
 for (const r of RELATIONS) {
   operations.push({

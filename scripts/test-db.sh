@@ -24,4 +24,8 @@ OUT="$ROOT/.tmp-pg/results.txt"
 "${PSQL[@]}" -f "$ROOT/tests/db/rls.test.sql" 2>&1 | tee "$ROOT/.tmp-pg/raw.txt" | sed -n "s/.*NOTICE:  //p" | tee "$OUT"
 PASS=$(grep -c '^ok - ' "$OUT" || true); FAIL=$(grep -c '^not ok - ' "$OUT" || true)
 echo "SQL tests: $PASS passed, $FAIL failed"
-[ "$FAIL" = "0" ] && [ "$PASS" -gt 0 ]
+if [ "$FAIL" != "0" ] || [ "$PASS" -eq 0 ]; then exit 1; fi
+
+# Exercise the same PostgreSQL adapter used by the production lore workflow.
+"${PSQL[@]}" -f "$ROOT/supabase/seed.sql"
+TIDE_TEST_DB_URL="postgresql://postgres@localhost/postgres?host=$SOCK&port=$PORT" npx tsx scripts/test-publication-db.ts

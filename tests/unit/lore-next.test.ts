@@ -10,7 +10,7 @@ async function applyNext(afterCurrent = false) {
   const { store, publication } = await setup();
   if (afterCurrent) await publication.publish(clone(current), GM);
   const base = await store.getActiveState();
-  const bundle = { ...clone(next), baseReleaseId: base.releaseId };
+  const bundle = { ...clone(next), baseReleaseId: base.releaseId, ...(afterCurrent ? {releaseId:recordId(PROJECT,"release/test-current-refresh")} : {}) };
   const preview = await publication.preview(bundle);
   expect(preview.issues.filter(i => i.severity === 'error')).toEqual([]);
   expect((await publication.publish(bundle, GM)).status).toBe('applied');
@@ -35,14 +35,14 @@ describe('complete Ilyr source pack (staged, not automatically published)', () =
     expect(state.records[recordId(PROJECT, 'world-mechanic/post-tide-present')]?.record?.visibility).toBe('gm_only');
   });
 
-  it('keeps unresolved legacy institutions private and does not change the bootstrap fixture', async () => {
+  it('keeps unresolved legacy institutions private and keeps the complete bootstrap fixture', async () => {
     const { store } = await applyNext();
     const state = await store.getActiveState();
     for (const name of ['faction/mass-weavers', 'institution/gravitar']) {
       expect(state.records[recordId(PROJECT, name)]?.record).toMatchObject({ visibility:'gm_only', canonStatus:'unverified' });
     }
-    expect(next.releaseId).not.toBe(current.releaseId);
-    expect(current.operations.some(o => 'record' in o && o.record?.type === 'entity' && o.record.title === 'Humans')).toBe(false);
+    expect(next.releaseId).toBe(current.releaseId);
+    expect(current.operations.some(o => 'record' in o && o.record?.type === 'entity' && o.record.title === 'Humans')).toBe(true);
   });
 
   it('preserves GM notes through publication', async () => {

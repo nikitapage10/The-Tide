@@ -2,13 +2,13 @@ import { SectionIntro } from "@/components/tide/SectionIntro";
 import { Notice } from "@/components/ui/States";
 import { Bench } from "@/components/workshop/Bench";
 import { publicScope } from "@/lib/domain/audience";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 import { ART } from "@/lib/art";
 
 export const metadata = { title: "The Workshop" };
 
 export default async function WorkshopPage() {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   // The bench is the GM's (visitors see it only in the open preview).
   const closed = ctx.audience !== "gm" && publicScope() === "tiered";
   return (

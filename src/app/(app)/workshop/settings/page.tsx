@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, SectionHeading } from "@/components/ui/Card";
 import { Notice } from "@/components/ui/States";
 import { configSummary } from "@/lib/server/config";
-import { requirePageContext } from "@/lib/server/page-context";
+import { requireGmPageContext } from "@/lib/server/page-context";
 
 export const metadata = { title: "Connection & settings" };
 
@@ -20,7 +20,7 @@ function Row({ label, ok, okText = "Set", missingText = "Not set" }: { label: st
 }
 
 export default async function SettingsPage() {
-  const ctx = await requirePageContext();
+  const ctx = await requireGmPageContext();
   const c = configSummary();
   const project = await ctx.publicationStore.getProject();
   return (

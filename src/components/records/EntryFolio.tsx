@@ -52,7 +52,7 @@ export async function EntryFolio({ ctx, state, rs, section }: { ctx: AppContext;
           <Notice title="Demonstration record">This record exists to show how the interface works. It is not canon.</Notice>
         </div>
       ) : null}
-      {isPeople ? <PeopleFolio state={state} r={r} section={section} /> : <Specimen state={state} r={r} section={section} />}
+      {isPeople ? <PeopleFolio state={state} r={r} section={section} reader={!ctx.canEdit} /> : <Specimen state={state} r={r} section={section} />}
       {ledger}
     </article>
   );
@@ -61,8 +61,8 @@ export async function EntryFolio({ ctx, state, rs, section }: { ctx: AppContext;
 function Crumbs({ section, r }: { section: "world" | "people"; r: EntityRecord }) {
   return (
     <nav aria-label="Breadcrumb" className="tracked mb-6 flex flex-wrap items-center gap-2 text-[0.62rem] text-faint">
-      <Link href={`/${section}`} className="text-faint no-underline hover:text-white">
-        {section === "people" ? "People" : "The World"}
+      <Link href={`/codex?view=${section === "people" ? "peoples" : "all"}`} className="text-faint no-underline hover:text-white">
+        Codex
       </Link>
       <span aria-hidden="true">/</span>
       <span>{isEnclave(r) ? "Enclave" : r.kind === "people" ? "Peoples" : ENTITY_KIND_LABEL[r.kind]}</span>
@@ -79,7 +79,7 @@ function Title({ r, className = "t-display-l" }: { r: EntityRecord; className?: 
 }
 
 /** A people or an enclave: the folio. */
-function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRecord; section: "world" | "people" }) {
+function PeopleFolio({ state, r, section, reader }: { state: PublishedState; r: EntityRecord; section: "world" | "people"; reader: boolean }) {
   const portrait = imageFor(state, r.id) ?? (isEnclave(r) ? arrival(r.title) : null);
   const key = peopleKey(r.title);
   const land = homeland(key);
@@ -130,7 +130,7 @@ function PeopleFolio({ state, r, section }: { state: PublishedState; r: EntityRe
           </div>
 
           {!r.body ? (
-            <p className="mt-12 max-w-xl text-muted">Source material has not been supplied. This people is still being written.</p>
+            <p className="mt-12 max-w-xl text-muted">{reader ? "This introduction covers the shared foundations. Detailed histories remain in the GM’s archive." : "Source material has not been supplied. This people is still being written."}</p>
           ) : null}
           {intro ? (
             <section id="overview" aria-label="Overview" className="reading drop-cap mt-14 scroll-mt-32">
@@ -440,7 +440,7 @@ async function Ledger({ ctx, state, r }: { ctx: AppContext; state: PublishedStat
           <GmNotesPanel subjectId={r.id} notes={notes} />
         </div>
       </div>
-      <p className="mt-8 text-xs text-faint">Read-only. To change this entry, edit it in its ChatGPT space and publish a new release.</p>
+      <p className="mt-8 text-xs text-faint">Source entries are versioned. Discuss changes in the GM notes, or develop a separate working draft in the Workshop.</p>
     </section>
   );
 }

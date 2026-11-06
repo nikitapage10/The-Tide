@@ -13,3 +13,10 @@ export async function requirePageContext(): Promise<AppContext> {
   await ensureLore(result.ctx);
   return result.ctx;
 }
+
+/** Private authoring tools are never available through the public preview. */
+export async function requireGmPageContext(): Promise<AppContext> {
+  const ctx = await requirePageContext();
+  if (!ctx.canEdit) redirect("/login");
+  return ctx;
+}
