@@ -45,7 +45,7 @@ async function main() {
     "Postgres publisher: seed, complete lore, replay, history and nine full peoples verified.",
   );
 }
-main().catch(() => {
-  console.error("Postgres publisher integration test failed.");
+main().catch((error) => {
+  console.error("Postgres publisher integration test failed:", error instanceof Error ? error.message : "Unknown failure");
   process.exit(1);
 });

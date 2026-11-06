@@ -69,7 +69,7 @@ export class PostgresPublicationStore implements PublicationStore {
       throw new Error(
         "Database publication query failed. Credentials and submitted text have been omitted.",
       );
-    return JSON.parse(result.stdout.trim()) as T;
+    return JSON.parse(result.stdout.trim() || "null") as T;
   }
   async getProject(): Promise<ProjectInfo> {
     const p = this.query<Record<string, unknown> | null>(
